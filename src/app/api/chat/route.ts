@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { question, cvText, apiKey } = await req.json();
+    const { question, cvText, apiKey, systemPrompt } = await req.json();
 
     // Use environment variable first, fallback to the one passed from local storage, then the provided hardcoded key
     const geminiKey = process.env.Gemini_API_Key || apiKey || 'AIzaSyAm5EY1ZQDfhbAa6j1iXZG1cQuKiRwQ0Zo';
@@ -14,9 +14,13 @@ export async function POST(req: Request) {
     // Truncate CV to avoid token limits
     const safeCvText = cvText ? cvText.substring(0, 20000) : '';
 
-    const prompt = `You are an expert AI interview assistant helping a candidate. You are acting AS the candidate. 
+    const defaultSystemPrompt = `You are an expert AI interview assistant helping a candidate. You are acting AS the candidate. 
 Based on the following CV, answer the interview question professionally, confidently, and concisely.
-Use the first person ("I", "my"). Keep the answer under 4 sentences so it is easy to read and say aloud.
+Use the first person ("I", "my"). Keep the answer under 4 sentences so it is easy to read and say aloud.`;
+
+    const finalSystemPrompt = systemPrompt || defaultSystemPrompt;
+
+    const prompt = `${finalSystemPrompt}
 
 CV Content:
 ${safeCvText}

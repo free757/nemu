@@ -386,7 +386,11 @@ export default function Dashboard() {
           const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question, cvText: profile.cv_text })
+            body: JSON.stringify({ 
+              question, 
+              cvText: profile.cv_text,
+              systemPrompt: profile.system_prompt 
+            })
           });
           const data = await res.json();
           if (data.error) throw new Error(data.error);
@@ -810,71 +814,103 @@ export default function Dashboard() {
                   </button>
 
                   {selectedProfileId && (
-                    <>
-                      <input 
-                        type="file" 
-                        accept="audio/mp3, audio/wav, audio/mpeg, audio/x-m4a, audio/mp4"
-                        id="voice-upload"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleVoiceUpload(file);
-                        }}
-                      />
-                      <div className="flex gap-2 w-full max-w-md">
-                        <input 
-                          type="text"
-                          placeholder="Paste ElevenLabs Voice ID here..."
-                          defaultValue={interviewProfiles.find(p => p.id === selectedProfileId)?.voice_id || ''}
-                          id="manual-voice-id"
-                          className={`flex-1 p-4 rounded-xl border outline-none font-mono text-sm ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-blue-400' : 'bg-gray-50 border-gray-200 text-blue-600'}`}
+                    <div className="w-full max-w-md space-y-6">
+                      {/* Voice Settings */}
+                      <div className="space-y-4">
+                        <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            placeholder="Paste ElevenLabs Voice ID here..."
+                            defaultValue={interviewProfiles.find(p => p.id === selectedProfileId)?.voice_id || ''}
+                            id="manual-voice-id"
+                            className={`flex-1 p-4 rounded-xl border outline-none font-mono text-sm ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-blue-400' : 'bg-gray-50 border-gray-200 text-blue-600'}`}
+                          />
+                          <button 
+                            onClick={async () => {
+                              const val = (document.getElementById('manual-voice-id') as HTMLInputElement).value;
+                              try {
+                                const { error } = await supabase
+                                  .from('interview_profiles')
+                                  .update({ voice_id: val })
+                                  .eq('id', selectedProfileId);
+                                if (error) throw error;
+                                alert(lang === 'ar' ? 'تم تحديث معرف الصوت!' : 'Voice ID updated!');
+                                fetchProfiles();
+                              } catch (e: any) {
+                                alert(e.message);
+                              }
+                            }}
+                            className="px-6 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all"
+                          >
+                            Update
+                          </button>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <input 
+                            type="file" 
+                            accept="audio/*"
+                            id="voice-upload"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleVoiceUpload(file);
+                            }}
+                          />
+                          <button 
+                            disabled={isCloningVoice || isRecordingVoice}
+                            onClick={() => document.getElementById('voice-upload')?.click()}
+                            className={`flex-1 py-4 border border-dashed rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${theme === 'dark' ? 'border-white/20 hover:border-purple-500 hover:bg-purple-500/10' : 'border-gray-300 hover:border-purple-500 hover:bg-purple-50'}`}
+                          >
+                            {isCloningVoice && !isRecordingVoice ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                            <span>Upload</span>
+                          </button>
+                          
+                          <button 
+                            disabled={isCloningVoice}
+                            onClick={isRecordingVoice ? stopRecordingVoice : startRecordingVoice}
+                            className={`flex-1 py-4 border border-dashed rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${isRecordingVoice ? 'border-red-500 bg-red-500/10 text-red-500 animate-pulse' : theme === 'dark' ? 'border-white/20 hover:border-red-500 hover:bg-red-500/10' : 'border-gray-300 hover:border-red-500 hover:bg-red-50'}`}
+                          >
+                            {isRecordingVoice ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                            <span>{isRecordingVoice ? 'Stop' : 'Record'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* AI Instructions (System Prompt) */}
+                      <div className="space-y-2 text-left pt-4 border-t border-white/5">
+                        <label className="text-sm font-bold text-gray-500 ml-1">
+                          {lang === 'ar' ? 'تعليمات الذكاء الاصطناعي (System Prompt):' : 'AI Instructions (System Prompt):'}
+                        </label>
+                        <textarea 
+                          rows={4}
+                          key={selectedProfileId} // Force re-render when profile changes to update defaultValue
+                          defaultValue={interviewProfiles.find(p => p.id === selectedProfileId)?.system_prompt || ''}
+                          id="manual-system-prompt"
+                          className={`w-full p-4 rounded-xl border outline-none text-sm ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}
+                          placeholder="Tell the AI how to behave..."
                         />
                         <button 
                           onClick={async () => {
-                            const val = (document.getElementById('manual-voice-id') as HTMLInputElement).value;
-                            if(!val) return;
+                            const val = (document.getElementById('manual-system-prompt') as HTMLTextAreaElement).value;
                             try {
                               const { error } = await supabase
                                 .from('interview_profiles')
-                                .update({ voice_id: val })
+                                .update({ system_prompt: val })
                                 .eq('id', selectedProfileId);
                               if (error) throw error;
-                              alert(lang === 'ar' ? 'تم تحديث معرف الصوت!' : 'Voice ID updated!');
+                              alert(lang === 'ar' ? 'تم تحديث التعليمات بنجاح!' : 'Instructions updated successfully!');
                               fetchProfiles();
                             } catch (e: any) {
                               alert(e.message);
                             }
                           }}
-                          className="px-6 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all"
+                          className="w-full py-3 bg-blue-600/10 text-blue-500 border border-blue-500/20 rounded-xl font-bold hover:bg-blue-600/20 transition-all"
                         >
-                          Update
+                          {lang === 'ar' ? 'حفظ التعليمات' : 'Save Instructions'}
                         </button>
                       </div>
-
-                      <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                        <span>Tip: Get IDs from <a href="https://elevenlabs.io/app/voice-library" target="_blank" className="text-blue-500 underline">ElevenLabs Voice Library</a></span>
-                      </div>
-
-                      <div className="flex gap-2 w-full max-w-md">
-                        <button 
-                          disabled={isCloningVoice || isRecordingVoice}
-                          onClick={() => document.getElementById('voice-upload')?.click()}
-                          className={`flex-1 py-4 border border-dashed rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${theme === 'dark' ? 'border-white/20 hover:border-purple-500 hover:bg-purple-500/10' : 'border-gray-300 hover:border-purple-500 hover:bg-purple-50'}`}
-                        >
-                          {isCloningVoice && !isRecordingVoice ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                          <span>Upload Audio</span>
-                        </button>
-                        
-                        <button 
-                          disabled={isCloningVoice}
-                          onClick={isRecordingVoice ? stopRecordingVoice : startRecordingVoice}
-                          className={`flex-1 py-4 border border-dashed rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${isRecordingVoice ? 'border-red-500 bg-red-500/10 text-red-500 animate-pulse' : theme === 'dark' ? 'border-white/20 hover:border-red-500 hover:bg-red-500/10' : 'border-gray-300 hover:border-red-500 hover:bg-red-50'}`}
-                        >
-                          {isRecordingVoice ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                          <span>{isRecordingVoice ? 'Stop & Clone' : 'Record Voice'}</span>
-                        </button>
-                      </div>
-                    </>
+                    </div>
                   )}
 
                   <button 
