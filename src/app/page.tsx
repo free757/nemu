@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
 
 
@@ -505,95 +506,129 @@ export default function Dashboard() {
   );
 
   return (
-    <div className={`flex h-screen ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-[#f8f9fa] text-gray-900'} ${lang === 'ar' ? 'font-arabic' : ''}`} dir="ltr">
-      {/* Sidebar */}
-      <motion.aside 
-        initial={false}
-        animate={{ width: isSidebarCollapsed ? 80 : 256 }}
-        className={`border-r flex flex-col transition-colors relative ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
-      >
-        {/* Toggle Button */}
-        <button 
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`absolute -right-3 top-10 w-6 h-6 rounded-full border flex items-center justify-center z-10 transition-all ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-gray-400 hover:text-white' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-900 shadow-sm'}`}
-        >
-          {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-
-        <div className={`p-6 flex items-center gap-3 overflow-hidden ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex-shrink-0 flex items-center justify-center">
+    <div className={`flex flex-col md:flex-row h-screen ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-[#f8f9fa] text-gray-900'} ${lang === 'ar' ? 'font-arabic' : ''}`} dir="ltr">
+      {/* Mobile Header */}
+      <div className={`md:hidden flex items-center justify-between p-4 border-b ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
-          {!isSidebarCollapsed && (
-            <motion.span 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="font-bold text-xl tracking-tight whitespace-nowrap"
-            >
-              NEMU<span className="text-blue-500">ADMIN</span>
-            </motion.span>
-          )}
+          <span className="font-bold text-lg tracking-tight">NEMU<span className="text-blue-500">ADMIN</span></span>
         </div>
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className={`p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-gray-100'}`}
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-2">
-          <button 
-            onClick={() => setActiveTab('users')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-          >
-            <Users className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.users}</motion.span>}
-          </button>
-          <button 
-            onClick={() => setActiveTab('config')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'config' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-          >
-            <Settings className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.config}</motion.span>}
-          </button>
-          <button 
-            onClick={() => setActiveTab('tools')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'tools' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-          >
-            <Bot className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.tools}</motion.span>}
-          </button>
-        </nav>
+      {/* Sidebar / Mobile Drawer */}
+      <AnimatePresence>
+        {(isMobileMenuOpen || !isSidebarCollapsed) && (
+          <>
+            {/* Backdrop for mobile */}
+            {isMobileMenuOpen && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] md:hidden"
+              />
+            )}
+            
+            <motion.aside 
+              initial={isMobileMenuOpen ? { x: -256 } : false}
+              animate={isMobileMenuOpen ? { x: 0 } : { width: isSidebarCollapsed ? 80 : 256 }}
+              exit={isMobileMenuOpen ? { x: -256 } : {}}
+              className={`fixed md:relative top-0 left-0 bottom-0 z-[101] md:z-auto border-r flex flex-col transition-colors h-full ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'} ${isMobileMenuOpen ? 'w-[256px]' : 'hidden md:flex'}`}
+            >
+              {/* Toggle Button (Desktop only) */}
+              <button 
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className={`hidden md:flex absolute -right-3 top-10 w-6 h-6 rounded-full border items-center justify-center z-10 transition-all ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-gray-400 hover:text-white' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-900 shadow-sm'}`}
+              >
+                {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
 
-        <div className={`p-4 border-t border-white/5 space-y-4 ${isSidebarCollapsed ? 'items-center flex flex-col px-0' : ''}`}>
-          <div className={`flex items-center px-2 ${isSidebarCollapsed ? 'flex-col gap-4' : 'justify-between'}`}>
-            <button 
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className={`p-2 rounded-lg transition-all ${theme === 'dark' ? 'bg-white/5 text-yellow-400' : 'bg-gray-100 text-gray-500'}`}
-            >
-              {theme === 'dark' ? <motion.div animate={{ rotate: 360 }}>☀️</motion.div> : <motion.div animate={{ rotate: 180 }}>🌙</motion.div>}
-            </button>
-            <button 
-              onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${theme === 'dark' ? 'bg-white/5 text-blue-400' : 'bg-gray-100 text-blue-600'}`}
-            >
-              {isSidebarCollapsed ? lang.toUpperCase() : (lang === 'en' ? 'ARABIC' : 'ENGLISH')}
-            </button>
-          </div>
-          <button className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-400/10 transition-all ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
-            <LogOut className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && <span className="font-medium">{t.signOut}</span>}
-          </button>
-        </div>
-      </motion.aside>
+              <div className={`p-6 flex items-center gap-3 overflow-hidden ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex-shrink-0 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                </div>
+                {!isSidebarCollapsed && (
+                  <motion.span 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="font-bold text-xl tracking-tight whitespace-nowrap"
+                  >
+                    NEMU<span className="text-blue-500">ADMIN</span>
+                  </motion.span>
+                )}
+              </div>
+
+              <nav className="flex-1 px-4 py-4 space-y-2">
+                <button 
+                  onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <Users className="w-5 h-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.users}</motion.span>}
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('config'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'config' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <Settings className="w-5 h-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.config}</motion.span>}
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('tools'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'tools' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <Bot className="w-5 h-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.tools}</motion.span>}
+                </button>
+              </nav>
+
+              <div className={`p-4 border-t border-white/5 space-y-4 ${isSidebarCollapsed ? 'items-center flex flex-col px-0' : ''}`}>
+                <div className={`flex items-center px-2 ${isSidebarCollapsed ? 'flex-col gap-4' : 'justify-between'}`}>
+                  <button 
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className={`p-2 rounded-lg transition-all ${theme === 'dark' ? 'bg-white/5 text-yellow-400' : 'bg-gray-100 text-gray-500'}`}
+                  >
+                    {theme === 'dark' ? <motion.div animate={{ rotate: 360 }}>☀️</motion.div> : <motion.div animate={{ rotate: 180 }}>🌙</motion.div>}
+                  </button>
+                  <button 
+                    onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${theme === 'dark' ? 'bg-white/5 text-blue-400' : 'bg-gray-100 text-blue-600'}`}
+                  >
+                    {isSidebarCollapsed ? lang.toUpperCase() : (lang === 'en' ? 'ARABIC' : 'ENGLISH')}
+                  </button>
+                </div>
+                <button className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-400/10 transition-all ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
+                  <LogOut className="w-5 h-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <span className="font-medium">{t.signOut}</span>}
+                </button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-8">
-        <header className="flex justify-between items-center mb-10">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
           <div>
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">
               {activeTab === 'users' ? t.title : activeTab === 'config' ? t.configTitle : t.toolsTitle}
             </h1>
-            <p className="text-gray-500">
+            <p className="text-gray-500 text-sm md:text-base">
               {activeTab === 'users' ? t.subtitle : activeTab === 'config' ? t.subtitle : t.toolsSubtitle}
             </p>
           </div>
           
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             {activeTab !== 'tools' && (
               <>
                 <button 
@@ -604,7 +639,7 @@ export default function Dashboard() {
                 </button>
                 <button 
                   onClick={handleOpenAdd}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20"
                 >
                   <Plus className="w-5 h-5" />
                   <span>{activeTab === 'users' ? t.addNew : t.addConfig}</span>
@@ -629,8 +664,8 @@ export default function Dashboard() {
             </div>
 
             {/* Users Table */}
-            <div className={`rounded-3xl border overflow-hidden shadow-sm ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
-              <table className="w-full text-left">
+            <div className={`rounded-3xl border shadow-sm overflow-x-auto ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
+              <table className="w-full text-left min-w-[700px]">
                 <thead>
                   <tr className={`border-b ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.profile}</th>
@@ -926,8 +961,8 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className={`p-8 rounded-3xl border flex flex-col min-h-[600px] ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
-                <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/5">
+              <div className={`p-4 md:p-8 rounded-3xl border flex flex-col min-h-[600px] ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
+                <div className="flex flex-col md:flex-row justify-between md:items-center gap-6 mb-6 pb-4 border-b border-white/5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center">
                       <div className={`w-3 h-3 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
@@ -939,10 +974,10 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2 md:gap-4">
                     <button 
                       onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
-                      className={`px-4 py-2 rounded-lg font-bold transition-all border ${
+                      className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm md:text-base font-bold transition-all border ${
                         isVoiceEnabled 
                         ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' 
                         : theme === 'dark' ? 'bg-white/5 text-gray-400 border-white/10' : 'bg-gray-100 text-gray-500 border-gray-200'
@@ -952,23 +987,23 @@ export default function Dashboard() {
                     </button>
                     <button 
                       onClick={() => setIsSessionActive(false)}
-                      className="px-4 py-2 bg-red-500/10 text-red-500 rounded-lg font-bold hover:bg-red-500/20"
+                      className="flex-1 md:flex-none px-4 py-2 bg-red-500/10 text-red-500 rounded-lg text-sm md:text-base font-bold hover:bg-red-500/20"
                     >
                       End Session
                     </button>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-4 mb-6">
+                <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-2">
                   {transcript.map((msg, i) => (
-                    <div key={i} className={`p-4 rounded-2xl max-w-[80%] ${
+                    <div key={i} className={`p-4 rounded-2xl max-w-[90%] md:max-w-[80%] ${
                       msg.role === 'user' ? 'bg-gray-100 text-gray-800 self-start ml-0 mr-auto' : 
                       msg.role === 'assistant' ? 'bg-blue-600 text-white self-end ml-auto mr-0' : 
                       'bg-transparent border border-dashed border-gray-300 text-gray-500 text-center mx-auto text-sm w-full'
                     }`}>
-                      {msg.role === 'assistant' && <strong className="block mb-1 text-blue-200">Suggested Answer:</strong>}
-                      {msg.role === 'user' && <strong className="block mb-1 text-gray-500">Question Heard:</strong>}
-                      {msg.text}
+                      {msg.role === 'assistant' && <strong className="block mb-1 text-blue-200 text-xs">Suggested Answer:</strong>}
+                      {msg.role === 'user' && <strong className="block mb-1 text-gray-500 text-xs">Question Heard:</strong>}
+                      <span className="text-sm md:text-base">{msg.text}</span>
                     </div>
                   ))}
                 </div>
@@ -976,11 +1011,11 @@ export default function Dashboard() {
                 <div className="flex justify-center mt-auto">
                   <button 
                     onClick={toggleListening}
-                    className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-xl transition-all ${
+                    className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center text-white shadow-xl transition-all ${
                       isListening ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-blue-600 hover:bg-blue-500'
                     }`}
                   >
-                    {isListening ? <div className="w-6 h-6 bg-white rounded-sm" /> : <Bot className="w-8 h-8" />}
+                    {isListening ? <div className="w-5 h-5 md:w-6 md:h-6 bg-white rounded-sm" /> : <Bot className="w-6 h-6 md:w-8 md:h-8" />}
                   </button>
                 </div>
               </div>
