@@ -8,6 +8,13 @@ export async function POST(req: Request) {
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const geminiKey = process.env.Gemini_API_Key;
 
+    // ── Startup diagnostics ──────────────────────────────────────────────────
+    console.log('=== CHAT API REQUEST ===');
+    console.log('OPENROUTER_API_KEY present:', !!openRouterKey);
+    console.log('Gemini_API_Key present:', !!geminiKey);
+    console.log('Will use provider:', openRouterKey ? 'OpenRouter' : geminiKey ? 'Gemini Direct' : 'NONE');
+    // ─────────────────────────────────────────────────────────────────────────
+
     if (!openRouterKey && !geminiKey) {
       console.error('Chat API Error: No API key found.');
       return NextResponse.json(
