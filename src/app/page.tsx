@@ -663,9 +663,9 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Users Table */}
-            <div className={`rounded-3xl border shadow-sm overflow-x-auto ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
-              <table className="w-full text-left min-w-[700px]">
+            {/* Desktop Table View */}
+            <div className={`hidden md:block rounded-3xl border shadow-sm overflow-hidden ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
+              <table className="w-full text-left">
                 <thead>
                   <tr className={`border-b ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.profile}</th>
@@ -732,12 +732,69 @@ export default function Dashboard() {
                   </AnimatePresence>
                 </tbody>
               </table>
-              {filteredUsers.length === 0 && !loading && (
-                <div className="p-20 text-center text-gray-500">
-                  {t.noUsers}
-                </div>
-              )}
             </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {filteredUsers.map((user) => (
+                <motion.div 
+                  key={user.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={`p-6 rounded-3xl border shadow-sm space-y-6 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-xl text-white">
+                        {user.username?.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</h3>
+                        <p className="text-gray-500 text-sm">{user.phone_number}</p>
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 border rounded-lg font-mono text-sm text-blue-400 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
+                      {user.pin}
+                    </span>
+                  </div>
+
+                  <div className={`p-4 rounded-2xl space-y-2 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                    <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{t.proxy}</p>
+                    <p className="flex items-center gap-2 text-sm">
+                      <Globe className="w-4 h-4 text-blue-500" />
+                      <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>{user.proxy_ip}:{user.proxy_port}</span>
+                    </p>
+                    <p className="text-gray-500 text-xs flex items-center gap-2">
+                       <MapPin className="w-4 h-4" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleOpenEdit(user)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      <span>{lang === 'ar' ? 'تعديل' : 'Edit'}</span>
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteClick(user.id, user.username)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500/20 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{lang === 'ar' ? 'حذف' : 'Delete'}</span>
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {filteredUsers.length === 0 && !loading && (
+              <div className="p-20 text-center text-gray-500">
+                {t.noUsers}
+              </div>
+            )}
+          </div>
           </div>
         ) : activeTab === 'config' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -768,8 +825,8 @@ export default function Dashboard() {
                     </button>
                   </div>
                 </div>
-                <div className={`rounded-2xl p-4 font-mono text-sm overflow-x-auto max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-black/50' : 'bg-gray-50 border border-gray-100'}`}>
-                  <pre className="text-blue-400">{JSON.stringify(config.config_value, null, 2)}</pre>
+                <div className={`rounded-2xl p-4 font-mono overflow-x-auto max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-black/50' : 'bg-gray-50 border border-gray-100'}`}>
+                  <pre className={`text-blue-400 ${lang === 'ar' ? 'text-right' : 'text-left'} text-xs md:text-sm`}>{JSON.stringify(config.config_value, null, 2)}</pre>
                 </div>
               </div>
             ))}
