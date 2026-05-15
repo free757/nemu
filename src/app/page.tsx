@@ -400,10 +400,10 @@ export default function Dashboard() {
           setTranscript(prev => [...prev, { role: 'assistant', text: data.answer }]);
           
           if (isVoiceEnabled) {
-            // Helper: Speak using browser's free built-in TTS
+            // Helper: Speak using browser's built-in TTS as fallback
             const speakWithBrowser = (text: string) => {
               if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Stop any current speech
+                window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'en-US';
                 utterance.rate = 0.95;
@@ -412,30 +412,23 @@ export default function Dashboard() {
               }
             };
 
-            // Try ElevenLabs first (if voice_id is set), fallback to browser TTS
-            if (profile.voice_id) {
-              try {
-                const audioRes = await fetch('/api/tts', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ text: data.answer, voiceId: profile.voice_id })
+            // Use Puter.js for free ElevenLabs TTS (no API key needed)
+            try {
+              const puter = (window as any).puter;
+              if (puter?.ai?.txt2speech) {
+                const voiceId = profile.voice_id || '21m00Tcm4TlvDq8ikWAM'; // Default: Rachel
+                const audio = await puter.ai.txt2speech(data.answer, {
+                  provider: 'elevenlabs',
+                  voice: voiceId,
+                  model: 'eleven_multilingual_v2',
                 });
-                if (!audioRes.ok) {
-                  // ElevenLabs failed (e.g. free plan) → fallback to browser TTS
-                  console.warn("ElevenLabs unavailable, using browser TTS instead.");
-                  speakWithBrowser(data.answer);
-                } else {
-                  const audioBlob = await audioRes.blob();
-                  const audioUrl = URL.createObjectURL(audioBlob);
-                  const audio = new Audio(audioUrl);
-                  audio.play();
-                }
-              } catch (audioErr: any) {
-                console.error("TTS Error:", audioErr);
+                audio.play();
+              } else {
+                // Puter.js not loaded yet, fallback to browser TTS
                 speakWithBrowser(data.answer);
               }
-            } else {
-              // No voice ID set → use browser TTS directly
+            } catch (audioErr: any) {
+              console.warn("Puter TTS failed, using browser TTS:", audioErr);
               speakWithBrowser(data.answer);
             }
           }
