@@ -34,7 +34,11 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        return NextResponse.json({ error: errData.detail?.message || 'ElevenLabs API Error' }, { status: response.status });
+        console.error('ElevenLabs API Error:', JSON.stringify(errData));
+        return NextResponse.json({ 
+          error: errData.detail?.message || 'ElevenLabs API Error',
+          raw: errData 
+        }, { status: response.status });
     }
 
     const audioBuffer = await response.arrayBuffer();
