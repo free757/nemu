@@ -8,6 +8,7 @@ export async function POST(req: Request) {
     const geminiKey = process.env.Gemini_API_Key || apiKey;
 
     if (!geminiKey) {
+      console.error('Chat API Error: Gemini API key is missing.');
       return NextResponse.json({ error: 'Gemini API key is missing. Please set Gemini_API_Key in Vercel Environment Variables.' }, { status: 400 });
     }
 
@@ -29,6 +30,7 @@ Interview Question:
 "${question}"
 `;
 
+    console.log('Sending request to Gemini...');
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
       method: 'POST',
       headers: { 
@@ -43,23 +45,28 @@ Interview Question:
     const data = await response.json();
     
     if (!response.ok) {
-        return NextResponse.json({ error: data.error?.message || 'Error from Gemini API' }, { status: 500 });
+        console.error('Gemini API Error Response:', JSON.stringify(data));
+        return NextResponse.json({ 
+          error: data.error?.message || 'Error from Gemini API',
+          details: data.error
+        }, { status: response.status });
     }
 
     if (!data.candidates || data.candidates.length === 0) {
         console.error("Gemini returned no candidates. Full response:", JSON.stringify(data));
-        return NextResponse.json({ error: "Gemini returned no answer. This might be due to safety filters blocking the content. Raw details: " + JSON.stringify(data) }, { status: 500 });
+        return NextResponse.json({ error: "Gemini returned no answer. This might be due to safety filters or quota limits." }, { status: 500 });
     }
 
     const answer = data.candidates[0].content?.parts?.[0]?.text;
     
     if (!answer) {
-        return NextResponse.json({ error: "Could not parse text from Gemini response. Raw details: " + JSON.stringify(data) }, { status: 500 });
+        console.error("Could not parse text from Gemini response:", JSON.stringify(data));
+        return NextResponse.json({ error: "Could not parse text from Gemini response." }, { status: 500 });
     }
 
     return NextResponse.json({ answer });
   } catch (error: any) {
-    console.error('Chat API Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Chat API Fatal Error:', error);
+    return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 });
   }
 }
