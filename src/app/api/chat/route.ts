@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-
+// Build: 2026-05-16T02:28 — Force redeploy to pick up OPENROUTER_API_KEY
 export async function POST(req: Request) {
   try {
     const { question, cvText, systemPrompt } = await req.json();
