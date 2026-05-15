@@ -4,11 +4,11 @@ export async function POST(req: Request) {
   try {
     const { question, cvText, apiKey, systemPrompt } = await req.json();
 
-    // Use environment variable first, fallback to the one passed from local storage, then the provided hardcoded key
-    const geminiKey = process.env.Gemini_API_Key || apiKey || 'AIzaSyAm5EY1ZQDfhbAa6j1iXZG1cQuKiRwQ0Zo';
+    // Use environment variable first, then the one passed from local storage
+    const geminiKey = process.env.Gemini_API_Key || apiKey;
 
     if (!geminiKey) {
-      return NextResponse.json({ error: 'Gemini API key is missing. Please set it in Settings.' }, { status: 400 });
+      return NextResponse.json({ error: 'Gemini API key is missing. Please set Gemini_API_Key in Vercel Environment Variables.' }, { status: 400 });
     }
 
     // Truncate CV to avoid token limits
