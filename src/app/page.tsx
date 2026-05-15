@@ -400,26 +400,43 @@ export default function Dashboard() {
           setTranscript(prev => [...prev, { role: 'assistant', text: data.answer }]);
           
           if (isVoiceEnabled) {
-            try {
-              const audioRes = await fetch('/api/tts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: data.answer, voiceId: profile.voice_id })
-              });
-              if (!audioRes.ok) {
-                const errData = await audioRes.json().catch(() => ({}));
-                const errMsg = errData?.raw?.detail?.message || errData?.error || `TTS Error ${audioRes.status}`;
-                console.error("TTS API Error:", JSON.stringify(errData));
-                setTranscript(prev => [...prev, { role: 'system', text: `⚠️ Voice Error: ${errMsg}` }]);
-              } else {
-                const audioBlob = await audioRes.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
-                audio.play();
+            // Helper: Speak using browser's free built-in TTS
+            const speakWithBrowser = (text: string) => {
+              if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Stop any current speech
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.95;
+                utterance.pitch = 1;
+                window.speechSynthesis.speak(utterance);
               }
-            } catch (audioErr: any) {
-              console.error("TTS Error:", audioErr);
-              setTranscript(prev => [...prev, { role: 'system', text: `⚠️ Voice Error: ${audioErr.message}` }]);
+            };
+
+            // Try ElevenLabs first (if voice_id is set), fallback to browser TTS
+            if (profile.voice_id) {
+              try {
+                const audioRes = await fetch('/api/tts', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ text: data.answer, voiceId: profile.voice_id })
+                });
+                if (!audioRes.ok) {
+                  // ElevenLabs failed (e.g. free plan) → fallback to browser TTS
+                  console.warn("ElevenLabs unavailable, using browser TTS instead.");
+                  speakWithBrowser(data.answer);
+                } else {
+                  const audioBlob = await audioRes.blob();
+                  const audioUrl = URL.createObjectURL(audioBlob);
+                  const audio = new Audio(audioUrl);
+                  audio.play();
+                }
+              } catch (audioErr: any) {
+                console.error("TTS Error:", audioErr);
+                speakWithBrowser(data.answer);
+              }
+            } else {
+              // No voice ID set → use browser TTS directly
+              speakWithBrowser(data.answer);
             }
           }
         } catch (e: any) {
