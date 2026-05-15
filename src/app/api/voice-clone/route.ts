@@ -6,10 +6,11 @@ export async function POST(req: Request) {
     const file = formData.get('file') as File;
     const name = formData.get('name') as string;
 
-    const elevenLabsKey = process.env.ElevenLabs_API_Key;
+    // Support both camelCase and UPPERCASE environment variables
+    const elevenLabsKey = process.env.ElevenLabs_API_Key || process.env.ELEVENLABS_API_KEY;
     
     if (!elevenLabsKey) {
-      return NextResponse.json({ error: 'ElevenLabs API key is missing' }, { status: 400 });
+      return NextResponse.json({ error: 'ElevenLabs API key is missing. Please set ElevenLabs_API_Key in Vercel.' }, { status: 400 });
     }
 
     if (!file || !name) {
