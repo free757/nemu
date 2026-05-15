@@ -2,14 +2,18 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { question, cvText, apiKey, systemPrompt } = await req.json();
+    const { question, cvText, systemPrompt } = await req.json();
 
-    // Use environment variable first, then the one passed from local storage
-    const geminiKey = process.env.Gemini_API_Key || apiKey;
+    // OpenRouter key (preferred) or fallback to Gemini direct
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    const geminiKey = process.env.Gemini_API_Key;
 
-    if (!geminiKey) {
-      console.error('Chat API Error: Gemini API key is missing.');
-      return NextResponse.json({ error: 'Gemini API key is missing. Please set Gemini_API_Key in Vercel Environment Variables.' }, { status: 400 });
+    if (!openRouterKey && !geminiKey) {
+      console.error('Chat API Error: No API key found.');
+      return NextResponse.json(
+        { error: 'No API key configured. Please set OPENROUTER_API_KEY in Vercel.' },
+        { status: 400 }
+      );
     }
 
     // Truncate CV to avoid token limits
@@ -21,50 +25,86 @@ Use the first person ("I", "my"). Keep the answer under 4 sentences so it is eas
 
     const finalSystemPrompt = systemPrompt || defaultSystemPrompt;
 
-    const prompt = `${finalSystemPrompt}
+    const userMessage = `CV Content:\n${safeCvText}\n\nInterview Question:\n"${question}"`;
 
-CV Content:
-${safeCvText}
+    // ─── Option A: OpenRouter (preferred — higher free limits) ───────────────
+    if (openRouterKey) {
+      console.log('Using OpenRouter (gemini-flash-1.5-free)...');
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://nemu-dashboard-ten.vercel.app',
+          'X-Title': 'Nemu AI Interview Assistant',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-flash-1.5:free',  // Free Gemini Flash via OpenRouter
+          messages: [
+            { role: 'system', content: finalSystemPrompt },
+            { role: 'user', content: userMessage },
+          ],
+          max_tokens: 300,
+        }),
+      });
 
-Interview Question:
-"${question}"
-`;
+      const data = await response.json();
 
-    console.log('Sending request to Gemini (gemini-flash-latest)...');
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-goog-api-key': geminiKey 
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-        console.error('Gemini API Error Response:', JSON.stringify(data));
-        return NextResponse.json({ 
-          error: data.error?.message || 'Error from Gemini API',
-          details: data.error
-        }, { status: response.status });
+      if (!response.ok) {
+        console.error('OpenRouter Error:', JSON.stringify(data));
+        // If OpenRouter fails, try Gemini direct below
+        if (!geminiKey) {
+          return NextResponse.json(
+            { error: data.error?.message || 'OpenRouter API Error' },
+            { status: response.status }
+          );
+        }
+      } else {
+        const answer = data.choices?.[0]?.message?.content;
+        if (!answer) {
+          return NextResponse.json({ error: 'No answer from OpenRouter.' }, { status: 500 });
+        }
+        return NextResponse.json({ answer });
+      }
     }
 
-    if (!data.candidates || data.candidates.length === 0) {
-        console.error("Gemini returned no candidates. Full response:", JSON.stringify(data));
-        return NextResponse.json({ error: "Gemini returned no answer. This might be due to safety filters or quota limits." }, { status: 500 });
+    // ─── Option B: Gemini direct (fallback) ──────────────────────────────────
+    if (geminiKey) {
+      console.log('Using Gemini direct (fallback)...');
+      const prompt = `${finalSystemPrompt}\n\n${userMessage}`;
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': geminiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Gemini Error:', JSON.stringify(data));
+        return NextResponse.json(
+          { error: data.error?.message || 'Gemini API Error', details: data.error },
+          { status: response.status }
+        );
+      }
+
+      const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!answer) {
+        return NextResponse.json({ error: 'No answer from Gemini.' }, { status: 500 });
+      }
+      return NextResponse.json({ answer });
     }
 
-    const answer = data.candidates[0].content?.parts?.[0]?.text;
-    
-    if (!answer) {
-        console.error("Could not parse text from Gemini response:", JSON.stringify(data));
-        return NextResponse.json({ error: "Could not parse text from Gemini response." }, { status: 500 });
-    }
+    return NextResponse.json({ error: 'No AI provider available.' }, { status: 500 });
 
-    return NextResponse.json({ answer });
   } catch (error: any) {
     console.error('Chat API Fatal Error:', error);
     return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 });
