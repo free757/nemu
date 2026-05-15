@@ -406,14 +406,20 @@ export default function Dashboard() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: data.answer, voiceId: profile.voice_id })
               });
-              if (!audioRes.ok) throw new Error('Failed to fetch audio');
-              
-              const audioBlob = await audioRes.blob();
-              const audioUrl = URL.createObjectURL(audioBlob);
-              const audio = new Audio(audioUrl);
-              audio.play();
-            } catch (audioErr) {
+              if (!audioRes.ok) {
+                const errData = await audioRes.json().catch(() => ({}));
+                const errMsg = errData?.raw?.detail?.message || errData?.error || `TTS Error ${audioRes.status}`;
+                console.error("TTS API Error:", JSON.stringify(errData));
+                setTranscript(prev => [...prev, { role: 'system', text: `⚠️ Voice Error: ${errMsg}` }]);
+              } else {
+                const audioBlob = await audioRes.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.play();
+              }
+            } catch (audioErr: any) {
               console.error("TTS Error:", audioErr);
+              setTranscript(prev => [...prev, { role: 'system', text: `⚠️ Voice Error: ${audioErr.message}` }]);
             }
           }
         } catch (e: any) {
