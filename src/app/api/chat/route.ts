@@ -36,7 +36,7 @@ Use the first person ("I", "my"). Keep the answer under 4 sentences so it is eas
 
     // ─── Option A: OpenRouter (preferred — higher free limits) ───────────────
     if (openRouterKey) {
-      console.log('Using OpenRouter (gemini-flash-1.5-free)...');
+      console.log('Using OpenRouter (meta-llama/llama-3.1-8b-instruct:free)...');
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -46,7 +46,7 @@ Use the first person ("I", "my"). Keep the answer under 4 sentences so it is eas
           'X-Title': 'Nemu AI Interview Assistant',
         },
         body: JSON.stringify({
-          model: 'google/gemini-flash-1.5:free',  // Free Gemini Flash via OpenRouter
+          model: 'meta-llama/llama-3.1-8b-instruct:free',  // Free Llama 3.1 (human-like)
           messages: [
             { role: 'system', content: finalSystemPrompt },
             { role: 'user', content: userMessage },

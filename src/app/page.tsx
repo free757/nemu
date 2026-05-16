@@ -384,82 +384,31 @@ export default function Dashboard() {
       if (profile) {
         setTranscript(prev => [...prev, { role: 'system', text: 'Thinking...' }]);
         try {
-          const defaultSystemPrompt = `You are an expert AI interview assistant helping a candidate. You are acting AS the candidate. 
-Based on the following CV, answer the interview question professionally, confidently, and concisely.
-Use the first person ("I", "my"). Keep the answer under 4 sentences so it is easy to read and say aloud.`;
-
-          const finalSystemPrompt = profile.system_prompt || defaultSystemPrompt;
-          const safeCvText = profile.cv_text ? profile.cv_text.substring(0, 8000) : '';
-          const userMessage = `CV Content:\n${safeCvText}\n\nInterview Question:\n"${question}"`;
-
-          let answer = '';
-
-          // ── Option A: Puter.js (free, no API key needed) ─────────────────────
-          const puter = (window as any).puter;
-          if (puter?.ai?.chat) {
-            try {
-              console.log('Using Puter.js AI (free)...');
-              const response = await puter.ai.chat([
-                { role: 'system', content: finalSystemPrompt },
-                { role: 'user', content: userMessage },
-              ], { model: 'gpt-4o-mini' });
-              answer = response?.message?.content || response?.text || '';
-            } catch (puterErr: any) {
-              console.warn('Puter AI failed, falling back to server API:', puterErr);
-            }
-          }
-
-          // ── Option B: Server-side API (OpenRouter → Gemini fallback) ─────────
-          if (!answer) {
-            console.log('Using server /api/chat...');
-            const res = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                question, 
-                cvText: profile.cv_text,
-                systemPrompt: profile.system_prompt 
-              })
-            });
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            answer = data.answer;
-          }
-
-          if (!answer) throw new Error('No answer received from AI.');
-
+          console.log('Using server /api/chat (OpenRouter)...');
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              question, 
+              cvText: profile.cv_text,
+              systemPrompt: profile.system_prompt 
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          
           setTranscript(prev => prev.filter(t => t.text !== 'Thinking...'));
-          setTranscript(prev => [...prev, { role: 'assistant', text: answer }]);
+          setTranscript(prev => [...prev, { role: 'assistant', text: data.answer }]);
           
           if (isVoiceEnabled) {
-            // Helper: Browser TTS fallback
-            const speakWithBrowser = (text: string) => {
-              if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'en-US';
-                utterance.rate = 0.95;
-                utterance.pitch = 1;
-                window.speechSynthesis.speak(utterance);
-              }
-            };
-
-            // Use Puter.js for free ElevenLabs TTS, fallback to browser TTS
-            try {
-              if (puter?.ai?.txt2speech) {
-                const voiceId = profile.voice_id || '21m00Tcm4TlvDq8ikWAM';
-                const audio = await puter.ai.txt2speech(answer, {
-                  provider: 'elevenlabs',
-                  voice: voiceId,
-                  model: 'eleven_multilingual_v2',
-                });
-                audio.play();
-              } else {
-                speakWithBrowser(answer);
-              }
-            } catch (audioErr: any) {
-              console.warn('Puter TTS failed, using browser TTS:', audioErr);
-              speakWithBrowser(answer);
+            // Free browser built-in TTS
+            if ('speechSynthesis' in window) {
+              window.speechSynthesis.cancel();
+              const utterance = new SpeechSynthesisUtterance(data.answer);
+              utterance.lang = 'en-US';
+              utterance.rate = 0.95;
+              utterance.pitch = 1;
+              window.speechSynthesis.speak(utterance);
             }
           }
         } catch (e: any) {
