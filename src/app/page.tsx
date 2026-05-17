@@ -1146,11 +1146,9 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
-
-                      )}
-                    </div>
-                  )}
                 </div>
+              )}
+            </div>
 
                 {!isEditingProfile && (
                   <button 
@@ -1164,7 +1162,6 @@ export default function Dashboard() {
                     Start Session
                   </button>
                 )}
-              </div>
               </div>
             ) : (
               <div className={`p-4 md:p-8 rounded-3xl border flex flex-col min-h-[600px] ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
