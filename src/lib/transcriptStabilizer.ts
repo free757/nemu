@@ -1,3 +1,7 @@
+// Module-level variables for rapid chunk flood protection
+let lastChunkTime = 0;
+let lastChunkText = '';
+
 /**
  * Cleans a transcript by:
  * 1. Normalizing spacing
@@ -73,6 +77,31 @@ export function calculateTranscriptStability(text: string): number {
   return Math.max(0.0, Math.min(1.0, score));
 }
 
+// Levenshtein distance helper for semantic similarity
+function getLevenshteinDistance(a: string, b: string): number {
+  const tmp: number[][] = [];
+  for (let i = 0; i <= a.length; i++) tmp[i] = [i];
+  for (let j = 0; j <= b.length; j++) tmp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      tmp[i][j] = Math.min(
+        tmp[i - 1][j] + 1,
+        tmp[i][j - 1] + 1,
+        tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return tmp[a.length][b.length];
+}
+
+// Semantic similarity check
+function isSemanticallySimilar(s1: string, s2: string): boolean {
+  const len = Math.max(s1.length, s2.length);
+  if (len === 0) return true;
+  const dist = getLevenshteinDistance(s1.toLowerCase(), s2.toLowerCase());
+  return (dist / len) < 0.15; // less than 15% distance differences
+}
+
 // Internal overlap merging helper
 function mergeOverlap(s1: string, s2: string): string | null {
   const w1 = s1.split(' ');
@@ -92,6 +121,10 @@ function mergeOverlap(s1: string, s2: string): string | null {
 export interface StabilizeParams {
   previousTranscript: string;
   incomingChunk: string;
+  previousConfidence?: number;
+  incomingConfidence?: number;
+  isPartial?: boolean;
+  semanticConfidence?: number; // Trigger freeze mode if high
 }
 
 export interface StabilizeResult {
@@ -101,19 +134,38 @@ export interface StabilizeResult {
 }
 
 /**
- * Core stabilization logic. Resolves overlaps, cleans noise, handles regression protection, 
- * and computes stability metrics on incoming speech updates.
+ * Enhanced production-grade stabilization logic. Resolves overlaps, cleans noise, handles regression protection,
+ * prevents flood thrashing, manages confidence scoring weight, isPartial controls, and transcript freeze mode.
  */
 export function stabilizeTranscript({
   previousTranscript,
-  incomingChunk
+  incomingChunk,
+  previousConfidence,
+  incomingConfidence,
+  isPartial = true,
+  semanticConfidence = 0.0
 }: StabilizeParams): StabilizeResult {
   console.log('[Stabilizer] chunk received');
 
   const cleanIncoming = cleanTranscript(incomingChunk);
   const cleanPrev = cleanTranscript(previousTranscript);
 
-  // --- 1. Ignore Noisy Micro-chunks ---
+  // --- 1. Flood Flood Protection ---
+  const now = Date.now();
+  if (cleanIncoming === lastChunkText && now - lastChunkTime < 150) {
+    // Drop flood duplicate
+    return {
+      stabilizedTranscript: cleanPrev,
+      stabilityScore: calculateTranscriptStability(cleanPrev),
+      changesDetected: false
+    };
+  }
+
+  // Update flood state
+  lastChunkTime = now;
+  lastChunkText = cleanIncoming;
+
+  // --- 2. Ignore Noisy Micro-chunks ---
   if (cleanIncoming.length < 2) {
     console.log('[Stabilizer] noisy chunk ignored');
     return {
@@ -133,11 +185,13 @@ export function stabilizeTranscript({
     };
   }
 
-  // --- 2. Regression Protection ---
-  // If the incoming chunk is shorter than what we already have and is fully contained as a prefix,
-  // ignore it to prevent the UI from deleting stable, complete text.
-  if (cleanPrev.toLowerCase().startsWith(cleanIncoming.toLowerCase()) && cleanIncoming.length < cleanPrev.length) {
-    console.log('[Stabilizer] noisy chunk ignored');
+  // --- 3. Confidence-Weighted Stabilization ---
+  if (
+    incomingConfidence !== undefined &&
+    previousConfidence !== undefined &&
+    incomingConfidence < previousConfidence - 0.20
+  ) {
+    console.log('[Stabilizer] low confidence chunk rejected');
     return {
       stabilizedTranscript: cleanPrev,
       stabilityScore: calculateTranscriptStability(cleanPrev),
@@ -145,7 +199,52 @@ export function stabilizeTranscript({
     };
   }
 
-  // --- 3. Duplicate check ---
+  // --- 4. Semantic Similarity Protection ---
+  if (isSemanticallySimilar(cleanPrev, cleanIncoming)) {
+    console.log('[Stabilizer] semantic similarity detected');
+    // Prefer cleanPrev if it's already stabilized to avoid minor thrashing
+    return {
+      stabilizedTranscript: cleanPrev,
+      stabilityScore: calculateTranscriptStability(cleanPrev),
+      changesDetected: false
+    };
+  }
+
+  // --- 5. Transcript Freeze Mode ---
+  if (semanticConfidence >= 0.85) {
+    console.log('[Stabilizer] freeze mode enabled');
+    // In freeze mode, we temporarily freeze replacement/deletion. Only allow appends!
+    if (cleanIncoming.toLowerCase().startsWith(cleanPrev.toLowerCase())) {
+      // Allowed refinement
+      return {
+        stabilizedTranscript: cleanIncoming,
+        stabilityScore: calculateTranscriptStability(cleanIncoming),
+        changesDetected: true
+      };
+    }
+    // Block replacements
+    return {
+      stabilizedTranscript: cleanPrev,
+      stabilityScore: calculateTranscriptStability(cleanPrev),
+      changesDetected: false
+    };
+  }
+
+  // --- 6. Regression Protection (Cautious Partial Updates) ---
+  if (isPartial) {
+    // If the incoming chunk is shorter than previous and is fully contained as a prefix,
+    // ignore regression to protect UI stable sentences.
+    if (cleanPrev.toLowerCase().startsWith(cleanIncoming.toLowerCase()) && cleanIncoming.length < cleanPrev.length) {
+      console.log('[Stabilizer] noisy chunk ignored');
+      return {
+        stabilizedTranscript: cleanPrev,
+        stabilityScore: calculateTranscriptStability(cleanPrev),
+        changesDetected: false
+      };
+    }
+  }
+
+  // --- 7. Duplicate Check ---
   if (cleanPrev.toLowerCase().includes(cleanIncoming.toLowerCase())) {
     return {
       stabilizedTranscript: cleanPrev,
@@ -154,7 +253,7 @@ export function stabilizeTranscript({
     };
   }
 
-  // --- 4. Overlap & Continuation Reconciliation ---
+  // --- 8. Overlap & Continuation Reconciliation ---
   // A. Continuation check (if incoming is an exact larger extension of previous)
   if (cleanIncoming.toLowerCase().startsWith(cleanPrev.toLowerCase())) {
     console.log('[Stabilizer] transcript stabilized');
@@ -176,7 +275,18 @@ export function stabilizeTranscript({
     };
   }
 
-  // C. Fallback: Join with a space (assume it's a new distinct sentence)
+  // C. Final Aggressive Replacement / Continuation
+  if (!isPartial) {
+    // Final chunks replace or append aggressively
+    console.log('[Stabilizer] transcript stabilized');
+    return {
+      stabilizedTranscript: cleanIncoming,
+      stabilityScore: calculateTranscriptStability(cleanIncoming),
+      changesDetected: true
+    };
+  }
+
+  // D. Fallback: Join with a space (assume it's a new distinct sentence)
   const fallbackTranscript = `${cleanPrev} ${cleanIncoming}`;
   console.log('[Stabilizer] transcript stabilized');
   return {
