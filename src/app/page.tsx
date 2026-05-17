@@ -397,6 +397,9 @@ export default function Dashboard() {
   // --- End of State ---
 
   const recognitionRef = useRef<any>(null);
+  const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const finalTranscriptRef = useRef<string>('');
+  const isCheckingRef = useRef<boolean>(false);
 
   const startListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -405,7 +408,6 @@ export default function Dashboard() {
       return;
     }
     
-    // Stop previous instance if exists
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch(e) {}
     }
@@ -413,13 +415,19 @@ export default function Dashboard() {
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
     
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    // Switch to continuous + interim results for smart buffering
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = lang === 'ar' ? 'ar-SA' : 'en-US';
 
-    recognition.onstart = () => setIsListening(true);
+    recognition.onstart = () => {
+      setIsListening(true);
+      finalTranscriptRef.current = '';
+      setManualQuestion('');
+    };
     
     recognition.onend = () => {
+      // Intentionally allowing it to stop for safety (avoids ghost mic)
       setIsListening(false);
     };
 
@@ -431,9 +439,64 @@ export default function Dashboard() {
       setIsListening(false);
     };
     
-    recognition.onresult = async (event: any) => {
-      const question = event.results[0][0].transcript;
-      await processQuestion(question);
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      
+      const fullText = finalTranscriptRef.current + interim;
+      setManualQuestion(fullText); // Display the live dictation in the input box
+
+      // Smart Silence Debounce (2 seconds)
+      if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+      
+      pauseTimerRef.current = setTimeout(async () => {
+        if (isCheckingRef.current) return;
+        const textToCheck = finalTranscriptRef.current + interim;
+        
+        // Ignore very short noise, but allow short Arabic questions (e.g. "من أنت؟")
+        if (textToCheck.trim().length < 3) {
+          console.log('Text too short to check:', textToCheck);
+          return; 
+        }
+
+        isCheckingRef.current = true;
+        try {
+          console.log('⏳ Checking semantic completion for:', textToCheck);
+          const res = await fetch('/api/check-completion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textToCheck })
+          });
+          
+          if (!res.ok) {
+            console.error('Check completion failed with status', res.status);
+            return;
+          }
+          
+          const data = await res.json();
+          console.log('🤖 Semantic AI Response:', data);
+          
+          if (data.isComplete) {
+             console.log('✅ COMPLETE! Stopping mic and sending to AI...');
+             try { recognitionRef.current.stop(); } catch(e) {}
+             finalTranscriptRef.current = '';
+             setManualQuestion('');
+             await processQuestion(textToCheck);
+          } else {
+             console.log('❌ INCOMPLETE! Keeping mic open...');
+          }
+        } catch (e) {
+          console.error('Semantic check failed exception', e);
+        } finally {
+          isCheckingRef.current = false;
+        }
+      }, 2000); // 2s of silence triggers the semantic check
     };
 
     recognition.start();
