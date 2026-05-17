@@ -55,6 +55,7 @@ export default function Dashboard() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [transcript, setTranscript] = useState<{role: string, text: string}[]>([]);
+  const [manualQuestion, setManualQuestion] = useState('');
 
   const fetchProfiles = async () => {
     const { data } = await supabase.from('interview_profiles').select('*').order('created_at', { ascending: false });
@@ -378,47 +379,59 @@ export default function Dashboard() {
     
     recognition.onresult = async (event: any) => {
       const question = event.results[0][0].transcript;
-      setTranscript(prev => [...prev, { role: 'user', text: question }]);
-      
-      const profile = interviewProfiles.find(p => p.id === selectedProfileId);
-      if (profile) {
-        setTranscript(prev => [...prev, { role: 'system', text: 'Thinking...' }]);
-        try {
-          console.log('Using server /api/chat (OpenRouter)...');
-          const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              question, 
-              cvText: profile.cv_text,
-              systemPrompt: profile.system_prompt 
-            })
-          });
-          const data = await res.json();
-          if (data.error) throw new Error(data.error);
-          
-          setTranscript(prev => prev.filter(t => t.text !== 'Thinking...'));
-          setTranscript(prev => [...prev, { role: 'assistant', text: data.answer }]);
-          
-          if (isVoiceEnabled) {
-            // Free browser built-in TTS
-            if ('speechSynthesis' in window) {
-              window.speechSynthesis.cancel();
-              const utterance = new SpeechSynthesisUtterance(data.answer);
-              utterance.lang = 'en-US';
-              utterance.rate = 0.95;
-              utterance.pitch = 1;
-              window.speechSynthesis.speak(utterance);
-            }
-          }
-        } catch (e: any) {
-           setTranscript(prev => prev.filter(t => t.text !== 'Thinking...'));
-           setTranscript(prev => [...prev, { role: 'system', text: `⚠️ Error: ${e.message}` }]);
-        }
-      }
+      await processQuestion(question);
     };
 
     recognition.start();
+  };
+
+  const processQuestion = async (question: string) => {
+    setTranscript(prev => [...prev, { role: 'user', text: question }]);
+    
+    const profile = interviewProfiles.find(p => p.id === selectedProfileId);
+    if (profile) {
+      setTranscript(prev => [...prev, { role: 'system', text: 'Thinking...' }]);
+      try {
+        console.log('Using server /api/chat (OpenRouter)...');
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            question, 
+            cvText: profile.cv_text,
+            systemPrompt: profile.system_prompt 
+          })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        
+        setTranscript(prev => prev.filter(t => t.text !== 'Thinking...'));
+        setTranscript(prev => [...prev, { role: 'assistant', text: data.answer }]);
+        
+        if (isVoiceEnabled) {
+          // Free browser built-in TTS
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(data.answer);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.95;
+            utterance.pitch = 1;
+            window.speechSynthesis.speak(utterance);
+          }
+        }
+      } catch (e: any) {
+         setTranscript(prev => prev.filter(t => t.text !== 'Thinking...'));
+         setTranscript(prev => [...prev, { role: 'system', text: `⚠️ Error: ${e.message}` }]);
+      }
+    }
+  };
+
+  const submitManualQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualQuestion.trim()) return;
+    const q = manualQuestion;
+    setManualQuestion('');
+    await processQuestion(q);
   };
 
   const toggleListening = () => {
@@ -1059,15 +1072,33 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                <div className="flex justify-center mt-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-2 mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
                   <button 
                     onClick={toggleListening}
-                    className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center text-white shadow-xl transition-all ${
+                    title="Click to speak"
+                    className={`w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-full flex items-center justify-center text-white shadow-xl transition-all ${
                       isListening ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-blue-600 hover:bg-blue-500'
                     }`}
                   >
-                    {isListening ? <div className="w-5 h-5 md:w-6 md:h-6 bg-white rounded-sm" /> : <Bot className="w-6 h-6 md:w-8 md:h-8" />}
+                    {isListening ? <div className="w-4 h-4 md:w-5 md:h-5 bg-white rounded-sm" /> : <Bot className="w-5 h-5 md:w-6 md:h-6" />}
                   </button>
+
+                  <form onSubmit={submitManualQuestion} className="flex-1 w-full flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={manualQuestion}
+                      onChange={(e) => setManualQuestion(e.target.value)}
+                      placeholder="Type a question here..."
+                      className="flex-1 bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/10 rounded-xl px-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!manualQuestion.trim()}
+                      className="px-6 py-3 md:py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-white transition-all text-sm md:text-base"
+                    >
+                      Send
+                    </button>
+                  </form>
                 </div>
               </div>
             )}
