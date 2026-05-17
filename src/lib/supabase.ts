@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Hardcoded keys for immediate deployment success
-const supabaseUrl = 'https://wliqqvdypzpnmwoegvam.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndsaXFxdmR5cHpwbm13b2VndmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTg1MDAsImV4cCI6MjA5NDE5NDUwMH0.zAaOnvTsgkrt2_OKSxNYpdSMxHfTKMbUEtv7uePte_g';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('⚠️ Supabase URL or Anon Key is missing from environment variables. Please check your Vercel settings.');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
