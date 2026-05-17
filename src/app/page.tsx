@@ -56,6 +56,7 @@ export default function Dashboard() {
   const audioChunksRef = useRef<Blob[]>([]);
   const [transcript, setTranscript] = useState<{role: string, text: string}[]>([]);
   const [manualQuestion, setManualQuestion] = useState('');
+  const [activeAITool, setActiveAITool] = useState<string | null>(null);
 
   const fetchProfiles = async () => {
     const { data } = await supabase.from('interview_profiles').select('*').order('created_at', { ascending: false });
@@ -841,6 +842,49 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-6 max-w-4xl">
 
+            {activeAITool === null ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Live Interview Assistant Card */}
+                <div 
+                  onClick={() => setActiveAITool('interview')}
+                  className={`p-6 rounded-3xl border cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 flex flex-col items-center justify-center text-center space-y-4 ${theme === 'dark' ? 'bg-[#111] border-white/10 hover:border-blue-500/50' : 'bg-white border-gray-200 hover:border-blue-500'}`}
+                >
+                  <div className="w-16 h-16 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center">
+                    <Bot className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold">Live Interview Pilot</h3>
+                  <p className="text-sm text-gray-500">Real-time stealth teleprompter with AI to ace your mock interviews.</p>
+                </div>
+
+                {/* Cover Letter Generator (Coming Soon) */}
+                <div className={`p-6 rounded-3xl border opacity-60 cursor-not-allowed flex flex-col items-center justify-center text-center space-y-4 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="w-16 h-16 bg-purple-500/10 text-purple-500 rounded-2xl flex items-center justify-center">
+                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </div>
+                  <h3 className="text-xl font-bold">Cover Letter AI</h3>
+                  <p className="text-sm text-gray-500">Generate personalized cover letters instantly. (Coming Soon)</p>
+                </div>
+
+                {/* Resume Builder (Coming Soon) */}
+                <div className={`p-6 rounded-3xl border opacity-60 cursor-not-allowed flex flex-col items-center justify-center text-center space-y-4 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="w-16 h-16 bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center">
+                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                  </div>
+                  <h3 className="text-xl font-bold">Resume Builder</h3>
+                  <p className="text-sm text-gray-500">Optimize your CV layout for ATS scanning. (Coming Soon)</p>
+                </div>
+              </div>
+            ) : activeAITool === 'interview' ? (
+              <div className="space-y-6">
+                <button 
+                  onClick={() => {
+                    setActiveAITool(null);
+                    setIsSessionActive(false);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg transition-all w-fit ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'}`}
+                >
+                  <ChevronLeft className="w-4 h-4" /> Back to Tools Grid
+                </button>
 
             {/* Interview Assistant Placeholder / Active Session */}
             {!isSessionActive ? (
@@ -1122,6 +1166,8 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            </div>
+            ) : null}
           </div>
         )}
       </main>
