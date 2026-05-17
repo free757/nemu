@@ -57,12 +57,51 @@ export default function Dashboard() {
   const [transcript, setTranscript] = useState<{role: string, text: string}[]>([]);
   const [manualQuestion, setManualQuestion] = useState('');
   const [activeAITool, setActiveAITool] = useState<string | null>(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editProfileData, setEditProfileData] = useState({ name: '', cv: '', prompt: '' });
 
   const fetchProfiles = async () => {
     const { data } = await supabase.from('interview_profiles').select('*').order('created_at', { ascending: false });
     if (data) {
       setInterviewProfiles(data);
       if (data.length > 0 && !selectedProfileId) setSelectedProfileId(data[0].id);
+    }
+  };
+
+  const handleCreateProfile = async () => {
+    const { data, error } = await supabase.from('interview_profiles').insert([{ profile_name: 'New Candidate' }]).select();
+    if (data && data.length > 0) {
+      await fetchProfiles();
+      setSelectedProfileId(data[0].id);
+      setEditProfileData({ name: data[0].profile_name, cv: '', prompt: '' });
+      setIsEditingProfile(true);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    const { error } = await supabase.from('interview_profiles').update({
+      profile_name: editProfileData.name,
+      cv_text: editProfileData.cv,
+      system_prompt: editProfileData.prompt
+    }).eq('id', selectedProfileId);
+    
+    if (!error) {
+      await fetchProfiles();
+      setIsEditingProfile(false);
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!confirm('Are you sure you want to delete this profile?')) return;
+    const { error } = await supabase.from('interview_profiles').delete().eq('id', selectedProfileId);
+    if (!error) {
+      setSelectedProfileId('');
+      setIsEditingProfile(false);
+      fetchProfiles();
+    } else {
+      alert(error.message);
     }
   };
 
@@ -897,64 +936,116 @@ export default function Dashboard() {
                   Upload your CV and start a live interview session. The AI will listen to the questions and provide real-time suggestions based on your experience.
                 </p>
                 
-                <div className="w-full max-w-md mt-4">
-                  <select 
-                    value={selectedProfileId}
-                    onChange={e => setSelectedProfileId(e.target.value)}
-                    className={`w-full p-4 rounded-xl border outline-none font-medium mb-4 ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-white' : 'bg-white border-gray-200'}`}
-                  >
-                    <option value="" disabled>Select a CV Profile...</option>
-                    {interviewProfiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.profile_name}</option>
-                    ))}
-                  </select>
-                </div>
+                <div className="w-full max-w-2xl mt-8 bg-black/5 dark:bg-white/5 p-6 rounded-3xl border border-gray-200 dark:border-white/10 text-left">
+                  {isEditingProfile ? (
+                    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-white/10 pb-4">
+                        <h3 className="text-xl font-bold">Edit Candidate Profile</h3>
+                        <button onClick={() => setIsEditingProfile(false)} className="text-gray-500 hover:text-gray-800 dark:hover:text-white font-bold">Cancel</button>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-500 mb-2">Candidate Name</label>
+                        <input type="text" value={editProfileData.name} onChange={e => setEditProfileData({...editProfileData, name: e.target.value})} className="w-full p-4 rounded-xl border outline-none bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-white/10 font-bold" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-500 mb-2">CV / Background Knowledge</label>
+                        <textarea rows={6} value={editProfileData.cv} onChange={e => setEditProfileData({...editProfileData, cv: e.target.value})} placeholder="Paste resume text or knowledge base here..." className="w-full p-4 rounded-xl border outline-none bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-white/10 font-mono text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-500 mb-2">System Prompt (AI Rules)</label>
+                        <textarea rows={4} value={editProfileData.prompt} onChange={e => setEditProfileData({...editProfileData, prompt: e.target.value})} placeholder="Optional: Leave empty for default human-like rules, or write specific instructions." className="w-full p-4 rounded-xl border outline-none bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-white/10 font-mono text-sm" />
+                      </div>
+                      <div className="flex gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-white/10">
+                        <button onClick={handleSaveProfile} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-all">Save Profile</button>
+                        <button onClick={handleDeleteProfile} className="px-6 py-4 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500 hover:text-white transition-all">Delete</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <select 
+                          value={selectedProfileId}
+                          onChange={e => setSelectedProfileId(e.target.value)}
+                          className={`flex-1 p-4 rounded-xl border outline-none font-bold text-lg ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-white' : 'bg-white border-gray-200'}`}
+                        >
+                          <option value="" disabled>Select a Candidate...</option>
+                          {interviewProfiles.map(p => (
+                            <option key={p.id} value={p.id}>{p.profile_name}</option>
+                          ))}
+                        </select>
+                        
+                        <button 
+                          onClick={() => {
+                            const p = interviewProfiles.find(x => x.id === selectedProfileId);
+                            if(p) {
+                              setEditProfileData({ name: p.profile_name, cv: p.cv_text || '', prompt: p.system_prompt || '' });
+                              setIsEditingProfile(true);
+                            }
+                          }}
+                          disabled={!selectedProfileId}
+                          className="p-4 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50 transition-all text-gray-500"
+                          title="Edit Candidate Profile"
+                        >
+                          <Edit2 className="w-6 h-6" />
+                        </button>
+                        
+                        <button 
+                          onClick={handleCreateProfile}
+                          className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-lg"
+                          title="Create New Candidate"
+                        >
+                          <Plus className="w-6 h-6" />
+                        </button>
+                      </div>
 
-                <div className="flex gap-4 w-full max-w-md mt-4">
-                  <input 
-                    type="file" 
-                    accept="application/pdf"
-                    id="cv-upload"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      
-                      try {
-                        const pdfjs = await import('pdfjs-dist');
-                        pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-                        
-                        const arrayBuffer = await file.arrayBuffer();
-                        const pdf = await pdfjs.getDocument(arrayBuffer).promise;
-                        let fullText = '';
-                        
-                        for (let i = 1; i <= pdf.numPages; i++) {
-                          const page = await pdf.getPage(i);
-                          const textContent = await page.getTextContent();
-                          const pageText = textContent.items.map((item: any) => item.str).join(' ');
-                          fullText += pageText + '\n';
-                        }
-                        
-                        const { error } = await supabase.from('interview_profiles').insert([{
-                          profile_name: file.name.replace('.pdf', ''),
-                          cv_text: fullText
-                        }]);
-                        
-                        if (error) throw error;
-                        alert(lang === 'ar' ? 'تم استخراج النص وحفظه بنجاح!' : 'CV text extracted and saved successfully!');
-                        fetchProfiles(); // refresh list
-                      } catch (err: any) {
-                        console.error(err);
-                        alert(lang === 'ar' ? `حدث خطأ: ${err.message}` : `Error processing PDF: ${err.message}`);
-                      }
-                    }}
-                  />
-                  <button 
-                    onClick={() => document.getElementById('cv-upload')?.click()}
-                    className={`flex-1 py-4 border border-dashed rounded-xl font-bold transition-all ${theme === 'dark' ? 'border-white/20 hover:border-blue-500 hover:bg-blue-500/10' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'}`}
-                  >
-                    Upload CV (PDF)
-                  </button>
+                  {!isEditingProfile && (
+                    <div className="flex gap-4 w-full">
+                      <input 
+                        type="file" 
+                        accept="application/pdf"
+                        id="cv-upload"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          try {
+                            const pdfjs = await import('pdfjs-dist');
+                            pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+                            
+                            const arrayBuffer = await file.arrayBuffer();
+                            const pdf = await pdfjs.getDocument(arrayBuffer).promise;
+                            let fullText = '';
+                            
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                              const page = await pdf.getPage(i);
+                              const textContent = await page.getTextContent();
+                              const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                              fullText += pageText + '\n';
+                            }
+                            
+                            const { error } = await supabase.from('interview_profiles').insert([{
+                              profile_name: file.name.replace('.pdf', ''),
+                              cv_text: fullText
+                            }]);
+                            
+                            if (error) throw error;
+                            alert(lang === 'ar' ? 'تم استخراج النص وحفظه كبروفايل جديد بنجاح!' : 'CV text extracted and saved as a new profile successfully!');
+                            fetchProfiles();
+                          } catch (err: any) {
+                            console.error(err);
+                            alert(lang === 'ar' ? `حدث خطأ: ${err.message}` : `Error processing PDF: ${err.message}`);
+                          }
+                        }}
+                      />
+                      <button 
+                        onClick={() => document.getElementById('cv-upload')?.click()}
+                        className={`flex-1 py-4 border border-dashed rounded-xl font-bold transition-all ${theme === 'dark' ? 'border-white/20 hover:border-blue-500 hover:bg-blue-500/10 text-gray-400' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 text-gray-600'}`}
+                      >
+                        Upload CV PDF (Auto-Create)
+                      </button>
+                    </div>
+                  )}
 
                   {selectedProfileId && (
                     <div className="w-full max-w-md space-y-6">
@@ -1056,17 +1147,24 @@ export default function Dashboard() {
                     </div>
                   )}
 
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {!isEditingProfile && (
                   <button 
                     onClick={() => {
-                      if(!selectedProfileId) return alert('Please select or upload a CV first!');
+                      if(!selectedProfileId) return alert('Please select a profile first!');
                       setIsSessionActive(true);
-                      setTranscript([{ role: 'system', text: 'Session started. Click the mic icon to start listening.' }]);
+                      setTranscript([{ role: 'system', text: 'Session started. Click the mic icon or type a question to begin.' }]);
                     }}
-                    className={`flex-1 py-4 text-white rounded-xl font-bold transition-all ${selectedProfileId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-500 cursor-not-allowed opacity-50'}`}
+                    className={`w-full max-w-2xl py-5 mt-4 text-white rounded-2xl font-bold text-lg transition-all shadow-xl ${selectedProfileId ? 'bg-blue-600 hover:bg-blue-500 hover:scale-[1.02]' : 'bg-gray-500 cursor-not-allowed opacity-50'}`}
                   >
                     Start Session
                   </button>
-                </div>
+                )}
+              </div>
               </div>
             ) : (
               <div className={`p-4 md:p-8 rounded-3xl border flex flex-col min-h-[600px] ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
