@@ -463,14 +463,46 @@ export default function Dashboard() {
         setTranscript(prev => [...prev, { role: 'assistant', text: data.answer }]);
         
         if (isVoiceEnabled) {
-          // Free browser built-in TTS
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(data.answer);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.95;
-            utterance.pitch = 1;
-            window.speechSynthesis.speak(utterance);
+          const playBrowserTTS = (textToSpeak: string) => {
+            if ('speechSynthesis' in window) {
+              window.speechSynthesis.cancel();
+              const utterance = new SpeechSynthesisUtterance(textToSpeak);
+              utterance.lang = 'en-US';
+              utterance.rate = 0.95;
+              utterance.pitch = 1;
+              window.speechSynthesis.speak(utterance);
+            }
+          };
+
+          if (profile.voice_id) {
+            try {
+              console.log('Fetching Cartesia TTS audio for voice:', profile.voice_id);
+              const ttsRes = await fetch('/api/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  text: data.answer,
+                  voiceId: profile.voice_id
+                })
+              });
+              
+              if (ttsRes.ok) {
+                const audioBlob = await ttsRes.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.play();
+              } else {
+                const errData = await ttsRes.json();
+                console.error("Cartesia API Error:", errData);
+                alert(`Cartesia TTS Error: ${errData.error || 'Check logs'}`);
+                playBrowserTTS(data.answer);
+              }
+            } catch (ttsErr) {
+              console.error("TTS Exception:", ttsErr);
+              playBrowserTTS(data.answer);
+            }
+          } else {
+            playBrowserTTS(data.answer);
           }
         }
       } catch (e: any) {
