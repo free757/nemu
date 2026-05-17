@@ -68,36 +68,42 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreateProfile = async () => {
-    try {
-      const { data, error } = await supabase.from('interview_profiles').insert([{ profile_name: 'New Candidate', cv_text: '' }]).select();
-      if (error) {
-        alert('Database error: ' + error.message);
-        return;
-      }
-      if (data && data.length > 0) {
-        await fetchProfiles();
-        setSelectedProfileId(data[0].id);
-        setEditProfileData({ name: data[0].profile_name, cv: '', prompt: '' });
-        setIsEditingProfile(true);
-      }
-    } catch (e: any) {
-      alert('Error: ' + e.message);
-    }
+  const handleCreateProfile = () => {
+    setSelectedProfileId('new');
+    setEditProfileData({ name: '', cv: '', prompt: '' });
+    setIsEditingProfile(true);
   };
 
   const handleSaveProfile = async () => {
-    const { error } = await supabase.from('interview_profiles').update({
-      profile_name: editProfileData.name,
-      cv_text: editProfileData.cv,
-      system_prompt: editProfileData.prompt
-    }).eq('id', selectedProfileId);
+    if (!editProfileData.name.trim()) return alert(lang === 'ar' ? 'الرجاء إدخال اسم المرشح.' : 'Please enter a candidate name.');
     
-    if (!error) {
-      await fetchProfiles();
-      setIsEditingProfile(false);
+    if (selectedProfileId === 'new') {
+      const { data, error } = await supabase.from('interview_profiles').insert([{ 
+        profile_name: editProfileData.name, 
+        cv_text: editProfileData.cv,
+        system_prompt: editProfileData.prompt
+      }]).select();
+      
+      if (!error && data && data.length > 0) {
+        await fetchProfiles();
+        setSelectedProfileId(data[0].id);
+        setIsEditingProfile(false);
+      } else {
+        alert(error?.message || 'Failed to create profile');
+      }
     } else {
-      alert(error.message);
+      const { error } = await supabase.from('interview_profiles').update({
+        profile_name: editProfileData.name,
+        cv_text: editProfileData.cv,
+        system_prompt: editProfileData.prompt
+      }).eq('id', selectedProfileId);
+      
+      if (!error) {
+        await fetchProfiles();
+        setIsEditingProfile(false);
+      } else {
+        alert(error.message);
+      }
     }
   };
 
@@ -948,8 +954,13 @@ export default function Dashboard() {
                   {isEditingProfile ? (
                     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
                       <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-white/10 pb-4">
-                        <h3 className="text-xl font-bold">Edit Candidate Profile</h3>
-                        <button onClick={() => setIsEditingProfile(false)} className="text-gray-500 hover:text-gray-800 dark:hover:text-white font-bold">Cancel</button>
+                        <h3 className="text-xl font-bold">{selectedProfileId === 'new' ? 'Create New Profile' : 'Edit Candidate Profile'}</h3>
+                        <button onClick={() => {
+                          if (selectedProfileId === 'new') {
+                            setSelectedProfileId(interviewProfiles.length > 0 ? interviewProfiles[0].id : '');
+                          }
+                          setIsEditingProfile(false);
+                        }} className="text-gray-500 hover:text-gray-800 dark:hover:text-white font-bold">Cancel</button>
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-gray-500 mb-2">Candidate Name</label>
