@@ -40,7 +40,8 @@ Do not add punctuation or any other words.`;
 
     const data = await response.json();
     if (!response.ok) {
-      return NextResponse.json({ isComplete: false, error: 'API Error' });
+      console.error('Check Completion OpenRouter Error:', data);
+      return NextResponse.json({ isComplete: false, error: data.error?.message || 'OpenRouter API Error' });
     }
 
     const answer = data.choices?.[0]?.message?.content?.trim().toUpperCase();
