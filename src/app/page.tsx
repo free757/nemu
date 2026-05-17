@@ -1058,18 +1058,38 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-2">
-                  {transcript.map((msg, i) => (
-                    <div key={i} className={`p-4 rounded-2xl max-w-[90%] md:max-w-[80%] ${
-                      msg.role === 'user' ? 'bg-gray-100 text-gray-800 self-start ml-0 mr-auto' : 
-                      msg.role === 'assistant' ? 'bg-blue-600 text-white self-end ml-auto mr-0' : 
-                      'bg-transparent border border-dashed border-gray-300 text-gray-500 text-center mx-auto text-sm w-full'
-                    }`}>
-                      {msg.role === 'assistant' && <strong className="block mb-1 text-blue-200 text-xs">Suggested Answer:</strong>}
-                      {msg.role === 'user' && <strong className="block mb-1 text-gray-500 text-xs">Question Heard:</strong>}
-                      <span className="text-sm md:text-base">{msg.text}</span>
-                    </div>
-                  ))}
+                <div className="flex-1 overflow-y-auto space-y-6 mb-6 pr-2 scroll-smooth">
+                  {transcript.map((msg, i) => {
+                    if (msg.role === 'assistant') {
+                      return (
+                        <div key={i} className={`w-full ${theme === 'dark' ? 'bg-blue-900/20 border-blue-500/50' : 'bg-blue-50 border-blue-400'} border-l-4 p-5 md:p-8 rounded-r-2xl shadow-sm transition-all`}>
+                          <strong className={`block mb-3 text-xs md:text-sm tracking-wider uppercase font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                            💡 Suggested Answer
+                          </strong>
+                          <p className={`text-xl md:text-3xl font-medium leading-relaxed tracking-wide ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                            {msg.text}
+                          </p>
+                        </div>
+                      );
+                    }
+                    if (msg.role === 'user') {
+                      return (
+                        <div key={i} className={`w-full p-4 md:p-5 rounded-xl border ${theme === 'dark' ? 'bg-white/5 border-white/10 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+                          <strong className="block mb-2 text-xs tracking-wider uppercase opacity-60">
+                            🎤 Question Heard
+                          </strong>
+                          <p className="text-sm md:text-lg italic">
+                            "{msg.text}"
+                          </p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={i} className="w-full py-3 bg-transparent text-gray-500 text-center mx-auto text-sm border border-dashed border-gray-300/20 rounded-lg">
+                        {msg.text}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-2 mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
