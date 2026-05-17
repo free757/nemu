@@ -35,8 +35,8 @@ CRITICAL RULES:
 
     const userMessage = `CV Content:\n${safeCvText}\n\nInterview Question:\n"${question}"`;
 
-    // ─── Option A: OpenRouter (meta-llama/llama-3.1-8b-instruct:free) ────────
-    console.log('Using OpenRouter (meta-llama/llama-3.1-8b-instruct:free)...');
+    // ─── Option A: OpenRouter (meta-llama/llama-3.3-70b-instruct:free) ────────
+    console.log('Using OpenRouter (meta-llama/llama-3.3-70b-instruct:free)...');
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -46,7 +46,7 @@ CRITICAL RULES:
         'X-Title': 'Nemu AI Interview Assistant',
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-8b-instruct:free',
+        model: 'meta-llama/llama-3.3-70b-instruct:free',
         messages: [
           { role: 'system', content: finalSystemPrompt },
           { role: 'user', content: userMessage },
