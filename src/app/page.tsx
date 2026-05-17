@@ -1073,7 +1073,7 @@ export default function Dashboard() {
                         <div className="flex gap-2">
                           <input 
                             type="text"
-                            placeholder="Paste ElevenLabs Voice ID here..."
+                            placeholder="Paste Cartesia Voice ID here..."
                             defaultValue={interviewProfiles.find(p => p.id === selectedProfileId)?.voice_id || ''}
                             id="manual-voice-id"
                             className={`flex-1 p-4 rounded-xl border outline-none font-mono text-sm ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-blue-400' : 'bg-gray-50 border-gray-200 text-blue-600'}`}

@@ -4,39 +4,47 @@ export async function POST(req: Request) {
   try {
     const { text, apiKey, voiceId: reqVoiceId } = await req.json();
 
-    // Support both camelCase and UPPERCASE environment variables
-    const elevenLabsKey = process.env.ElevenLabs_API_Key || process.env.ELEVENLABS_API_KEY || apiKey;
+    const cartesiaKey = process.env.CARTESIA_API_KEY || apiKey;
 
-    if (!elevenLabsKey) {
-      return NextResponse.json({ error: 'ElevenLabs API key is missing. Please set ElevenLabs_API_Key in Vercel.' }, { status: 400 });
+    if (!cartesiaKey) {
+      return NextResponse.json({ error: 'Cartesia API key is missing. Please set CARTESIA_API_KEY in Vercel.' }, { status: 400 });
     }
 
-    // Default Voice ID: Rachel (21m00Tcm4TlvDq8ikWAM)
-    // Use the requested voiceId if provided, else fallback to Rachel
-    const voiceId = reqVoiceId || '21m00Tcm4TlvDq8ikWAM'; 
+    // Default Voice ID: Cartesia's Default British Female Voice (e.g. Gemma or similar)
+    let voiceId = reqVoiceId;
+    if (!voiceId || !voiceId.includes('-')) {
+      // If no ID or it's an old ElevenLabs ID, use a standard Cartesia Voice UUID
+      // This is a common English Female voice on Cartesia
+      voiceId = 'a0e99841-438c-4a64-b6a9-62f108dddef2'; 
+    }
 
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const response = await fetch('https://api.cartesia.ai/tts/bytes', {
       method: 'POST',
       headers: {
-        'Accept': 'audio/mpeg',
+        'Cartesia-Version': '2024-06-10',
+        'X-API-Key': cartesiaKey,
         'Content-Type': 'application/json',
-        'xi-api-key': elevenLabsKey
       },
       body: JSON.stringify({
-        text,
-        model_id: 'eleven_multilingual_v2', // Multilingual supports Arabic and English if needed
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75
+        model_id: 'sonic-multilingual', // Multilingual supports many languages
+        transcript: text,
+        voice: {
+          mode: 'id',
+          id: voiceId
+        },
+        output_format: {
+          container: 'mp3',
+          encoding: 'mp3',
+          sample_rate: 44100
         }
       })
     });
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        console.error('ElevenLabs API Error:', JSON.stringify(errData));
+        console.error('Cartesia API Error:', JSON.stringify(errData));
         return NextResponse.json({ 
-          error: errData.detail?.message || 'ElevenLabs API Error',
+          error: errData.error?.message || 'Cartesia API Error',
           raw: errData 
         }, { status: response.status });
     }
