@@ -69,12 +69,20 @@ export default function Dashboard() {
   };
 
   const handleCreateProfile = async () => {
-    const { data, error } = await supabase.from('interview_profiles').insert([{ profile_name: 'New Candidate' }]).select();
-    if (data && data.length > 0) {
-      await fetchProfiles();
-      setSelectedProfileId(data[0].id);
-      setEditProfileData({ name: data[0].profile_name, cv: '', prompt: '' });
-      setIsEditingProfile(true);
+    try {
+      const { data, error } = await supabase.from('interview_profiles').insert([{ profile_name: 'New Candidate', cv_text: '' }]).select();
+      if (error) {
+        alert('Database error: ' + error.message);
+        return;
+      }
+      if (data && data.length > 0) {
+        await fetchProfiles();
+        setSelectedProfileId(data[0].id);
+        setEditProfileData({ name: data[0].profile_name, cv: '', prompt: '' });
+        setIsEditingProfile(true);
+      }
+    } catch (e: any) {
+      alert('Error: ' + e.message);
     }
   };
 
