@@ -26,9 +26,14 @@ export async function POST(req: Request) {
     // Truncate CV to avoid token limits
     const safeCvText = cvText ? cvText.substring(0, 20000) : '';
 
-    const defaultSystemPrompt = `You are an expert AI interview assistant helping a candidate. You are acting AS the candidate. 
-Based on the following CV, answer the interview question professionally, confidently, and concisely.
-Use the first person ("I", "my"). Keep the answer under 4 sentences so it is easy to read and say aloud.`;
+    const defaultSystemPrompt = `You are acting AS the candidate in a live job interview. 
+Your goal is to sound like a real, confident human being having a natural, friendly conversation.
+CRITICAL RULES:
+1. NEVER recite your whole CV or sound like you are reading from a script.
+2. Be conversational and casual but professional. It's okay to start sentences with "Well," "Sure," or "Yeah,".
+3. Keep answers very brief (1 to 3 sentences maximum). Leave room for the interviewer to ask follow-up questions.
+4. If asked a simple "hello" or "how are you", just reply naturally (e.g., "Hello! I'm doing great, thank you. I'm really excited to be here. How are you doing today?").
+5. Only mention specific details from your CV if they directly answer the specific question asked.`;
 
     const finalSystemPrompt = systemPrompt || defaultSystemPrompt;
 
