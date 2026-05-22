@@ -28,7 +28,8 @@ import {
   Upload,
   Mic,
   MicOff,
-  Ban
+  Ban,
+  Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -40,6 +41,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Notifications state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [notificationFormData, setNotificationFormData] = useState({ title: '', content: '' });
 
   // ── Auth Guard ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -149,6 +155,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (activeTab === 'tools') fetchProfiles();
+    if (activeTab === 'notifications') fetchNotifications();
   }, [activeTab]);
 
 
@@ -202,20 +209,25 @@ export default function Dashboard() {
       users: 'Users Management',
       config: 'Remote Config',
       tools: 'AI Tools',
+      notifications: 'Notification Center',
       signOut: 'Sign Out',
       title: 'Manage Users',
       configTitle: 'Remote Configuration',
       toolsTitle: 'AI Tools Suite',
+      notificationsTitle: 'Global Notifications',
       subtitle: 'Control everything in real-time from one place.',
       toolsSubtitle: 'Your personal AI productivity and career suite.',
+      notificationsSubtitle: 'Send messages and instructions to all mobile employees instantly.',
       addNew: 'Add New User',
       addConfig: 'Add New Config',
+      addNotification: 'Send Notification',
       search: 'Search users by name or PIN...',
       profile: 'User Profile',
       pin: 'PIN',
       proxy: 'Proxy Info',
       actions: 'Actions',
       noUsers: 'No users found matching your search.',
+      noNotifications: 'No notifications have been sent yet.',
       edit: 'Edit User Profile',
       create: 'Create New User',
       fullName: 'Full Name',
@@ -245,26 +257,34 @@ export default function Dashboard() {
       quickPastePlaceholder: 'Paste proxy string here...',
       isManager: 'Is Manager (Dashboard Access)',
       blockConfirm: 'Are you sure you want to block this user? They will be logged out of their phone instantly.',
-      unblockConfirm: 'Are you sure you want to unblock this user?'
+      unblockConfirm: 'Are you sure you want to unblock this user?',
+      notifTitle: 'Notification Title',
+      notifContent: 'Message Content',
+      send: 'Send Message'
     },
     ar: {
       users: 'إدارة المستخدمين',
       config: 'الإعدادات عن بعد',
       tools: 'أدوات الذكاء الاصطناعي',
+      notifications: 'مركز الإشعارات',
       signOut: 'تسجيل الخروج',
       title: 'إدارة المستخدمين',
       configTitle: 'الإعدادات عن بعد',
       toolsTitle: 'حزمة أدوات الذكاء الاصطناعي',
+      notificationsTitle: 'الإشعارات العامة',
       subtitle: 'تحكم في كل شيء في الوقت الفعلي من مكان واحد.',
       toolsSubtitle: 'حزمة أدواتك الشخصية للإنتاجية والمسار المهني.',
+      notificationsSubtitle: 'أرسل رسائل وتوجيهات لجميع الموظفين على الهواتف فوراً.',
       addNew: 'إضافة مستخدم جديد',
       addConfig: 'إضافة إعداد جديد',
+      addNotification: 'إرسال إشعار جديد',
       search: 'ابحث عن المستخدمين بالاسم أو الـ PIN...',
       profile: 'ملف المستخدم',
       pin: 'كود الدخول',
       proxy: 'بيانات البروكسي',
       actions: 'الإجراءات',
       noUsers: 'لم يتم العثور على مستخدمين يطابقون بحثك.',
+      noNotifications: 'لم يتم إرسال أي إشعارات بعد.',
       edit: 'تعديل ملف المستخدم',
       create: 'إنشاء مستخدم جديد',
       fullName: 'الاسم الكامل',
@@ -294,7 +314,10 @@ export default function Dashboard() {
       quickPastePlaceholder: 'الصق سطر البروكسي هنا...',
       isManager: 'مدير (صلاحية دخول لوحة التحكم)',
       blockConfirm: 'هل أنت متأكد من حظر هذا المستخدم؟ سيتم طرده وتسجيل خروجه من الهاتف فوراً.',
-      unblockConfirm: 'هل أنت متأكد من إلغاء حظر هذا المستخدم؟'
+      unblockConfirm: 'هل أنت متأكد من إلغاء حظر هذا المستخدم؟',
+      notifTitle: 'عنوان الإشعار',
+      notifContent: 'محتوى الرسالة',
+      send: 'إرسال الرسالة'
     }
   }[lang];
 
@@ -310,9 +333,44 @@ export default function Dashboard() {
     if (!error) setRemoteConfigs(data);
   };
 
+  const fetchNotifications = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+    if (!error) setNotifications(data);
+    setLoading(false);
+  };
+
+  const handleNotificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notificationFormData.title || !notificationFormData.content) {
+      alert(lang === 'ar' ? 'يرجى ملء جميع الحقول!' : 'Please fill all fields!');
+      return;
+    }
+    const { error } = await supabase.from('notifications').insert([notificationFormData]);
+    if (!error) {
+      setIsNotificationModalOpen(false);
+      setNotificationFormData({ title: '', content: '' });
+      fetchNotifications();
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    if (confirm(lang === 'ar' ? 'هل أنت متأكد من حذف هذا الإشعار؟' : 'Are you sure you want to delete this notification?')) {
+      const { error } = await supabase.from('notifications').delete().eq('id', id);
+      if (!error) {
+        fetchNotifications();
+      } else {
+        alert(error.message);
+      }
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchConfigs();
+    fetchNotifications();
   }, []);
 
   const handleDeleteClick = (id: string, name: string, type: 'user' | 'config' = 'user') => {
@@ -1031,6 +1089,13 @@ export default function Dashboard() {
                   <Bot className="w-5 h-5 flex-shrink-0" />
                   {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.tools}</motion.span>}
                 </button>
+                <button 
+                  onClick={() => { setActiveTab('notifications'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'notifications' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <Bell className="w-5 h-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.notifications}</motion.span>}
+                </button>
               </nav>
 
               <div className={`p-4 border-t border-white/5 space-y-4 ${isSidebarCollapsed ? 'items-center flex flex-col px-0' : ''}`}>
@@ -1069,10 +1134,10 @@ export default function Dashboard() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-2">
-              {activeTab === 'users' ? t.title : activeTab === 'config' ? t.configTitle : t.toolsTitle}
+              {activeTab === 'users' ? t.title : activeTab === 'config' ? t.configTitle : activeTab === 'notifications' ? t.notificationsTitle : t.toolsTitle}
             </h1>
             <p className="text-gray-500 text-sm md:text-base">
-              {activeTab === 'users' ? t.subtitle : activeTab === 'config' ? t.subtitle : t.toolsSubtitle}
+              {activeTab === 'users' ? t.subtitle : activeTab === 'config' ? t.subtitle : activeTab === 'notifications' ? t.notificationsSubtitle : t.toolsSubtitle}
             </p>
           </div>
           
@@ -1080,17 +1145,17 @@ export default function Dashboard() {
             {activeTab !== 'tools' && (
               <>
                 <button 
-                  onClick={activeTab === 'users' ? fetchUsers : fetchConfigs}
+                  onClick={activeTab === 'users' ? fetchUsers : activeTab === 'config' ? fetchConfigs : fetchNotifications}
                   className={`p-3 border rounded-xl transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
                 >
                   <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
                 <button 
-                  onClick={handleOpenAdd}
+                  onClick={activeTab === 'notifications' ? () => setIsNotificationModalOpen(true) : handleOpenAdd}
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20"
                 >
                   <Plus className="w-5 h-5" />
-                  <span>{activeTab === 'users' ? t.addNew : t.addConfig}</span>
+                  <span>{activeTab === 'users' ? t.addNew : activeTab === 'config' ? t.addConfig : t.addNotification}</span>
                 </button>
               </>
             )}
@@ -1332,6 +1397,52 @@ export default function Dashboard() {
                     <div className={`rounded-2xl p-4 font-mono overflow-x-auto max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-black/50' : 'bg-gray-50 border border-gray-100'}`}>
                       <pre className={`text-blue-400 ${lang === 'ar' ? 'text-right' : 'text-left'} text-xs md:text-sm`}>{JSON.stringify(config.config_value, null, 2)}</pre>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'notifications' ? (
+          <div className="space-y-6 max-w-5xl">
+            {notifications.length === 0 ? (
+              <div className={`p-16 text-center rounded-[2rem] border ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'} flex flex-col items-center justify-center space-y-4`}>
+                <Bell className="w-12 h-12 text-gray-500 animate-bounce" />
+                <h3 className="text-xl font-bold">{t.noNotifications}</h3>
+                <p className="text-sm text-gray-500 max-w-sm">
+                  {lang === 'ar' 
+                    ? 'لم يتم إرسال أي إشعار حتى الآن للموظفين. يمكنك إرسال إشعارك الأول الآن!' 
+                    : 'Get started by creating your very first global notification for your employees.'}
+                </p>
+                <button
+                  onClick={() => setIsNotificationModalOpen(true)}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                >
+                  <Plus className="w-5 h-5" />
+                  {t.addNotification}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {notifications.map((notif) => (
+                  <div key={notif.id} className={`p-6 rounded-3xl border flex justify-between items-start gap-4 transition-all hover:scale-[1.01] ${theme === 'dark' ? 'bg-[#111] border-white/5 hover:border-white/10' : 'bg-white border-gray-200 hover:shadow-lg'}`}>
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-600/10 text-blue-500 rounded-lg flex items-center justify-center">
+                          <Bell className="w-4 h-4" />
+                        </div>
+                        <h4 className="text-lg font-bold">{notif.title}</h4>
+                      </div>
+                      <p className="text-gray-400 text-sm md:text-base whitespace-pre-wrap">{notif.content}</p>
+                      <span className="text-xs text-gray-500 block">
+                        {new Date(notif.created_at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteNotification(notif.id)}
+                      className="p-3 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -2033,6 +2144,67 @@ export default function Dashboard() {
                     className="flex-1 px-6 py-4 bg-blue-600 rounded-2xl font-bold hover:bg-blue-500 transition-all text-white"
                   >
                     {editingConfig ? t.save : t.createBtn}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Send Notification Modal */}
+      <AnimatePresence>
+        {isNotificationModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsNotificationModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={`relative w-full max-w-lg rounded-[2.5rem] border p-8 shadow-2xl ${theme === 'dark' ? 'bg-[#111] border-white/10' : 'bg-white border-gray-200'}`}
+            >
+              <h2 className={`text-2xl font-bold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{t.addNotification}</h2>
+              <form onSubmit={handleNotificationSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400 ml-1">{t.notifTitle}</label>
+                  <input 
+                    required
+                    value={notificationFormData.title}
+                    onChange={e => setNotificationFormData({...notificationFormData, title: e.target.value})}
+                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'}`}
+                    placeholder={lang === 'ar' ? 'أدخل عنوان الإشعار...' : 'Enter title...'}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-400 ml-1">{t.notifContent}</label>
+                  <textarea 
+                    required
+                    rows={4}
+                    value={notificationFormData.content}
+                    onChange={e => setNotificationFormData({...notificationFormData, content: e.target.value})}
+                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all resize-none ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'}`}
+                    placeholder={lang === 'ar' ? 'اكتب محتوى الإشعار بالتفصيل هنا...' : 'Enter message content here...'}
+                  />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsNotificationModalOpen(false)}
+                    className={`flex-1 px-6 py-4 rounded-2xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  >
+                    {t.cancel}
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-6 py-4 bg-blue-600 rounded-2xl font-bold hover:bg-blue-500 transition-all text-white shadow-lg shadow-blue-600/20"
+                  >
+                    {t.send}
                   </button>
                 </div>
               </form>
