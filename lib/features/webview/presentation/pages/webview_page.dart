@@ -150,9 +150,13 @@ class _WebViewPageState extends State<WebViewPage> {
             const elements = document.querySelectorAll(selector);
             elements.forEach(el => el.style.display = 'none');
           });
+        }
 
-          // Apply Custom JS from remote config
+        // 3. ALWAYS run Custom JS from Remote Config at the end as an ultimate override!
+        try {
           $customJs
+        } catch(e) {
+          console.error("Remote Config Custom JS Error:", e);
         }
       })();
     ''');
