@@ -110,36 +110,44 @@ export default function LoginPage() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden flex flex-col items-center justify-center select-none"
-         style={{ background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)' }}>
+         style={{ background: 'linear-gradient(135deg, #070b19 0%, #0f172a 50%, #1e1b4b 100%)' }}>
       
-      {/* Animated ambient blobs */}
+      {/* Animated premium ambient blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-96 h-96 rounded-full blur-3xl opacity-20 animate-pulse"
-             style={{ background: 'radial-gradient(circle, #4f8ef7, transparent)', top: '-5%', left: '-5%' }} />
-        <div className="absolute w-80 h-80 rounded-full blur-3xl opacity-15 animate-pulse"
-             style={{ background: 'radial-gradient(circle, #a855f7, transparent)', bottom: '5%', right: '0%', animationDelay: '1s' }} />
-        <div className="absolute w-64 h-64 rounded-full blur-3xl opacity-10 animate-pulse"
-             style={{ background: 'radial-gradient(circle, #06b6d4, transparent)', bottom: '20%', left: '10%', animationDelay: '2s' }} />
+        <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25 animate-pulse"
+             style={{ background: 'radial-gradient(circle, #2563eb, transparent)', top: '-10%', left: '-10%', animationDuration: '8s' }} />
+        <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20 animate-pulse"
+             style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%', animationDelay: '2s', animationDuration: '10s' }} />
+        <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-15 animate-pulse"
+             style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', top: '25%', right: '20%', animationDelay: '4s', animationDuration: '12s' }} />
+      </div>
+
+      {/* Desktop Clock (Top Center, macOS Style) */}
+      <div className="hidden md:block absolute top-16 text-center z-10 select-none">
+        <h1 className="text-8xl font-thin text-white/90 tracking-tight" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+          {time}
+        </h1>
+        <p className="text-lg text-white/55 mt-3 font-light tracking-wide">{date}</p>
       </div>
 
       {/* macOS-style frosted glass panel */}
-      <div className="relative z-10 flex flex-col items-center gap-8 px-10 py-12 rounded-3xl"
+      <div className="relative z-10 flex flex-col items-center gap-8 px-10 py-12 rounded-[2.5rem] w-full max-w-[380px] md:max-w-[400px]"
            style={{
-             background: 'rgba(255,255,255,0.04)',
-             backdropFilter: 'blur(40px)',
-             WebkitBackdropFilter: 'blur(40px)',
-             border: '1px solid rgba(255,255,255,0.10)',
-             boxShadow: '0 32px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
-             minWidth: 340
+             background: 'rgba(255,255,255,0.03)',
+             backdropFilter: 'blur(50px)',
+             WebkitBackdropFilter: 'blur(50px)',
+             border: '1px solid rgba(255,255,255,0.08)',
+             boxShadow: '0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
            }}>
 
-        {/* Clock */}
-        <div className="text-center">
+        {/* Mobile Clock (Only visible inside panel on small screens) */}
+        <div className="text-center md:hidden mb-2">
           <div className="text-5xl font-thin text-white tracking-tight" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             {time}
           </div>
           <div className="text-sm text-white/40 mt-1 font-light tracking-wide">{date}</div>
         </div>
+
 
         {/* Avatar */}
         <div className="flex flex-col items-center gap-3">
