@@ -158,7 +158,8 @@ export default function Dashboard() {
     proxy_user: '',
     proxy_pass: '',
     proxy_location: '',
-    proxy_timezone: ''
+    proxy_timezone: '',
+    is_manager: false
   });
 
   const [quickPaste, setQuickPaste] = useState('');
@@ -237,7 +238,8 @@ export default function Dashboard() {
       confirmBtn: 'Yes, Delete',
       confirmCancel: 'No, Keep',
       quickPaste: 'Quick Paste (IP:Port:User:Pass)',
-      quickPastePlaceholder: 'Paste proxy string here...'
+      quickPastePlaceholder: 'Paste proxy string here...',
+      isManager: 'Is Manager (Dashboard Access)'
     },
     ar: {
       users: 'إدارة المستخدمين',
@@ -283,7 +285,8 @@ export default function Dashboard() {
       confirmBtn: 'نعم، احذف',
       confirmCancel: 'لا، تراجع',
       quickPaste: 'لصق سريع (IP:Port:User:Pass)',
-      quickPastePlaceholder: 'الصق سطر البروكسي هنا...'
+      quickPastePlaceholder: 'الصق سطر البروكسي هنا...',
+      isManager: 'مدير (صلاحية دخول لوحة التحكم)'
     }
   }[lang];
 
@@ -333,7 +336,8 @@ export default function Dashboard() {
       proxy_user: user.proxy_user || '',
       proxy_pass: user.proxy_pass || '',
       proxy_location: user.proxy_location || '',
-      proxy_timezone: user.proxy_timezone || ''
+      proxy_timezone: user.proxy_timezone || '',
+      is_manager: user.is_manager || false
     });
     setIsModalOpen(true);
   };
@@ -355,7 +359,7 @@ export default function Dashboard() {
       setFormData({
         pin: '', username: '', phone_number: '',
         proxy_ip: '', proxy_port: '', proxy_user: '', proxy_pass: '',
-        proxy_location: '', proxy_timezone: ''
+        proxy_location: '', proxy_timezone: '', is_manager: false
       });
       setIsModalOpen(true);
     } else {
@@ -1047,7 +1051,14 @@ export default function Dashboard() {
                               {user.username?.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</p>
+                              <div className="flex items-center gap-2">
+                                <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</p>
+                                {user.is_manager && (
+                                  <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold uppercase tracking-wider">
+                                    Manager
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-gray-500 text-sm">{user.phone_number}</p>
                             </div>
                           </div>
@@ -1106,7 +1117,14 @@ export default function Dashboard() {
                         {user.username?.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h3 className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</h3>
+                          {user.is_manager && (
+                            <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold uppercase tracking-wider">
+                              Manager
+                            </span>
+                          )}
+                        </div>
                         <p className="text-gray-500 text-sm">{user.phone_number}</p>
                       </div>
                     </div>
@@ -1733,6 +1751,18 @@ export default function Dashboard() {
                       className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
                       placeholder="+20123456789"
                     />
+                  </div>
+                  <div className={`flex items-center justify-between p-4 rounded-2xl border transition-all h-[56px] self-end ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                    <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t.isManager}</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.is_manager} 
+                        onChange={e => setFormData({...formData, is_manager: e.target.checked})} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
                 </div>
 

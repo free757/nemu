@@ -44,8 +44,9 @@ export default function LoginPage() {
     try {
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, username, pin')
+        .select('id, username, pin, is_manager')
         .eq('pin', enteredPin)
+        .eq('is_manager', true)
         .single();
 
       if (error || !data) {
