@@ -105,7 +105,7 @@ export default function LoginPage() {
       x: [0, -18, 18, -14, 14, -8, 8, -4, 4, 0],
       transition: { duration: 0.5, ease: 'easeInOut' }
     }
-  };
+  } as any;
 
   return (
     <div className="relative w-screen h-screen overflow-hidden flex flex-col items-center justify-center select-none"
