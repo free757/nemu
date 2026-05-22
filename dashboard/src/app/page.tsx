@@ -61,6 +61,7 @@ export default function Dashboard() {
   const [blockTargetUser, setBlockTargetUser] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editingConfig, setEditingConfig] = useState<any>(null);
+  const [visualProjects, setVisualProjects] = useState<any[]>([]);
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -374,9 +375,26 @@ export default function Dashboard() {
 
   const handleOpenConfigEdit = (config: any) => {
     setEditingConfig(config);
+    const isProjects = config.config_key === 'projects';
+    let valStr = '';
+    if (typeof config.config_value === 'object') {
+      valStr = JSON.stringify(config.config_value, null, 2);
+      if (isProjects) {
+        setVisualProjects(config.config_value || []);
+      }
+    } else {
+      valStr = config.config_value;
+      if (isProjects) {
+        try {
+          setVisualProjects(JSON.parse(config.config_value) || []);
+        } catch {
+          setVisualProjects([]);
+        }
+      }
+    }
     setConfigFormData({
       config_key: config.config_key,
-      config_value: typeof config.config_value === 'object' ? JSON.stringify(config.config_value, null, 2) : config.config_value,
+      config_value: valStr,
       is_enabled: config.is_enabled
     });
     setIsConfigModalOpen(true);
@@ -394,6 +412,7 @@ export default function Dashboard() {
       setIsModalOpen(true);
     } else {
       setEditingConfig(null);
+      setVisualProjects([]);
       setConfigFormData({
         config_key: '',
         config_value: '',
@@ -431,15 +450,21 @@ export default function Dashboard() {
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let parsedValue;
-    try {
-      parsedValue = JSON.parse(configFormData.config_value);
-    } catch (e) {
-      parsedValue = configFormData.config_value;
+    
+    if (configFormData.config_key === 'projects') {
+      parsedValue = visualProjects;
+    } else {
+      try {
+        parsedValue = JSON.parse(configFormData.config_value);
+      } catch (e) {
+        parsedValue = configFormData.config_value;
+      }
     }
 
     const payload = {
-      ...configFormData,
-      config_value: parsedValue
+      config_key: configFormData.config_key,
+      config_value: parsedValue,
+      is_enabled: configFormData.is_enabled
     };
 
     let error;
@@ -1721,17 +1746,223 @@ export default function Dashboard() {
                     placeholder="e.g. home_button_url"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-gray-400 ml-1">{t.configVal}</label>
-                  <textarea 
-                    required
-                    rows={6}
-                    value={configFormData.config_value}
-                    onChange={e => setConfigFormData({...configFormData, config_value: e.target.value})}
-                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
-                    placeholder='{"url": "https://google.com", "label": "Google"}'
-                  />
-                </div>
+                {configFormData.config_key === 'projects' ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-sm font-bold text-gray-400">{lang === 'ar' ? 'المشاريع / أزرار التطبيقات' : 'Projects / App Buttons'}</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVisualProjects([
+                            ...visualProjects,
+                            {
+                              id: `project-${Date.now()}`,
+                              name: lang === 'ar' ? 'مشروع جديد' : 'New Project',
+                              url: '',
+                              color: '0xFF3B82F6',
+                              selectors_to_hide: [],
+                              custom_js: '',
+                              android_package_name: '',
+                              ios_url_scheme: '',
+                              app_store_link: ''
+                            }
+                          ]);
+                        }}
+                        className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold flex items-center gap-1 transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {lang === 'ar' ? 'إضافة زر جديد' : 'Add New Button'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1">
+                      {visualProjects.map((proj, idx) => {
+                        const isApp = proj.android_package_name || proj.ios_url_scheme;
+                        return (
+                          <div key={proj.id} className={`p-5 rounded-3xl border space-y-4 relative ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVisualProjects(visualProjects.filter(p => p.id !== proj.id));
+                              }}
+                              className="absolute top-4 right-4 p-1.5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                              title="Remove Project"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+
+                            {/* Basic Info */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-xs text-gray-500 font-medium">{lang === 'ar' ? 'اسم الزر / المشروع' : 'Button / Project Name'}</label>
+                                <input
+                                  required
+                                  value={proj.name}
+                                  onChange={e => {
+                                    const newList = [...visualProjects];
+                                    newList[idx].name = e.target.value;
+                                    setVisualProjects(newList);
+                                  }}
+                                  className={`w-full text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                  placeholder="e.g. Toloka AI"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-xs text-gray-500 font-medium">{lang === 'ar' ? 'لون الزر (كود Hex)' : 'Button Color (Hex)'}</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    value={proj.color}
+                                    onChange={e => {
+                                      const newList = [...visualProjects];
+                                      newList[idx].color = e.target.value;
+                                      setVisualProjects(newList);
+                                    }}
+                                    className={`flex-1 text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                    placeholder="e.g. 0xFF3B82F6"
+                                  />
+                                  <div 
+                                    className="w-11 h-11 rounded-xl border border-white/10"
+                                    style={{ backgroundColor: proj.color.startsWith('0xFF') ? `#${proj.color.substring(4)}` : proj.color }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Type selector */}
+                            <div className="space-y-2">
+                              <label className="text-xs text-gray-500 font-medium">{lang === 'ar' ? 'نوع الإجراء عند الضغط' : 'Action Type on Click'}</label>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newList = [...visualProjects];
+                                    newList[idx].android_package_name = '';
+                                    newList[idx].ios_url_scheme = '';
+                                    newList[idx].app_store_link = '';
+                                    setVisualProjects(newList);
+                                  }}
+                                  className={`flex-1 py-2 px-3 text-xs rounded-xl font-bold border transition-all ${!isApp ? 'bg-blue-600/10 border-blue-500 text-blue-400' : 'bg-transparent border-white/5 text-gray-400'}`}
+                                >
+                                  {lang === 'ar' ? 'فتح موقع ويب (WebView)' : 'Open Website (WebView)'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newList = [...visualProjects];
+                                    if (!newList[idx].android_package_name) newList[idx].android_package_name = 'com.example.app';
+                                    setVisualProjects(newList);
+                                  }}
+                                  className={`flex-1 py-2 px-3 text-xs rounded-xl font-bold border transition-all ${isApp ? 'bg-blue-600/10 border-blue-500 text-blue-400' : 'bg-transparent border-white/5 text-gray-400'}`}
+                                >
+                                  {lang === 'ar' ? 'فتح تطبيق خارجي (أندرويد / آيفون)' : 'Open Native App (Android/iOS)'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Fields based on type */}
+                            {!isApp ? (
+                              <div className="space-y-3 animate-in fade-in duration-150">
+                                <div className="space-y-1">
+                                  <label className="text-xs text-gray-500 font-medium">WebView URL</label>
+                                  <input
+                                    required
+                                    value={proj.url}
+                                    onChange={e => {
+                                      const newList = [...visualProjects];
+                                      newList[idx].url = e.target.value;
+                                      setVisualProjects(newList);
+                                    }}
+                                    type="url"
+                                    className={`w-full text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                    placeholder="https://we.toloka.ai/..."
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-xs text-gray-500 font-medium">{lang === 'ar' ? 'العناصر المراد إخفاؤها (فصل بفاصلة)' : 'CSS Selectors to Hide (comma-separated)'}</label>
+                                  <input
+                                    value={proj.selectors_to_hide?.join(', ')}
+                                    onChange={e => {
+                                      const newList = [...visualProjects];
+                                      newList[idx].selectors_to_hide = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                                      setVisualProjects(newList);
+                                    }}
+                                    className={`w-full text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                    placeholder=".header-banner, .footer-links"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-3 animate-in fade-in duration-150">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 font-medium">Android Package Name (Google Play)</label>
+                                    <input
+                                      required
+                                      value={proj.android_package_name}
+                                      onChange={e => {
+                                        const newList = [...visualProjects];
+                                        newList[idx].android_package_name = e.target.value;
+                                        setVisualProjects(newList);
+                                      }}
+                                      className={`w-full text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                      placeholder="e.g. com.github.shadowsocks"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-xs text-gray-500 font-medium">iOS URL Scheme (App Store)</label>
+                                    <input
+                                      value={proj.ios_url_scheme}
+                                      onChange={e => {
+                                        const newList = [...visualProjects];
+                                        newList[idx].ios_url_scheme = e.target.value;
+                                        setVisualProjects(newList);
+                                      }}
+                                      className={`w-full text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                      placeholder="e.g. shadowsocks://"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-xs text-gray-500 font-medium">{lang === 'ar' ? 'رابط التنزيل المباشر (Google Play / App Store)' : 'Store Link / Fallback Download Link'}</label>
+                                  <input
+                                    value={proj.app_store_link}
+                                    onChange={e => {
+                                      const newList = [...visualProjects];
+                                      newList[idx].app_store_link = e.target.value;
+                                      setVisualProjects(newList);
+                                    }}
+                                    type="url"
+                                    className={`w-full text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                    placeholder="https://play.google.com/store/apps/details?id=..."
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {visualProjects.length === 0 && (
+                        <div className="p-8 text-center text-gray-500 border border-dashed border-white/5 rounded-3xl">
+                          {lang === 'ar' ? 'لا توجد أزرار مضافة بعد. اضغط على "إضافة زر جديد".' : 'No buttons added yet. Click "Add New Button".'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-400 ml-1">{t.configVal}</label>
+                    <textarea 
+                      required
+                      rows={6}
+                      value={configFormData.config_value}
+                      onChange={e => setConfigFormData({...configFormData, config_value: e.target.value})}
+                      className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+                      placeholder='{"url": "https://google.com", "label": "Google"}'
+                    />
+                  </div>
+                )}
                 <div className="flex items-center gap-3">
                    <input 
                     type="checkbox"
