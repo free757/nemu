@@ -6,7 +6,15 @@ import '../../../remote_config/domain/entities/project_config.dart';
 
 class WebViewPage extends StatefulWidget {
   final ProjectConfig config;
-  const WebViewPage({super.key, required this.config});
+  final String? autoEmail;
+  final String? autoPassword;
+
+  const WebViewPage({
+    super.key,
+    required this.config,
+    this.autoEmail,
+    this.autoPassword,
+  });
 
   @override
   State<WebViewPage> createState() => _WebViewPageState();
@@ -35,9 +43,17 @@ class _WebViewPageState extends State<WebViewPage> {
   void initState() {
     super.initState();
     _loadBotImage();
+    
+    // 1. Force clear all cookies BEFORE loading to guarantee absolute privacy
+    WebViewCookieManager().clearCookies();
+
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
+      // 2. Set a clean Chrome Mobile User-Agent that masks the WebView identity
+      ..setUserAgent("Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36")
+      // 3. Clear all browser cache and local storage
+      ..clearCache()
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
@@ -61,17 +77,21 @@ class _WebViewPageState extends State<WebViewPage> {
     final customJs = widget.config.customJs;
     final isTolokaAuth = url.contains('we.toloka.ai/auth') || url.contains('we.toloka.ai/login');
 
+    final email = widget.autoEmail ?? '';
+    final password = widget.autoPassword ?? '';
+
     controller.runJavaScript('''
       (function() {
+        // --- 1. Automatic Toloka Auth Page Customization & Auto-Click ---
         if ($isTolokaAuth) {
-          // 1. Accept cookies automatically if banner exists
+          // Accept cookies automatically if banner exists
           const cookieButtons = Array.from(document.querySelectorAll('button'));
           const acceptBtn = cookieButtons.find(b => b.textContent && (b.textContent.includes('Accept all') || b.textContent.includes('قبول الكل')));
           if (acceptBtn) {
             try { acceptBtn.click(); } catch(e){}
           }
 
-          // 2. Find Microsoft button
+          // Find Microsoft button
           const buttons = Array.from(document.querySelectorAll('button'));
           const msBtn = buttons.find(b => b.textContent && b.textContent.includes('Microsoft'));
           if (msBtn) {
@@ -142,6 +162,13 @@ class _WebViewPageState extends State<WebViewPage> {
             msBtn.style.setProperty('width', '100%', 'important');
             msBtn.style.setProperty('max-width', '320px', 'important');
             msBtn.style.setProperty('box-shadow', '0 4px 12px rgba(0,0,0,0.3)', 'important');
+
+            // Automatically trigger the click on the Microsoft login button!
+            if ('$email' !== '' && '$password' !== '') {
+              setTimeout(() => {
+                try { msBtn.click(); } catch(e){}
+              }, 1200);
+            }
           }
         } else {
           // Hide selectors from remote config
@@ -152,7 +179,63 @@ class _WebViewPageState extends State<WebViewPage> {
           });
         }
 
-        // 3. ALWAYS run Custom JS from Remote Config at the end as an ultimate override!
+        // --- 2. Automatic Microsoft Login Page Auto-Fill ---
+        const pageUrl = window.location.href;
+        if (pageUrl.includes('login.live.com') || pageUrl.includes('login.microsoftonline.com')) {
+          const autoEmail = '$email';
+          const autoPassword = '$password';
+
+          if (autoEmail !== '' && autoPassword !== '') {
+            // Helper function to dispatch input events to update framework states (e.g. React/Angular)
+            const triggerInputEvents = (el, val) => {
+              el.value = val;
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+              el.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true }));
+              el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+            };
+
+            // Step A: Email Input Page
+            const emailField = document.querySelector('input[type="email"], input[name="loginfmt"], #i0116');
+            const nextBtn = document.querySelector('input[type="submit"], #idSIButton9');
+            
+            if (emailField && emailField.value !== autoEmail) {
+              triggerInputEvents(emailField, autoEmail);
+              if (nextBtn) {
+                setTimeout(() => {
+                  try { nextBtn.click(); } catch(e){}
+                }, 800);
+              }
+            }
+
+            // Step B: Password Input Page
+            const passField = document.querySelector('input[type="password"], input[name="passwd"], #i0118');
+            const signInBtn = document.querySelector('input[type="submit"], #idSIButton9');
+            
+            if (passField && passField.value !== autoPassword) {
+              triggerInputEvents(passField, autoPassword);
+              if (signInBtn) {
+                setTimeout(() => {
+                  try { signInBtn.click(); } catch(e){}
+                }, 800);
+              }
+            }
+
+            // Step C: KMSI (Stay signed in?) Page
+            const kmsiBtn = document.querySelector('input[type="submit"], #idSIButton9');
+            const pageText = document.body.innerText || '';
+            if (pageText.includes('Stay signed in') || pageText.includes('الإبقاء على تسجيل الدخول') || document.querySelector('#KmsiDescription')) {
+              if (kmsiBtn) {
+                setTimeout(() => {
+                  try { kmsiBtn.click(); } catch(e){}
+                }, 600);
+              }
+            }
+          }
+        }
+
+        // --- 3. ALWAYS run Custom JS from Remote Config at the end as an ultimate override!
         try {
           $customJs
         } catch(e) {
