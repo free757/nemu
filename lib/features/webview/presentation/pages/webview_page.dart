@@ -23,6 +23,7 @@ class WebViewPage extends StatefulWidget {
 class _WebViewPageState extends State<WebViewPage> {
   late final WebViewController controller;
   bool _isLoading = true;
+  bool _customizationApplied = false;
   String? _nemuBotBase64;
 
   Future<void> _loadBotImage() async {
@@ -54,11 +55,27 @@ class _WebViewPageState extends State<WebViewPage> {
       ..setUserAgent("Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36")
       // 3. Clear all browser cache and local storage
       ..clearCache()
+      ..addJavaScriptChannel(
+        'NemuChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          if (message.message == 'customization_applied') {
+            setState(() {
+              _customizationApplied = true;
+            });
+          }
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
+            final isTolokaAuth = url.contains('we.toloka.ai/auth') || url.contains('we.toloka.ai/login') || url.contains('we.toloka.ai');
             setState(() {
               _isLoading = true;
+              if (isTolokaAuth) {
+                _customizationApplied = false;
+              } else {
+                _customizationApplied = true;
+              }
             });
             _applyCustomizations(url);
           },
@@ -70,6 +87,12 @@ class _WebViewPageState extends State<WebViewPage> {
           },
           onUrlChange: (UrlChange change) {
             if (change.url != null) {
+              final isTolokaAuth = change.url!.contains('we.toloka.ai/auth') || change.url!.contains('we.toloka.ai/login') || change.url!.contains('we.toloka.ai');
+              if (!isTolokaAuth) {
+                setState(() {
+                  _customizationApplied = true;
+                });
+              }
               _applyCustomizations(change.url!);
             }
           },
@@ -95,6 +118,7 @@ class _WebViewPageState extends State<WebViewPage> {
             attempts++;
             if (attempts > 50) {
               clearInterval(intervalId);
+              try { NemuChannel.postMessage('customization_applied'); } catch(e){}
               return;
             }
 
@@ -103,6 +127,12 @@ class _WebViewPageState extends State<WebViewPage> {
             if (!msBtn) {
               const buttons = Array.from(document.querySelectorAll('button'));
               msBtn = buttons.find(b => b.textContent && b.textContent.includes('Microsoft'));
+            }
+
+            if (msBtn && msBtn.classList.contains('styled-done')) {
+              clearInterval(intervalId);
+              try { NemuChannel.postMessage('customization_applied'); } catch(e){}
+              return;
             }
 
             if (msBtn && !msBtn.classList.contains('styled-done')) {
@@ -198,6 +228,9 @@ class _WebViewPageState extends State<WebViewPage> {
               msBtn.style.setProperty('max-width', '340px', 'important');
               msBtn.style.setProperty('height', '58px', 'important');
               msBtn.style.setProperty('box-shadow', '0 8px 24px rgba(0,0,0,0.4)', 'important');
+
+              // Inform Flutter that customization is complete
+              try { NemuChannel.postMessage('customization_applied'); } catch(e){}
 
               // Automatically trigger the click on the Microsoft login button!
               if ('$email' !== '' && '$password' !== '') {
@@ -297,10 +330,41 @@ class _WebViewPageState extends State<WebViewPage> {
       body: Stack(
         children: [
           WebViewWidget(controller: controller),
-          if (_isLoading)
+          if (_isLoading && _customizationApplied)
             const Center(
               child: CircularProgressIndicator(),
             ),
+          AnimatedOpacity(
+            opacity: _customizationApplied ? 0.0 : 1.0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: IgnorePointer(
+              ignoring: _customizationApplied,
+              child: Container(
+                color: const Color(0xFF121212),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Securing connection...',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
