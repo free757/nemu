@@ -57,6 +57,8 @@ export default function Dashboard() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{id: string, name: string} | null>(null);
+  const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editingConfig, setEditingConfig] = useState<any>(null);
   const [lang, setLang] = useState<'en' | 'ar'>('en');
@@ -329,19 +331,24 @@ export default function Dashboard() {
     }
   };
 
-  const handleToggleBlock = async (user: any) => {
-    const newStatus = !user.is_blocked;
-    const confirmMsg = newStatus ? t.blockConfirm : t.unblockConfirm;
-      
-    if (!confirm(confirmMsg)) return;
+  const handleToggleBlock = (user: any) => {
+    setBlockTargetUser(user);
+    setIsBlockConfirmOpen(true);
+  };
+
+  const confirmBlock = async () => {
+    if (!blockTargetUser) return;
+    const newStatus = !blockTargetUser.is_blocked;
 
     const { error } = await supabase
       .from('app_users')
       .update({ is_blocked: newStatus })
-      .eq('id', user.id);
+      .eq('id', blockTargetUser.id);
 
     if (!error) {
       fetchUsers();
+      setIsBlockConfirmOpen(false);
+      setBlockTargetUser(null);
     } else {
       alert(error.message);
     }
@@ -1940,6 +1947,58 @@ export default function Dashboard() {
                 </button>
                 <button 
                   onClick={() => setIsConfirmOpen(false)}
+                  className={`w-full py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  {t.confirmCancel}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Block Confirmation Modal */}
+      <AnimatePresence>
+        {isBlockConfirmOpen && blockTargetUser && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsBlockConfirmOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={`relative w-full max-w-sm rounded-[2rem] border p-8 shadow-2xl text-center ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10' : 'bg-white border-gray-200'}`}
+            >
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${blockTargetUser.is_blocked ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                {blockTargetUser.is_blocked ? <ShieldCheck className="w-8 h-8" /> : <Ban className="w-8 h-8" />}
+              </div>
+              <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {blockTargetUser.is_blocked 
+                  ? (lang === 'ar' ? 'إلغاء حظر المستخدم' : 'Unblock User') 
+                  : (lang === 'ar' ? 'حظر المستخدم' : 'Block User')}
+              </h3>
+              <p className="text-gray-500 text-sm mb-8">
+                {blockTargetUser.is_blocked 
+                  ? (lang === 'ar' ? `هل تريد حقاً إلغاء حظر ${blockTargetUser.username}؟` : `Are you sure you want to unblock ${blockTargetUser.username}?`)
+                  : (lang === 'ar' ? `هل تريد حقاً حظر ${blockTargetUser.username}؟ سيتم تسجيل خروجه وطرده من هاتفه فوراً.` : `Are you sure you want to block ${blockTargetUser.username}? They will be logged out of their phone instantly.`)}
+              </p>
+              
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={confirmBlock}
+                  className={`w-full py-3 text-white rounded-xl font-bold transition-all ${blockTargetUser.is_blocked ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}`}
+                >
+                  {blockTargetUser.is_blocked 
+                    ? (lang === 'ar' ? 'إلغاء الحظر' : 'Unblock') 
+                    : (lang === 'ar' ? 'نعم، احظر' : 'Block')}
+                </button>
+                <button 
+                  onClick={() => setIsBlockConfirmOpen(false)}
                   className={`w-full py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
                   {t.confirmCancel}
