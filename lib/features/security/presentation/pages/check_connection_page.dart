@@ -555,10 +555,22 @@ class ProjectButtonsSection extends StatelessWidget {
                               openStore: true,
                             );
                           } else {
+                            String? userEmail;
+                            String? userPassword;
+                            final authState = context.read<AuthCubit>().state;
+                            if (authState is AuthAuthenticated) {
+                              userEmail = authState.user.email;
+                              userPassword = authState.user.password;
+                            }
+
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => WebViewPage(config: project),
+                                builder: (context) => WebViewPage(
+                                  config: project,
+                                  autoEmail: userEmail,
+                                  autoPassword: userPassword,
+                                ),
                               ),
                             );
                           }
