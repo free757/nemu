@@ -433,7 +433,13 @@ export default function Dashboard() {
     e.preventDefault();
     const payload = {
       ...formData,
-      proxy_port: parseInt(formData.proxy_port)
+      proxy_ip: formData.proxy_ip?.trim() || null,
+      proxy_port: formData.proxy_port ? parseInt(formData.proxy_port) : null,
+      proxy_user: formData.proxy_user?.trim() || null,
+      proxy_pass: formData.proxy_pass?.trim() || null,
+      proxy_location: formData.proxy_location?.trim() || null,
+      proxy_timezone: formData.proxy_timezone?.trim() || null,
+      phone_number: formData.phone_number?.trim() || null
     };
 
     let error;
@@ -1794,7 +1800,6 @@ export default function Dashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="relative">
                       <input 
-                        required
                         value={formData.proxy_ip}
                         onChange={e => setFormData({...formData, proxy_ip: e.target.value})}
                         className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
@@ -1802,7 +1807,6 @@ export default function Dashboard() {
                       />
                     </div>
                     <input 
-                      required
                       type="number"
                       value={formData.proxy_port}
                       onChange={e => setFormData({...formData, proxy_port: e.target.value})}
