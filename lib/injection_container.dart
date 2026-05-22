@@ -80,9 +80,20 @@ Future<void> init() async {
   sl.registerLazySingleton(() => sharedPreferences);
   sl.registerLazySingleton(() => http.Client());
   sl.registerLazySingleton(() => Supabase.instance.client);
-  sl.registerLazySingleton(() => FlutterV2ray(onStatusChanged: (status) {
+
+  final v2ray = FlutterV2ray(onStatusChanged: (status) {
     // Update global notifier — SecurityCubit reads this to reflect real state
     vpnStatusNotifier.value = status.state;
     debugPrint('V2Ray Status: ${status.state}');
-  }));
+  });
+
+  try {
+    debugPrint('[V2Ray] Initializing V2Ray Core...');
+    await v2ray.initializeV2Ray();
+    debugPrint('[V2Ray] V2Ray Core initialized successfully.');
+  } catch (e) {
+    debugPrint('[V2Ray] Failed to initialize V2Ray Core: $e');
+  }
+
+  sl.registerLazySingleton(() => v2ray);
 }
