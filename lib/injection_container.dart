@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -22,6 +23,9 @@ import 'package:nemu/features/auth/domain/repositories/auth_repository.dart';
 import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 
 final sl = GetIt.instance;
+
+/// Global notifier for V2Ray connection state — updated by onStatusChanged callback
+final vpnStatusNotifier = ValueNotifier<String>('DISCONNECTED');
 
 Future<void> init() async {
   //! Features - Auth
@@ -51,8 +55,12 @@ Future<void> init() async {
   );
 
   //! Features - Security
-  // Cubit
-  sl.registerFactory(() => SecurityCubit(checkConnectionUseCase: sl(), securityRepository: sl()));
+  // Cubit — passes vpnStatusNotifier so it reads real V2Ray state
+  sl.registerFactory(() => SecurityCubit(
+    checkConnectionUseCase: sl(),
+    securityRepository: sl(),
+    vpnStatusNotifier: vpnStatusNotifier,
+  ));
   // Use cases
   sl.registerLazySingleton(() => CheckConnectionUseCase(sl()));
   // Repository
@@ -73,7 +81,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => http.Client());
   sl.registerLazySingleton(() => Supabase.instance.client);
   sl.registerLazySingleton(() => FlutterV2ray(onStatusChanged: (status) {
-    // You can handle global status changes here if needed
-    print('V2Ray Status: ${status.state}');
+    // Update global notifier — SecurityCubit reads this to reflect real state
+    vpnStatusNotifier.value = status.state;
+    debugPrint('V2Ray Status: ${status.state}');
   }));
 }
