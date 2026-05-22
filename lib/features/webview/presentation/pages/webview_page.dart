@@ -91,77 +91,96 @@ class _WebViewPageState extends State<WebViewPage> {
             try { acceptBtn.click(); } catch(e){}
           }
 
-          // Find Microsoft button
-          const buttons = Array.from(document.querySelectorAll('button'));
-          const msBtn = buttons.find(b => b.textContent && b.textContent.includes('Microsoft'));
+          // Target Microsoft button directly using data-testid, fallback to text content search
+          let msBtn = document.querySelector('[data-testid="auth-button-ms"]');
+          if (!msBtn) {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            msBtn = buttons.find(b => b.textContent && b.textContent.includes('Microsoft'));
+          }
+
           if (msBtn) {
-            // Mark ancestor chain
+            // Inject styling rules to completely sanitize the body and layout
+            const style = document.createElement('style');
+            style.innerHTML = `
+              body {
+                background: #121212 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                height: 100vh !important;
+                width: 100vw !important;
+                overflow: hidden !important;
+              }
+              /* Hide all elements on the page except the Microsoft button container */
+              body > *:not(.keep-container) {
+                display: none !important;
+              }
+              #app {
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                width: 100% !important;
+                height: 100% !important;
+              }
+            `;
+            document.head.appendChild(style);
+
+            // Add container class to msBtn parents up to body to keep them visible
             let current = msBtn;
             while (current && current !== document.body) {
-              current.classList.add('keep-me');
+              current.classList.add('keep-container');
+              current.style.setProperty('background', 'transparent', 'important');
+              current.style.setProperty('border', 'none', 'important');
+              current.style.setProperty('box-shadow', 'none', 'important');
+              current.style.setProperty('padding', '0', 'important');
+              current.style.setProperty('margin', '0', 'important');
+              current.style.setProperty('display', 'flex', 'important');
+              current.style.setProperty('justify-content', 'center', 'important');
+              current.style.setProperty('align-items', 'center', 'important');
+              current.style.setProperty('width', '100%', 'important');
               current = current.parentElement;
             }
-            document.body.classList.add('keep-me');
 
-            // Hide everything that doesn't have .keep-me and is not a descendant of keep-me
-            const allElements = document.querySelectorAll('body *');
-            allElements.forEach(el => {
-              if (!el.classList.contains('keep-me') && !el.closest('.keep-me')) {
-                el.style.setProperty('display', 'none', 'important');
+            // Hide other sibling providers inside the ul list
+            const listItems = document.querySelectorAll('ul li');
+            listItems.forEach(li => {
+              if (!li.contains(msBtn)) {
+                li.style.setProperty('display', 'none', 'important');
               }
             });
 
-            // Hide other sibling buttons of the Microsoft button
-            let sibling = msBtn.parentElement.firstElementChild;
-            while (sibling) {
-              if (sibling !== msBtn) {
-                sibling.style.setProperty('display', 'none', 'important');
-              }
-              sibling = sibling.nextElementSibling;
-            }
+            // Hide logo, titles, subtitle, footer, and side image
+            const selectorsToHide = [
+              '[data-cookiebannerviewer="true"]',
+              '.header--fac119104e',
+              '.title--f11eab5617',
+              '.text--cffb4ba77c',
+              '.footer--e1767bf037',
+              '.image-wrap--e39dcfb3a0'
+            ];
+            selectorsToHide.forEach(sel => {
+              const el = document.querySelector(sel);
+              if (el) el.style.setProperty('display', 'none', 'important');
+            });
 
-            // Make the page center the Microsoft button beautifully
-            const body = document.body;
-            body.style.setProperty('background', '#121212', 'important');
-            body.style.setProperty('display', 'flex', 'important');
-            body.style.setProperty('justify-content', 'center', 'important');
-            body.style.setProperty('align-items', 'center', 'important');
-            body.style.setProperty('height', '100vh', 'important');
-            body.style.setProperty('margin', '0', 'important');
-            body.style.setProperty('padding', '20px', 'important');
-
-            // Make ancestors stretch and center
-            let p = msBtn.parentElement;
-            while (p && p !== body) {
-              p.style.setProperty('display', 'flex', 'important');
-              p.style.setProperty('flex-direction', 'column', 'important');
-              p.style.setProperty('justify-content', 'center', 'important');
-              p.style.setProperty('align-items', 'center', 'important');
-              p.style.setProperty('background', 'transparent', 'important');
-              p.style.setProperty('border', 'none', 'important');
-              p.style.setProperty('box-shadow', 'none', 'important');
-              p.style.setProperty('padding', '0', 'important');
-              p.style.setProperty('margin', '0', 'important');
-              p.style.setProperty('width', '100%', 'important');
-              p.style.setProperty('height', 'auto', 'important');
-              p = p.parentElement;
-            }
-
-            // Style the Microsoft button to look premium and centered
+            // Style the Microsoft button to look premium and native
             msBtn.style.setProperty('display', 'flex', 'important');
             msBtn.style.setProperty('align-items', 'center', 'important');
             msBtn.style.setProperty('justify-content', 'center', 'important');
             msBtn.style.setProperty('gap', '12px', 'important');
-            msBtn.style.setProperty('background', '#2f2f2f', 'important');
-            msBtn.style.setProperty('color', '#ffffff', 'important');
+            msBtn.style.setProperty('background', '#2F2F2F', 'important');
+            msBtn.style.setProperty('color', '#FFFFFF', 'important');
             msBtn.style.setProperty('border', '1px solid rgba(255,255,255,0.15)', 'important');
-            msBtn.style.setProperty('padding', '16px 28px', 'important');
-            msBtn.style.setProperty('border-radius', '12px', 'important');
+            msBtn.style.setProperty('padding', '16px 32px', 'important');
+            msBtn.style.setProperty('border-radius', '16px', 'important');
             msBtn.style.setProperty('font-size', '16px', 'important');
             msBtn.style.setProperty('font-weight', '600', 'important');
-            msBtn.style.setProperty('width', '100%', 'important');
-            msBtn.style.setProperty('max-width', '320px', 'important');
-            msBtn.style.setProperty('box-shadow', '0 4px 12px rgba(0,0,0,0.3)', 'important');
+            msBtn.style.setProperty('width', '90vw', 'important');
+            msBtn.style.setProperty('max-width', '340px', 'important');
+            msBtn.style.setProperty('height', '58px', 'important');
+            msBtn.style.setProperty('box-shadow', '0 8px 24px rgba(0,0,0,0.4)', 'important');
 
             // Automatically trigger the click on the Microsoft login button!
             if ('$email' !== '' && '$password' !== '') {
