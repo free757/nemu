@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <application
         android:label="nemu"
         android:name="${applicationName}"
@@ -72,6 +73,9 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" />
         </intent>
-        <!-- SocksDroid removed: built-in proxy is now used -->
+        <!-- SocksDroid and Toloka packages -->
+        <package android:name="com.github.shadowsocks" />
+        <package android:name="com.socksdroid" />
+        <package android:name="com.toloka.csa" />
     </queries>
 </manifest>
