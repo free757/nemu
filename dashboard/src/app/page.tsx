@@ -484,6 +484,32 @@ export default function Dashboard() {
     }
   };
 
+  const handleCreateDefaultProjectsConfig = async () => {
+    const defaultPayload = {
+      config_key: 'projects',
+      config_value: [
+        {
+          id: 'project-1',
+          name: 'Project 1',
+          url: 'https://we.toloka.ai/auth?retpath=https%3A%2F%2Fwe.toloka.ai%2F',
+          color: '0xFFFFA726',
+          custom_js: '',
+          selectors_to_hide: ['.header-banner', '.footer-links'],
+          android_package_name: '',
+          ios_url_scheme: '',
+          app_store_link: ''
+        }
+      ],
+      is_enabled: true
+    };
+    const { error } = await supabase.from('remote_configs').insert([defaultPayload]);
+    if (!error) {
+      fetchConfigs();
+    } else {
+      alert(error.message);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
@@ -1256,39 +1282,60 @@ export default function Dashboard() {
             )}
           </div>
         ) : activeTab === 'config' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {remoteConfigs.map((config) => (
-              <div key={config.id} className={`p-6 rounded-3xl border space-y-4 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-600/20 text-purple-500 rounded-xl flex items-center justify-center">
-                      <Settings className="w-5 h-5" />
-                    </div>
-                    <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{config.config_key}</h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${config.is_enabled ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                      {config.is_enabled ? 'ACTIVE' : 'DISABLED'}
-                    </div>
-                    <button 
-                      onClick={() => handleOpenConfigEdit(config)}
-                      className="p-2 text-gray-400 hover:text-blue-500 rounded-lg transition-all"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteClick(config.id, config.config_key)}
-                      className="p-2 text-red-500/50 hover:text-red-500 rounded-lg transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className={`rounded-2xl p-4 font-mono overflow-x-auto max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-black/50' : 'bg-gray-50 border border-gray-100'}`}>
-                  <pre className={`text-blue-400 ${lang === 'ar' ? 'text-right' : 'text-left'} text-xs md:text-sm`}>{JSON.stringify(config.config_value, null, 2)}</pre>
-                </div>
+          <div>
+            {remoteConfigs.length === 0 ? (
+              <div className={`p-16 text-center rounded-[2rem] border ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'} flex flex-col items-center justify-center space-y-4`}>
+                <Settings className="w-12 h-12 text-gray-500 animate-pulse" />
+                <h3 className="text-xl font-bold">{lang === 'ar' ? 'لا توجد إعدادات مضافة' : 'No Configurations Found'}</h3>
+                <p className="text-sm text-gray-500 max-w-sm">
+                  {lang === 'ar' 
+                    ? 'لم يتم العثور على أي تكوينات. يمكنك إنشاء إعداد المشاريع الافتراضي للبدء فوراً.' 
+                    : 'Create a default "projects" config to quickly get started managing your mobile buttons.'}
+                </p>
+                <button
+                  onClick={handleCreateDefaultProjectsConfig}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                >
+                  <Plus className="w-5 h-5" />
+                  {lang === 'ar' ? 'إنشاء إعداد المشاريع الافتراضي' : 'Create Default "projects" Config'}
+                </button>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {remoteConfigs.map((config) => (
+                  <div key={config.id} className={`p-6 rounded-3xl border space-y-4 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-purple-600/20 text-purple-500 rounded-xl flex items-center justify-center">
+                          <Settings className="w-5 h-5" />
+                        </div>
+                        <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{config.config_key}</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${config.is_enabled ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                          {config.is_enabled ? 'ACTIVE' : 'DISABLED'}
+                        </div>
+                        <button 
+                          onClick={() => handleOpenConfigEdit(config)}
+                          className="p-2 text-gray-400 hover:text-blue-500 rounded-lg transition-all"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteClick(config.id, config.config_key)}
+                          className="p-2 text-red-500/50 hover:text-red-500 rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className={`rounded-2xl p-4 font-mono overflow-x-auto max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-black/50' : 'bg-gray-50 border border-gray-100'}`}>
+                      <pre className={`text-blue-400 ${lang === 'ar' ? 'text-right' : 'text-left'} text-xs md:text-sm`}>{JSON.stringify(config.config_value, null, 2)}</pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-6 max-w-4xl">
