@@ -170,7 +170,9 @@ export default function Dashboard() {
     proxy_pass: '',
     proxy_location: '',
     proxy_timezone: '',
-    is_manager: false
+    is_manager: false,
+    email: '',
+    password: ''
   });
 
   const [quickPaste, setQuickPaste] = useState('');
@@ -260,7 +262,10 @@ export default function Dashboard() {
       unblockConfirm: 'Are you sure you want to unblock this user?',
       notifTitle: 'Notification Title',
       notifContent: 'Message Content',
-      send: 'Send Message'
+      send: 'Send Message',
+      microsoftCreds: 'Microsoft Auto-Login Credentials',
+      microsoftEmail: 'Microsoft Email',
+      microsoftPassword: 'Microsoft Password'
     },
     ar: {
       users: 'إدارة المستخدمين',
@@ -317,7 +322,10 @@ export default function Dashboard() {
       unblockConfirm: 'هل أنت متأكد من إلغاء حظر هذا المستخدم؟',
       notifTitle: 'عنوان الإشعار',
       notifContent: 'محتوى الرسالة',
-      send: 'إرسال الرسالة'
+      send: 'إرسال الرسالة',
+      microsoftCreds: 'بيانات تسجيل الدخول التلقائي لمايكروسوفت',
+      microsoftEmail: 'بريد مايكروسوفت الإلكتروني',
+      microsoftPassword: 'كلمة سر مايكروسوفت'
     }
   }[lang];
 
@@ -426,7 +434,9 @@ export default function Dashboard() {
       proxy_pass: user.proxy_pass || '',
       proxy_location: user.proxy_location || '',
       proxy_timezone: user.proxy_timezone || '',
-      is_manager: user.is_manager || false
+      is_manager: user.is_manager || false,
+      email: user.email || '',
+      password: user.password || ''
     });
     setIsModalOpen(true);
   };
@@ -465,7 +475,8 @@ export default function Dashboard() {
       setFormData({
         pin: '', username: '', phone_number: '',
         proxy_ip: '', proxy_port: '', proxy_user: '', proxy_pass: '',
-        proxy_location: '', proxy_timezone: '', is_manager: false
+        proxy_location: '', proxy_timezone: '', is_manager: false,
+        email: '', password: ''
       });
       setIsModalOpen(true);
     } else {
@@ -578,7 +589,9 @@ export default function Dashboard() {
       proxy_pass: formData.proxy_pass?.trim() || null,
       proxy_location: formData.proxy_location?.trim() || null,
       proxy_timezone: formData.proxy_timezone?.trim() || null,
-      phone_number: formData.phone_number?.trim() || null
+      phone_number: formData.phone_number?.trim() || null,
+      email: formData.email?.trim() || null,
+      password: formData.password?.trim() || null
     };
 
     let error;
@@ -1203,7 +1216,7 @@ export default function Dashboard() {
                               {user.username?.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center flex-wrap gap-2">
                                 <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</p>
                                 {user.is_manager && (
                                   <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold uppercase tracking-wider">
@@ -1213,6 +1226,11 @@ export default function Dashboard() {
                                 {user.is_blocked && (
                                   <span className="px-2 py-0.5 text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-bold uppercase tracking-wider">
                                     Blocked
+                                  </span>
+                                )}
+                                {user.email && user.password && (
+                                  <span className="px-2 py-0.5 text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                                    🔑 Auto-Login
                                   </span>
                                 )}
                               </div>
@@ -1281,7 +1299,7 @@ export default function Dashboard() {
                         {user.username?.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center flex-wrap gap-2">
                           <h3 className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</h3>
                           {user.is_manager && (
                             <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold uppercase tracking-wider">
@@ -1291,6 +1309,11 @@ export default function Dashboard() {
                           {user.is_blocked && (
                             <span className="px-2 py-0.5 text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-bold uppercase tracking-wider">
                               Blocked
+                            </span>
+                          )}
+                          {user.email && user.password && (
+                            <span className="px-2 py-0.5 text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                              🔑 Auto-Login
                             </span>
                           )}
                         </div>
@@ -2273,6 +2296,40 @@ export default function Dashboard() {
                       />
                       <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
+                  </div>
+                </div>
+
+                {/* Microsoft Credentials Section */}
+                <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="text-sm font-bold text-orange-500 flex items-center gap-2 uppercase tracking-widest">
+                    <ShieldCheck className="w-4 h-4" /> {t.microsoftCreds}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                        {t.microsoftEmail}
+                      </label>
+                      <input 
+                        type="email"
+                        value={formData.email}
+                        onChange={e => setFormData({...formData, email: e.target.value})}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                        placeholder="username@outlook.com / company.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                        {t.microsoftPassword}
+                      </label>
+                      <input 
+                        type="text"
+                        value={formData.password}
+                        onChange={e => setFormData({...formData, password: e.target.value})}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                        placeholder="••••••••••••"
+                      />
+                    </div>
                   </div>
                 </div>
 
