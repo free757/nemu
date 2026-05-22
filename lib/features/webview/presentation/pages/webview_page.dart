@@ -60,12 +60,18 @@ class _WebViewPageState extends State<WebViewPage> {
             setState(() {
               _isLoading = true;
             });
+            _applyCustomizations(url);
           },
           onPageFinished: (String url) {
             setState(() {
               _isLoading = false;
             });
             _applyCustomizations(url);
+          },
+          onUrlChange: (UrlChange change) {
+            if (change.url != null) {
+              _applyCustomizations(change.url!);
+            }
           },
         ),
       )
@@ -75,7 +81,7 @@ class _WebViewPageState extends State<WebViewPage> {
   void _applyCustomizations(String url) {
     final selectors = widget.config.selectorsToHide.map((s) => "'$s'").join(',');
     final customJs = widget.config.customJs;
-    final isTolokaAuth = url.contains('we.toloka.ai/auth') || url.contains('we.toloka.ai/login');
+    final isTolokaAuth = url.contains('we.toloka.ai/auth') || url.contains('we.toloka.ai/login') || url.contains('we.toloka.ai');
 
     final email = widget.autoEmail ?? '';
     final password = widget.autoPassword ?? '';
@@ -84,111 +90,123 @@ class _WebViewPageState extends State<WebViewPage> {
       (function() {
         // --- 1. Automatic Toloka Auth Page Customization & Auto-Click ---
         if ($isTolokaAuth) {
-          // Accept cookies automatically if banner exists
-          const cookieButtons = Array.from(document.querySelectorAll('button'));
-          const acceptBtn = cookieButtons.find(b => b.textContent && (b.textContent.includes('Accept all') || b.textContent.includes('قبول الكل')));
-          if (acceptBtn) {
-            try { acceptBtn.click(); } catch(e){}
-          }
-
-          // Target Microsoft button directly using data-testid, fallback to text content search
-          let msBtn = document.querySelector('[data-testid="auth-button-ms"]');
-          if (!msBtn) {
-            const buttons = Array.from(document.querySelectorAll('button'));
-            msBtn = buttons.find(b => b.textContent && b.textContent.includes('Microsoft'));
-          }
-
-          if (msBtn) {
-            // Inject styling rules to completely sanitize the body and layout
-            const style = document.createElement('style');
-            style.innerHTML = `
-              body {
-                background: #121212 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
-                height: 100vh !important;
-                width: 100vw !important;
-                overflow: hidden !important;
-              }
-              /* Hide all elements on the page except the Microsoft button container */
-              body > *:not(.keep-container) {
-                display: none !important;
-              }
-              #app {
-                display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
-                width: 100% !important;
-                height: 100% !important;
-              }
-            `;
-            document.head.appendChild(style);
-
-            // Add container class to msBtn parents up to body to keep them visible
-            let current = msBtn;
-            while (current && current !== document.body) {
-              current.classList.add('keep-container');
-              current.style.setProperty('background', 'transparent', 'important');
-              current.style.setProperty('border', 'none', 'important');
-              current.style.setProperty('box-shadow', 'none', 'important');
-              current.style.setProperty('padding', '0', 'important');
-              current.style.setProperty('margin', '0', 'important');
-              current.style.setProperty('display', 'flex', 'important');
-              current.style.setProperty('justify-content', 'center', 'important');
-              current.style.setProperty('align-items', 'center', 'important');
-              current.style.setProperty('width', '100%', 'important');
-              current = current.parentElement;
+          let attempts = 0;
+          const intervalId = setInterval(() => {
+            attempts++;
+            if (attempts > 50) {
+              clearInterval(intervalId);
+              return;
             }
 
-            // Hide other sibling providers inside the ul list
-            const listItems = document.querySelectorAll('ul li');
-            listItems.forEach(li => {
-              if (!li.contains(msBtn)) {
-                li.style.setProperty('display', 'none', 'important');
-              }
-            });
-
-            // Hide logo, titles, subtitle, footer, and side image
-            const selectorsToHide = [
-              '[data-cookiebannerviewer="true"]',
-              '.header--fac119104e',
-              '.title--f11eab5617',
-              '.text--cffb4ba77c',
-              '.footer--e1767bf037',
-              '.image-wrap--e39dcfb3a0'
-            ];
-            selectorsToHide.forEach(sel => {
-              const el = document.querySelector(sel);
-              if (el) el.style.setProperty('display', 'none', 'important');
-            });
-
-            // Style the Microsoft button to look premium and native
-            msBtn.style.setProperty('display', 'flex', 'important');
-            msBtn.style.setProperty('align-items', 'center', 'important');
-            msBtn.style.setProperty('justify-content', 'center', 'important');
-            msBtn.style.setProperty('gap', '12px', 'important');
-            msBtn.style.setProperty('background', '#2F2F2F', 'important');
-            msBtn.style.setProperty('color', '#FFFFFF', 'important');
-            msBtn.style.setProperty('border', '1px solid rgba(255,255,255,0.15)', 'important');
-            msBtn.style.setProperty('padding', '16px 32px', 'important');
-            msBtn.style.setProperty('border-radius', '16px', 'important');
-            msBtn.style.setProperty('font-size', '16px', 'important');
-            msBtn.style.setProperty('font-weight', '600', 'important');
-            msBtn.style.setProperty('width', '90vw', 'important');
-            msBtn.style.setProperty('max-width', '340px', 'important');
-            msBtn.style.setProperty('height', '58px', 'important');
-            msBtn.style.setProperty('box-shadow', '0 8px 24px rgba(0,0,0,0.4)', 'important');
-
-            // Automatically trigger the click on the Microsoft login button!
-            if ('$email' !== '' && '$password' !== '') {
-              setTimeout(() => {
-                try { msBtn.click(); } catch(e){}
-              }, 1200);
+            // Target Microsoft button directly using data-testid, fallback to text search
+            let msBtn = document.querySelector('[data-testid="auth-button-ms"]');
+            if (!msBtn) {
+              const buttons = Array.from(document.querySelectorAll('button'));
+              msBtn = buttons.find(b => b.textContent && b.textContent.includes('Microsoft'));
             }
-          }
+
+            if (msBtn && !msBtn.classList.contains('styled-done')) {
+              msBtn.classList.add('styled-done');
+              clearInterval(intervalId); // Stop polling
+
+              // Accept cookies automatically if banner exists
+              const cookieButtons = Array.from(document.querySelectorAll('button'));
+              const acceptBtn = cookieButtons.find(b => b.textContent && (b.textContent.includes('Accept all') || b.textContent.includes('قبول الكل')));
+              if (acceptBtn) {
+                try { acceptBtn.click(); } catch(e){}
+              }
+
+              // Inject styling rules to completely sanitize the body and layout
+              const style = document.createElement('style');
+              style.innerHTML = `
+                body {
+                  background: #121212 !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  display: flex !important;
+                  justify-content: center !important;
+                  align-items: center !important;
+                  height: 100vh !important;
+                  width: 100vw !important;
+                  overflow: hidden !important;
+                }
+                /* Hide all elements on the page except the Microsoft button container */
+                body > *:not(.keep-container) {
+                  display: none !important;
+                }
+                #app {
+                  display: flex !important;
+                  justify-content: center !important;
+                  align-items: center !important;
+                  width: 100% !important;
+                  height: 100% !important;
+                }
+              `;
+              document.head.appendChild(style);
+
+              // Add container class to msBtn parents up to body to keep them visible
+              let current = msBtn;
+              while (current && current !== document.body) {
+                current.classList.add('keep-container');
+                current.style.setProperty('background', 'transparent', 'important');
+                current.style.setProperty('border', 'none', 'important');
+                current.style.setProperty('box-shadow', 'none', 'important');
+                current.style.setProperty('padding', '0', 'important');
+                current.style.setProperty('margin', '0', 'important');
+                current.style.setProperty('display', 'flex', 'important');
+                current.style.setProperty('justify-content', 'center', 'important');
+                current.style.setProperty('align-items', 'center', 'important');
+                current.style.setProperty('width', '100%', 'important');
+                current = current.parentElement;
+              }
+
+              // Hide other sibling providers inside the ul list
+              const listItems = document.querySelectorAll('ul li');
+              listItems.forEach(li => {
+                if (!li.contains(msBtn)) {
+                  li.style.setProperty('display', 'none', 'important');
+                }
+              });
+
+              // Hide logo, titles, subtitle, footer, and side image
+              const selectorsToHide = [
+                '[data-cookiebannerviewer="true"]',
+                '.header--fac119104e',
+                '.title--f11eab5617',
+                '.text--cffb4ba77c',
+                '.footer--e1767bf037',
+                '.image-wrap--e39dcfb3a0'
+              ];
+              selectorsToHide.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (el) el.style.setProperty('display', 'none', 'important');
+              });
+
+              // Style the Microsoft button to look premium and native
+              msBtn.style.setProperty('display', 'flex', 'important');
+              msBtn.style.setProperty('align-items', 'center', 'important');
+              msBtn.style.setProperty('justify-content', 'center', 'important');
+              msBtn.style.setProperty('gap', '12px', 'important');
+              msBtn.style.setProperty('background', '#2F2F2F', 'important');
+              msBtn.style.setProperty('color', '#FFFFFF', 'important');
+              msBtn.style.setProperty('border', '1px solid rgba(255,255,255,0.15)', 'important');
+              msBtn.style.setProperty('padding', '16px 32px', 'important');
+              msBtn.style.setProperty('border-radius', '16px', 'important');
+              msBtn.style.setProperty('font-size', '16px', 'important');
+              msBtn.style.setProperty('font-weight', '600', 'important');
+              msBtn.style.setProperty('width', '90vw', 'important');
+              msBtn.style.setProperty('max-width', '340px', 'important');
+              msBtn.style.setProperty('height', '58px', 'important');
+              msBtn.style.setProperty('box-shadow', '0 8px 24px rgba(0,0,0,0.4)', 'important');
+
+              // Automatically trigger the click on the Microsoft login button!
+              if ('$email' !== '' && '$password' !== '') {
+                setTimeout(() => {
+                  try { msBtn.click(); } catch(e){}
+                }, 1200);
+              }
+            }
+          }, 300);
         } else {
           // Hide selectors from remote config
           const selectors = [$selectors];
