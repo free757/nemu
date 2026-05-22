@@ -967,7 +967,7 @@ export default function Dashboard() {
 
       {/* Sidebar / Mobile Drawer */}
       <AnimatePresence>
-        {(isMobileMenuOpen || !isSidebarCollapsed) && (
+        {(isMobileMenuOpen || true) && (
           <>
             {/* Backdrop for mobile */}
             {isMobileMenuOpen && (
