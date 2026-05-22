@@ -138,6 +138,31 @@ export default function Dashboard() {
     proxy_timezone: ''
   });
 
+  const [quickPaste, setQuickPaste] = useState('');
+
+  const handleQuickPasteChange = (value: string) => {
+    setQuickPaste(value);
+    const cleanVal = value.trim();
+    if (!cleanVal) return;
+    
+    // Supported delimiters: colon (:), comma (,), semicolon (;), pipe (|), or spaces
+    const parts = cleanVal.split(/[:;,| \t]+/);
+    if (parts.length >= 2) {
+      const ip = parts[0];
+      const port = parts[1];
+      const user = parts[2] || '';
+      const pass = parts[3] || '';
+      
+      setFormData(prev => ({
+        ...prev,
+        proxy_ip: ip,
+        proxy_port: port,
+        proxy_user: user,
+        proxy_pass: pass
+      }));
+    }
+  };
+
   const [configFormData, setConfigFormData] = useState({
     config_key: '',
     config_value: '',
@@ -187,7 +212,9 @@ export default function Dashboard() {
       confirmTitle: 'Are you sure?',
       confirmText: 'Do you really want to delete this? This action cannot be undone.',
       confirmBtn: 'Yes, Delete',
-      confirmCancel: 'No, Keep'
+      confirmCancel: 'No, Keep',
+      quickPaste: 'Quick Paste (IP:Port:User:Pass)',
+      quickPastePlaceholder: 'Paste proxy string here...'
     },
     ar: {
       users: 'إدارة المستخدمين',
@@ -231,7 +258,9 @@ export default function Dashboard() {
       confirmTitle: 'هل أنت متأكد؟',
       confirmText: 'هل تريد حقاً حذف هذا؟ لا يمكن التراجع عن هذا الإجراء.',
       confirmBtn: 'نعم، احذف',
-      confirmCancel: 'لا، تراجع'
+      confirmCancel: 'لا، تراجع',
+      quickPaste: 'لصق سريع (IP:Port:User:Pass)',
+      quickPastePlaceholder: 'الصق سطر البروكسي هنا...'
     }
   }[lang];
 
@@ -271,6 +300,7 @@ export default function Dashboard() {
 
   const handleOpenEdit = (user: any) => {
     setEditingUser(user);
+    setQuickPaste('');
     setFormData({
       pin: user.pin || '',
       username: user.username || '',
@@ -298,6 +328,7 @@ export default function Dashboard() {
   const handleOpenAdd = () => {
     if (activeTab === 'users') {
       setEditingUser(null);
+      setQuickPaste('');
       setFormData({
         pin: '', username: '', phone_number: '',
         proxy_ip: '', proxy_port: '', proxy_user: '', proxy_pass: '',
@@ -1516,6 +1547,27 @@ export default function Dashboard() {
                   <h3 className="text-sm font-bold text-blue-500 flex items-center gap-2 uppercase tracking-widest">
                     <Globe className="w-4 h-4" /> {t.proxyConfig}
                   </h3>
+
+                  {/* Quick Paste Input */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                      {t.quickPaste}
+                    </label>
+                    <div className="relative">
+                      <input 
+                        value={quickPaste}
+                        onChange={e => handleQuickPasteChange(e.target.value)}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono text-sm ${theme === 'dark' ? 'bg-black/40 border-white/5 text-blue-400 placeholder-gray-600' : 'bg-white border-gray-200 text-blue-600 placeholder-gray-400'}`}
+                        placeholder={t.quickPastePlaceholder}
+                      />
+                      {quickPaste && (
+                        <div className="absolute right-3 top-3 text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          Auto-parsed!
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="relative">
                       <input 
