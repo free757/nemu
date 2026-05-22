@@ -27,7 +27,8 @@ import {
   Bot,
   Upload,
   Mic,
-  MicOff
+  MicOff,
+  Ban
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -239,7 +240,9 @@ export default function Dashboard() {
       confirmCancel: 'No, Keep',
       quickPaste: 'Quick Paste (IP:Port:User:Pass)',
       quickPastePlaceholder: 'Paste proxy string here...',
-      isManager: 'Is Manager (Dashboard Access)'
+      isManager: 'Is Manager (Dashboard Access)',
+      blockConfirm: 'Are you sure you want to block this user? They will be logged out of their phone instantly.',
+      unblockConfirm: 'Are you sure you want to unblock this user?'
     },
     ar: {
       users: 'إدارة المستخدمين',
@@ -286,7 +289,9 @@ export default function Dashboard() {
       confirmCancel: 'لا، تراجع',
       quickPaste: 'لصق سريع (IP:Port:User:Pass)',
       quickPastePlaceholder: 'الصق سطر البروكسي هنا...',
-      isManager: 'مدير (صلاحية دخول لوحة التحكم)'
+      isManager: 'مدير (صلاحية دخول لوحة التحكم)',
+      blockConfirm: 'هل أنت متأكد من حظر هذا المستخدم؟ سيتم طرده وتسجيل خروجه من الهاتف فوراً.',
+      unblockConfirm: 'هل أنت متأكد من إلغاء حظر هذا المستخدم؟'
     }
   }[lang];
 
@@ -321,6 +326,24 @@ export default function Dashboard() {
         activeTab === 'users' ? fetchUsers() : fetchConfigs();
         setIsConfirmOpen(false);
       }
+    }
+  };
+
+  const handleToggleBlock = async (user: any) => {
+    const newStatus = !user.is_blocked;
+    const confirmMsg = newStatus ? t.blockConfirm : t.unblockConfirm;
+      
+    if (!confirm(confirmMsg)) return;
+
+    const { error } = await supabase
+      .from('app_users')
+      .update({ is_blocked: newStatus })
+      .eq('id', user.id);
+
+    if (!error) {
+      fetchUsers();
+    } else {
+      alert(error.message);
     }
   };
 
@@ -1064,6 +1087,11 @@ export default function Dashboard() {
                                     Manager
                                   </span>
                                 )}
+                                {user.is_blocked && (
+                                  <span className="px-2 py-0.5 text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-bold uppercase tracking-wider">
+                                    Blocked
+                                  </span>
+                                )}
                               </div>
                               <p className="text-gray-500 text-sm">{user.phone_number}</p>
                             </div>
@@ -1087,6 +1115,13 @@ export default function Dashboard() {
                         </td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => handleToggleBlock(user)}
+                              className={`p-2 rounded-lg transition-all ${user.is_blocked ? 'text-red-500 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-400 hover:bg-red-500/5'}`}
+                              title={user.is_blocked ? 'Unblock User' : 'Block User'}
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
                             <button 
                               onClick={() => handleOpenEdit(user)}
                               className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
@@ -1130,6 +1165,11 @@ export default function Dashboard() {
                               Manager
                             </span>
                           )}
+                          {user.is_blocked && (
+                            <span className="px-2 py-0.5 text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-bold uppercase tracking-wider">
+                              Blocked
+                            </span>
+                          )}
                         </div>
                         <p className="text-gray-500 text-sm">{user.phone_number}</p>
                       </div>
@@ -1151,6 +1191,13 @@ export default function Dashboard() {
                   </div>
 
                   <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleToggleBlock(user)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${user.is_blocked ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    >
+                      <Ban className="w-4 h-4" />
+                      <span>{user.is_blocked ? (lang === 'ar' ? 'فك حظر' : 'Unblock') : (lang === 'ar' ? 'حظر' : 'Block')}</span>
+                    </button>
                     <button 
                       onClick={() => handleOpenEdit(user)}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}

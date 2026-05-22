@@ -7,6 +7,8 @@ import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
 import 'package:nemu/features/webview/presentation/pages/webview_page.dart';
 import 'package:external_app_launcher/external_app_launcher.dart';
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 class CheckConnectionPage extends StatelessWidget {
   const CheckConnectionPage({super.key});
@@ -49,24 +51,27 @@ class CheckConnectionView extends StatelessWidget {
               if (authState is! AuthAuthenticated) return const SizedBox.shrink();
               final user = authState.user;
 
-              return Column(
-                children: [
-                  _buildHeader(context, user.username ?? 'User'),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      child: Column(
-                        children: [
-                          _buildUserCard(user),
-                          const SizedBox(height: 20),
-                          _buildProxyCard(context, user),
-                          const SizedBox(height: 30),
-                          const ProjectButtonsSection(),
-                        ],
+              return BlockChecker(
+                userId: user.id,
+                child: Column(
+                  children: [
+                    _buildHeader(context, user.username ?? 'User'),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        child: Column(
+                          children: [
+                            _buildUserCard(user),
+                            const SizedBox(height: 20),
+                            _buildProxyCard(context, user),
+                            const SizedBox(height: 30),
+                            const ProjectButtonsSection(),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             },
           ),
@@ -293,5 +298,51 @@ class ProjectButtonsSection extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class BlockChecker extends StatefulWidget {
+  final String userId;
+  final Widget child;
+  const BlockChecker({super.key, required this.userId, required this.child});
+
+  @override
+  State<BlockChecker> createState() => _BlockCheckerState();
+}
+
+class _BlockCheckerState extends State<BlockChecker> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBlockStatus();
+    _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      _checkBlockStatus();
+    });
+  }
+
+  Future<void> _checkBlockStatus() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('app_users')
+          .select('is_blocked')
+          .eq('id', widget.userId)
+          .maybeSingle();
+      if (response != null && response['is_blocked'] == true && mounted) {
+        context.read<AuthCubit>().logout();
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
