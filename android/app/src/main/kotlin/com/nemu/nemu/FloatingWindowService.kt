@@ -257,11 +257,12 @@ class FloatingWindowService : Service() {
                         it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         startActivity(it)
                     }
-                    // Close drawer panel
+                    // Close drawer panel and re-lock
                     panelView?.visibility = View.GONE
                     panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                     windowManager.updateViewLayout(panelView, panelParams)
                     currentScreenState = 0
+                    isUnlocked = false
                 }
             }
             val openAppParams = LinearLayout.LayoutParams(
@@ -541,15 +542,18 @@ class FloatingWindowService : Service() {
         panelView?.let { panel ->
             if (panel.visibility == View.VISIBLE) {
                 panel.visibility = View.GONE
-                // Reset state to menu on close
+                // Reset state to menu and auto re-lock cabinet on close
                 currentScreenState = 0
+                isUnlocked = false
+                updatePanelFields()
                 
-                // Add FLAG_NOT_FOCUSABLE back so user can interact with underlying app when panel is closed
+                // Make panel not focusable so keyboard disappears
                 panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 windowManager.updateViewLayout(panel, panelParams)
             } else {
                 panel.visibility = View.VISIBLE
                 currentScreenState = 0
+                isUnlocked = false
                 updatePanelFields()
             }
         }
