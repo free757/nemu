@@ -531,12 +531,8 @@ class FloatingWindowService : Service() {
             createPanel()
             // Make sure the newly replaced panel is visible
             panelView?.visibility = View.VISIBLE
-            // If we are in PIN entry screen, make it focusable. If menu or unlocked, let it be not focusable
-            if (currentScreenState == 1 && !isUnlocked) {
-                panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-            } else {
-                panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-            }
+            // ALWAYS clear FLAG_NOT_FOCUSABLE when the panel is open so it captures backdrop clicks!
+            panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
             windowManager.updateViewLayout(panelView, panelParams)
         }
     }
@@ -547,14 +543,12 @@ class FloatingWindowService : Service() {
                 panel.visibility = View.GONE
                 // Reset state to menu on close
                 currentScreenState = 0
-                updatePanelFields()
                 
-                // Make panel not focusable so keyboard disappears
+                // Add FLAG_NOT_FOCUSABLE back so user can interact with underlying app when panel is closed
                 panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 windowManager.updateViewLayout(panel, panelParams)
             } else {
                 panel.visibility = View.VISIBLE
-                // Reset to menu on open
                 currentScreenState = 0
                 updatePanelFields()
             }
