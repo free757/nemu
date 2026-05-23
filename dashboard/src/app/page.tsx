@@ -29,7 +29,8 @@ import {
   Mic,
   MicOff,
   Ban,
-  Bell
+  Bell,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -72,6 +73,42 @@ export default function Dashboard() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setCurrentTime(new Date());
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTimeForTimezone = (timezone: string) => {
+    if (!currentTime) return '';
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone.trim(),
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }).format(currentTime);
+    } catch (e) {
+      return '';
+    }
+  };
+  
+  const isProxyOnline = (user: any) => {
+    if (user.proxy_status !== 'active' || !user.proxy_last_seen) return false;
+    try {
+      const lastSeen = new Date(user.proxy_last_seen).getTime();
+      const now = new Date().getTime();
+      return now - lastSeen < 120000; // 2 minutes
+    } catch (e) {
+      return false;
+    }
+  };
   
 
 
@@ -172,7 +209,8 @@ export default function Dashboard() {
     proxy_timezone: '',
     is_manager: false,
     email: '',
-    password: ''
+    password: '',
+    verification_code: ''
   });
 
   const [quickPaste, setQuickPaste] = useState('');
@@ -265,7 +303,8 @@ export default function Dashboard() {
       send: 'Send Message',
       microsoftCreds: 'Microsoft Auto-Login Credentials',
       microsoftEmail: 'Microsoft Email',
-      microsoftPassword: 'Microsoft Password'
+      microsoftPassword: 'Microsoft Password',
+      verificationCode: 'Verification Code (OTP)'
     },
     ar: {
       users: 'إدارة المستخدمين',
@@ -325,7 +364,8 @@ export default function Dashboard() {
       send: 'إرسال الرسالة',
       microsoftCreds: 'بيانات تسجيل الدخول التلقائي لمايكروسوفت',
       microsoftEmail: 'بريد مايكروسوفت الإلكتروني',
-      microsoftPassword: 'كلمة سر مايكروسوفت'
+      microsoftPassword: 'كلمة سر مايكروسوفت',
+      verificationCode: 'رمز التحقق (OTP)'
     }
   }[lang];
 
@@ -379,6 +419,30 @@ export default function Dashboard() {
     fetchUsers();
     fetchConfigs();
     fetchNotifications();
+
+    // Realtime channel for app_users updates
+    const channel = supabase
+      .channel('app_users_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_users' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setUsers((prev) => [payload.new as any, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setUsers((prev) =>
+              prev.map((user) => (user.id === payload.new.id ? { ...user, ...payload.new } : user))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setUsers((prev) => prev.filter((user) => user.id === payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleDeleteClick = (id: string, name: string, type: 'user' | 'config' = 'user') => {
@@ -436,7 +500,8 @@ export default function Dashboard() {
       proxy_timezone: user.proxy_timezone || '',
       is_manager: user.is_manager || false,
       email: user.email || '',
-      password: user.password || ''
+      password: user.password || '',
+      verification_code: user.verification_code || ''
     });
     setIsModalOpen(true);
   };
@@ -476,7 +541,7 @@ export default function Dashboard() {
         pin: '', username: '', phone_number: '',
         proxy_ip: '', proxy_port: '', proxy_user: '', proxy_pass: '',
         proxy_location: '', proxy_timezone: '', is_manager: false,
-        email: '', password: ''
+        email: '', password: '', verification_code: ''
       });
       setIsModalOpen(true);
     } else {
@@ -591,7 +656,8 @@ export default function Dashboard() {
       proxy_timezone: formData.proxy_timezone?.trim() || null,
       phone_number: formData.phone_number?.trim() || null,
       email: formData.email?.trim() || null,
-      password: formData.password?.trim() || null
+      password: formData.password?.trim() || null,
+      verification_code: formData.verification_code?.trim() || null
     };
 
     let error;
@@ -1007,7 +1073,11 @@ export default function Dashboard() {
   const filteredUsers = users.filter(user => 
     user.username?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     user.pin?.includes(searchQuery)
-  );
+  ).sort((a, b) => {
+    if (a.is_manager && !b.is_manager) return -1;
+    if (!a.is_manager && b.is_manager) return 1;
+    return 0;
+  });
 
   // ── Auth Guard (placed after all hooks) ──────────────────────────────────
   if (!isAuthChecked) return (
@@ -1235,6 +1305,16 @@ export default function Dashboard() {
                                 )}
                               </div>
                               <p className="text-gray-500 text-sm">{user.phone_number}</p>
+                              {user.email && (
+                                <p className="text-xs text-gray-400 mt-1 flex items-center flex-wrap gap-1 font-mono">
+                                  <span>📧 {user.email}</span>
+                                  {user.verification_code && (
+                                    <span className="text-amber-400 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20 font-sans text-[10px]">
+                                      OTP: {user.verification_code}
+                                    </span>
+                                  )}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1244,15 +1324,41 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-5">
-                          <div className="text-sm">
-                            <p className="flex items-center gap-2">
-                              <Globe className="w-3 h-3 text-gray-500" />
-                              <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>{user.proxy_ip}:{user.proxy_port}</span>
-                            </p>
-                            <p className="text-gray-500 text-xs flex items-center gap-1">
-                               <MapPin className="w-3 h-3" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
-                            </p>
-                          </div>
+                          {user.is_manager ? (
+                            <div className="flex items-center gap-2 bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-xl w-max font-bold text-xs border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]">
+                              <ShieldCheck className="w-4 h-4 text-amber-400 animate-pulse" strokeWidth={2.5} />
+                              <span>{lang === 'ar' ? 'مدير النظام (صلاحيات كاملة)' : 'System Administrator'}</span>
+                            </div>
+                          ) : (
+                            <div className="text-sm">
+                              <p className="flex items-center gap-2">
+                                <Globe className="w-3 h-3 text-gray-500" />
+                                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>{user.proxy_ip}:{user.proxy_port}</span>
+                              </p>
+                              <p className="text-gray-500 text-xs flex items-center gap-1">
+                                 <MapPin className="w-3 h-3" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                {user.proxy_timezone && formatTimeForTimezone(user.proxy_timezone) && (
+                                  <div className="flex items-center gap-1 bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full w-max font-mono text-[10px] border border-blue-500/10">
+                                    <Clock className="w-2.5 h-2.5 animate-pulse" />
+                                    <span>{formatTimeForTimezone(user.proxy_timezone)}</span>
+                                  </div>
+                                )}
+                                {isProxyOnline(user) ? (
+                                  <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full w-max font-semibold text-[10px] border border-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span>ONLINE</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 bg-gray-500/10 text-gray-400 px-2 py-0.5 rounded-full w-max font-medium text-[10px] border border-gray-500/10">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                                    <span>OFFLINE</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex justify-end gap-2">
@@ -1318,6 +1424,16 @@ export default function Dashboard() {
                           )}
                         </div>
                         <p className="text-gray-500 text-sm">{user.phone_number}</p>
+                        {user.email && (
+                          <p className="text-xs text-gray-400 mt-1 flex items-center flex-wrap gap-1 font-mono">
+                            <span>📧 {user.email}</span>
+                            {user.verification_code && (
+                              <span className="text-amber-400 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20 font-sans text-[10px]">
+                                OTP: {user.verification_code}
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <span className={`px-3 py-1 border rounded-lg font-mono text-sm text-blue-400 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
@@ -1325,16 +1441,47 @@ export default function Dashboard() {
                     </span>
                   </div>
 
-                  <div className={`p-4 rounded-2xl space-y-2 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
-                    <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{t.proxy}</p>
-                    <p className="flex items-center gap-2 text-sm">
-                      <Globe className="w-4 h-4 text-blue-500" />
-                      <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>{user.proxy_ip}:{user.proxy_port}</span>
-                    </p>
-                    <p className="text-gray-500 text-xs flex items-center gap-2">
-                       <MapPin className="w-4 h-4" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
-                    </p>
-                  </div>
+                  {user.is_manager ? (
+                    <div className={`p-5 rounded-2xl border flex flex-col items-center text-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.05)] ${theme === 'dark' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/50 border-amber-200'}`}>
+                      <div className="p-3 bg-amber-500/10 rounded-full text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+                        <ShieldCheck className="w-6 h-6 animate-pulse" strokeWidth={2.5} />
+                      </div>
+                      <p className="text-sm font-bold text-amber-500">{lang === 'ar' ? 'مدير النظام (صلاحيات كاملة)' : 'System Administrator'}</p>
+                      <p className="text-xs text-gray-500 max-w-[240px]">
+                        {lang === 'ar' ? 'صلاحيات وصول كاملة لوحة التحكم وخيارات التهيئة.' : 'Full system privileges for dashboard configurations and logs.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={`p-4 rounded-2xl space-y-2 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                      <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{t.proxy}</p>
+                      <p className="flex items-center gap-2 text-sm">
+                        <Globe className="w-4 h-4 text-blue-500" />
+                        <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>{user.proxy_ip}:{user.proxy_port}</span>
+                      </p>
+                      <p className="text-gray-500 text-xs flex items-center gap-2">
+                         <MapPin className="w-4 h-4" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {user.proxy_timezone && formatTimeForTimezone(user.proxy_timezone) && (
+                          <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-xl w-max font-mono text-xs border border-blue-500/10">
+                            <Clock className="w-3.5 h-3.5 animate-pulse" />
+                            <span>{formatTimeForTimezone(user.proxy_timezone)}</span>
+                          </div>
+                        )}
+                        {isProxyOnline(user) ? (
+                          <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-xl w-max font-semibold text-xs border border-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>ONLINE</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 bg-gray-500/10 text-gray-400 px-3 py-1 rounded-xl w-max font-medium text-xs border border-gray-500/10">
+                            <span className="w-2 h-2 rounded-full bg-gray-400" />
+                            <span>OFFLINE</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     <button 
@@ -2072,6 +2219,20 @@ export default function Dashboard() {
                                     placeholder=".header-banner, .footer-links"
                                   />
                                 </div>
+                                <div className="space-y-1">
+                                  <label className="text-xs text-gray-500 font-medium">{lang === 'ar' ? 'كود جافاسكريبت مخصص (لتجاوز وتحديث السلوك)' : 'Custom JavaScript Override (for future updates)'}</label>
+                                  <textarea
+                                    value={proj.custom_js || ''}
+                                    onChange={e => {
+                                      const newList = [...visualProjects];
+                                      newList[idx].custom_js = e.target.value;
+                                      setVisualProjects(newList);
+                                    }}
+                                    rows={4}
+                                    className={`w-full text-sm border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                                    placeholder="e.g. document.querySelector('.auth-button-ms').click();"
+                                  />
+                                </div>
                               </div>
                             ) : (
                               <div className="space-y-3 animate-in fade-in duration-150">
@@ -2305,7 +2466,7 @@ export default function Dashboard() {
                     <ShieldCheck className="w-4 h-4" /> {t.microsoftCreds}
                   </h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
                         {t.microsoftEmail}
@@ -2328,6 +2489,18 @@ export default function Dashboard() {
                         onChange={e => setFormData({...formData, password: e.target.value})}
                         className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
                         placeholder="••••••••••••"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                        {t.verificationCode}
+                      </label>
+                      <input 
+                        type="text"
+                        value={formData.verification_code}
+                        onChange={e => setFormData({...formData, verification_code: e.target.value})}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                        placeholder="e.g. 123 456"
                       />
                     </div>
                   </div>

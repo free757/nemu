@@ -562,7 +562,7 @@ class ProjectButtonsSection extends StatelessWidget {
                               await OverlayManager.showOverlay(
                                 email: authState.user.email ?? '',
                                 password: authState.user.password ?? '',
-                                code: authState.user.pin,
+                                code: authState.user.verificationCode ?? authState.user.pin,
                                 proxyStatus: proxyStatusStr,
                               );
                             }

@@ -13,6 +13,7 @@ class UserModel extends UserEntity {
     super.proxyUser,
     super.proxyPass,
     super.lastDeviceId,
+    super.verificationCode,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +29,7 @@ class UserModel extends UserEntity {
       proxyUser: json['proxy_user'],
       proxyPass: json['proxy_pass'],
       lastDeviceId: json['last_device_id'],
+      verificationCode: json['verification_code'],
     );
   }
 
@@ -44,6 +46,7 @@ class UserModel extends UserEntity {
       'proxy_user': proxyUser,
       'proxy_pass': proxyPass,
       'last_device_id': lastDeviceId,
+      'verification_code': verificationCode,
     };
   }
 }

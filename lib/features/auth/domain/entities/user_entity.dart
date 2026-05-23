@@ -12,6 +12,7 @@ class UserEntity extends Equatable {
   final String? proxyUser;
   final String? proxyPass;
   final String? lastDeviceId;
+  final String? verificationCode;
 
   const UserEntity({
     required this.id,
@@ -25,6 +26,7 @@ class UserEntity extends Equatable {
     this.proxyUser,
     this.proxyPass,
     this.lastDeviceId,
+    this.verificationCode,
   });
 
   @override
@@ -40,5 +42,6 @@ class UserEntity extends Equatable {
         proxyUser,
         proxyPass,
         lastDeviceId,
+        verificationCode,
       ];
 }

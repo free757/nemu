@@ -4,8 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Grid, Terminal, Waves, Sunset, Palette } from 'lucide-react';
 
 const PIN_LENGTH = 4;
+type BackgroundType = 'aurora' | 'cyber' | 'matrix' | 'nebula' | 'sunset';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,6 +18,19 @@ export default function LoginPage() {
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
   const shakeKey = useRef(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Dynamic Wallpaper State loaded from LocalStorage
+  const [selectedBg, setSelectedBg] = useState<BackgroundType>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('nemu_lock_bg') as BackgroundType) || 'nebula';
+    }
+    return 'nebula';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('nemu_lock_bg', selectedBg);
+  }, [selectedBg]);
 
   // Live clock
   useEffect(() => {
@@ -28,6 +43,54 @@ export default function LoginPage() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Matrix Digital Rain Canvas Loop
+  useEffect(() => {
+    if (selectedBg !== 'matrix') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const columns = Math.floor(canvas.width / 20) + 1;
+    const ypos = Array(columns).fill(0);
+
+    const matrix = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#10b981'; // Sleek emerald green
+      ctx.font = '15px monospace';
+
+      ypos.forEach((y, ind) => {
+        const text = String.fromCharCode(33 + Math.random() * 93);
+        const x = ind * 20;
+        ctx.fillText(text, x, y);
+        if (y > 100 + Math.random() * 10000) ypos[ind] = 0;
+        else ypos[ind] = y + 20;
+      });
+    };
+
+    const loop = () => {
+      matrix();
+      animationFrameId = requestAnimationFrame(loop);
+    };
+    loop();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', resize);
+    };
+  }, [selectedBg]);
 
   // Auto-submit when PIN is complete
   useEffect(() => {
@@ -109,17 +172,112 @@ export default function LoginPage() {
   } as any;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden flex flex-col items-center justify-center select-none"
-         style={{ background: 'linear-gradient(135deg, #070b19 0%, #0f172a 50%, #1e1b4b 100%)' }}>
+    <div className="relative w-screen h-screen overflow-hidden flex flex-col items-center justify-center select-none">
       
-      {/* Animated premium ambient blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25 animate-pulse"
-             style={{ background: 'radial-gradient(circle, #2563eb, transparent)', top: '-10%', left: '-10%', animationDuration: '8s' }} />
-        <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20 animate-pulse"
-             style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%', animationDelay: '2s', animationDuration: '10s' }} />
-        <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-15 animate-pulse"
-             style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', top: '25%', right: '20%', animationDelay: '4s', animationDuration: '12s' }} />
+      {/* Background Layer with Buttery Smooth Fades */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden z-0">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={selectedBg}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+            className="absolute inset-0 w-full h-full"
+          >
+            {selectedBg === 'nebula' && (
+              <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(135deg, #070b19 0%, #0f172a 50%, #1e1b4b 100%)' }}>
+                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #2563eb, transparent)', top: '-10%', left: '-10%', animationDuration: '8s' }} />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%', animationDelay: '2s', animationDuration: '10s' }} />
+                <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-15 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', top: '25%', right: '20%', animationDelay: '4s', animationDuration: '12s' }} />
+              </div>
+            )}
+
+            {selectedBg === 'cyber' && (
+              <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(180deg, #05050c 0%, #0b0914 100%)' }}>
+                <div className="absolute inset-0 opacity-10"
+                     style={{
+                       backgroundImage: 'linear-gradient(to right, #06b6d4 1px, transparent 1px), linear-gradient(to bottom, #06b6d4 1px, transparent 1px)',
+                       backgroundSize: '45px 45px',
+                     }} />
+                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-35 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #0891b2, transparent)', top: '10%', left: '20%', animationDuration: '6s' }} />
+                <div className="absolute w-[400px] h-[400px] rounded-full blur-[100px] opacity-20 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #d946ef, transparent)', bottom: '10%', right: '10%', animationDelay: '1s', animationDuration: '8s' }} />
+              </div>
+            )}
+
+            {selectedBg === 'matrix' && (
+              <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(180deg, #020202 0%, #050a06 100%)' }}>
+                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-35" />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[130px] opacity-15 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #10b981, transparent)', top: '-5%', right: '5%', animationDuration: '7s' }} />
+              </div>
+            )}
+
+            {selectedBg === 'aurora' && (
+              <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(135deg, #031417 0%, #051c1e 50%, #0d0c1b 100%)' }}>
+                <div className="absolute w-[650px] h-[650px] rounded-full blur-[150px] opacity-25 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #0d9488, transparent)', top: '-20%', right: '-10%', animationDuration: '9s' }} />
+                <div className="absolute w-[550px] h-[550px] rounded-full blur-[130px] opacity-20 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #059669, transparent)', bottom: '-10%', left: '-10%', animationDelay: '3s', animationDuration: '11s' }} />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-15 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #6366f1, transparent)', top: '30%', left: '40%', animationDelay: '5s', animationDuration: '13s' }} />
+              </div>
+            )}
+
+            {selectedBg === 'sunset' && (
+              <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(135deg, #1c0a00 0%, #1e1b4b 50%, #31001c 100%)' }}>
+                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #ea580c, transparent)', top: '-10%', left: '-5%', animationDuration: '7s' }} />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%', animationDelay: '2s', animationDuration: '9s' }} />
+                <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-20 animate-pulse"
+                     style={{ background: 'radial-gradient(circle, #eab308, transparent)', top: '20%', right: '25%', animationDelay: '4s', animationDuration: '11s' }} />
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Top Right Floating Wallpaper Picker */}
+      <div className="absolute top-6 right-6 z-20 flex items-center gap-2 bg-black/30 backdrop-blur-2xl border border-white/10 px-3 py-2 rounded-2xl shadow-2xl">
+        <div className="text-white/40 p-1 flex items-center gap-1.5 text-xs select-none mr-1">
+          <Palette className="w-3.5 h-3.5 text-white/50 animate-bounce" />
+          <span className="hidden sm:inline font-bold uppercase tracking-wider text-[10px]">Theme</span>
+        </div>
+        
+        {[
+          { id: 'nebula', icon: Sparkles, label: 'Space Nebula' },
+          { id: 'cyber', icon: Grid, label: 'Cyber Grid' },
+          { id: 'matrix', icon: Terminal, label: 'Matrix Hacker' },
+          { id: 'aurora', icon: Waves, label: 'Aurora Waves' },
+          { id: 'sunset', icon: Sunset, label: 'Sunset Mirage' }
+        ].map(bg => {
+          const Icon = bg.icon;
+          const active = selectedBg === bg.id;
+          return (
+            <button
+              key={bg.id}
+              onClick={() => setSelectedBg(bg.id as BackgroundType)}
+              className={`p-2 rounded-xl transition-all duration-300 relative group flex items-center justify-center`}
+              style={{
+                background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+                border: active ? '1px solid rgba(255,255,255,0.15)' : '1px solid transparent',
+              }}
+            >
+              <Icon className={`w-4 h-4 transition-colors ${active ? 'text-blue-400' : 'text-white/50 group-hover:text-white'}`} />
+              
+              {/* Tooltip */}
+              <span className="absolute bottom-full mb-3 scale-0 group-hover:scale-100 transition-all duration-200 bg-black/90 backdrop-blur-md text-[10px] text-white/90 px-2.5 py-1.5 rounded-lg border border-white/10 shadow-2xl pointer-events-none whitespace-nowrap">
+                {bg.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Desktop Clock (Top Center, macOS Style) */}
@@ -147,7 +305,6 @@ export default function LoginPage() {
           </div>
           <div className="text-sm text-white/40 mt-1 font-light tracking-wide">{date}</div>
         </div>
-
 
         {/* Avatar */}
         <div className="flex flex-col items-center gap-3">
