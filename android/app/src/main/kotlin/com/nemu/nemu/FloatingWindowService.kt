@@ -191,8 +191,15 @@ class FloatingWindowService : Service() {
     }
 
     private fun createPanel() {
+        // Fullscreen container with translucent dark background dim effect
         panelView = FrameLayout(this).apply {
             visibility = View.GONE
+            setBackgroundColor(Color.parseColor("#80000000")) // 50% opacity black backdrop
+            
+            // Tap outside: Dismiss/hide panel
+            setOnClickListener {
+                togglePanelVisibility()
+            }
         }
 
         // Dynamic glassmorphic background for drawer panel
@@ -207,6 +214,10 @@ class FloatingWindowService : Service() {
             orientation = LinearLayout.VERTICAL
             background = panelBg
             setPadding(dpToPx(20f), dpToPx(20f), dpToPx(20f), dpToPx(20f))
+            
+            // Consume clicks inside container so they do not close the cabinet
+            setOnTouchListener { _, _ -> true }
+            setOnClickListener { /* No-op, consume click */ }
         }
 
         // Header Title based on screen state
@@ -423,7 +434,14 @@ class FloatingWindowService : Service() {
         }
         container.addView(closeBtn, btnParams)
 
-        panelView?.addView(container)
+        // Center layout inside the full-screen backdrop panelView
+        val containerParams = FrameLayout.LayoutParams(
+            dpToPx(290f),
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+        panelView?.addView(container, containerParams)
 
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -432,15 +450,14 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        // Fullscreen overlay matches screen bounds
         panelParams = WindowManager.LayoutParams(
-            dpToPx(290f),
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
             layoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.CENTER
-        }
+        )
 
         windowManager.addView(panelView, panelParams)
     }
