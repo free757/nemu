@@ -50,4 +50,10 @@ class AuthCubit extends Cubit<AuthState> {
     await authRepository.logout();
     emit(AuthUnauthenticated());
   }
+
+  void updateUserInfo(UserEntity updatedUser) {
+    if (state is AuthAuthenticated) {
+      emit(AuthAuthenticated(updatedUser));
+    }
+  }
 }

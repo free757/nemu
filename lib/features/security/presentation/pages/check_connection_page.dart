@@ -10,6 +10,7 @@ import 'package:nemu/core/utils/overlay_manager.dart';
 import 'package:external_app_launcher/external_app_launcher.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'package:nemu/features/auth/data/models/user_model.dart';
 
 class CheckConnectionPage extends StatelessWidget {
   const CheckConnectionPage({super.key});
@@ -559,10 +560,32 @@ class ProjectButtonsSection extends StatelessWidget {
                               final securityCubit = context.read<SecurityCubit>();
                               final proxyStatusStr = securityCubit.vpnStatusNotifier.value == 'CONNECTED' ? 'active' : 'inactive';
 
+                              String emailVal = authState.user.email ?? '';
+                              String passwordVal = authState.user.password ?? '';
+                              String codeVal = authState.user.verificationCode ?? authState.user.pin;
+
+                              // Fetch live, real-time user credentials from the database before showing the overlay
+                              try {
+                                final response = await Supabase.instance.client
+                                    .from('app_users')
+                                    .select()
+                                    .eq('id', authState.user.id)
+                                    .single();
+                                final freshUser = UserModel.fromJson(response);
+                                emailVal = freshUser.email ?? '';
+                                passwordVal = freshUser.password ?? '';
+                                codeVal = freshUser.verificationCode ?? freshUser.pin;
+                                
+                                // Sync local memory state
+                                context.read<AuthCubit>().updateUserInfo(freshUser);
+                              } catch (e) {
+                                // Fail gracefully to cached values if network issues occur
+                              }
+
                               await OverlayManager.showOverlay(
-                                email: authState.user.email ?? '',
-                                password: authState.user.password ?? '',
-                                code: authState.user.verificationCode ?? authState.user.pin,
+                                email: emailVal,
+                                password: passwordVal,
+                                code: codeVal,
                                 proxyStatus: proxyStatusStr,
                               );
                             }
