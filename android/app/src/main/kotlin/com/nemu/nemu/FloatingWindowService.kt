@@ -151,7 +151,11 @@ class FloatingWindowService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        if (lastAction == MotionEvent.ACTION_DOWN) {
+                        val diffX = event.rawX - initialTouchX
+                        val diffY = event.rawY - initialTouchY
+                        val distance = Math.sqrt((diffX * diffX + diffY * diffY).toDouble())
+                        
+                        if (distance < 10.0) {
                             // Single tap: toggle expanded credentials panel
                             togglePanelVisibility()
                         } else {
