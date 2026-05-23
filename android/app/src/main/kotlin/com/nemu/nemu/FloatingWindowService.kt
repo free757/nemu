@@ -409,30 +409,45 @@ class FloatingWindowService : Service() {
             }
         }
 
-        // Red Close Button
-        val closeBtn = Button(this).apply {
-            text = "Dismiss Overlay"
+        // Sleek Gray Collapse Menu Button (Simply closes panel, keeps bubble visible)
+        val collapseBtn = Button(this).apply {
+            text = "Collapse Menu"
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             
             val shapeDrawable = GradientDrawable().apply {
-                setColor(Color.parseColor("#EF4444"))
+                setColor(Color.parseColor("#4B5563")) // Neutral slate grey
                 cornerRadius = dpToPx(12f).toFloat()
             }
             background = shapeDrawable
             
             setOnClickListener {
-                stopSelf()
+                togglePanelVisibility()
             }
         }
-        val btnParams = LinearLayout.LayoutParams(
+        val collapseBtnParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dpToPx(44f)
         ).apply {
             topMargin = dpToPx(12f)
         }
-        container.addView(closeBtn, btnParams)
+        container.addView(collapseBtn, collapseBtnParams)
+
+        // Flat Red Exit text button (to completely kill the service & remove the bubble)
+        val exitOverlayBtn = TextView(this).apply {
+            text = "Exit Floating Overlay"
+            setTextColor(Color.parseColor("#EF4444")) // Warning Red
+            typeface = Typeface.DEFAULT_BOLD
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            gravity = Gravity.CENTER
+            setPadding(0, dpToPx(12f), 0, 0)
+            
+            setOnClickListener {
+                stopSelf()
+            }
+        }
+        container.addView(exitOverlayBtn)
 
         // Center layout inside the full-screen backdrop panelView
         val containerParams = FrameLayout.LayoutParams(
