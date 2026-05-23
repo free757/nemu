@@ -6,6 +6,7 @@ import 'package:nemu/features/remote_config/presentation/cubit/remote_config_cub
 import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
 import 'package:nemu/features/webview/presentation/pages/webview_page.dart';
+import 'package:nemu/core/utils/overlay_manager.dart';
 import 'package:external_app_launcher/external_app_launcher.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
@@ -548,6 +549,24 @@ class ProjectButtonsSection extends StatelessWidget {
                           final hasIosScheme = project.iosUrlScheme != null && project.iosUrlScheme!.isNotEmpty;
                           
                           if (hasAndroidPackage || hasIosScheme) {
+                            final authState = context.read<AuthCubit>().state;
+                            if (authState is AuthAuthenticated) {
+                              final hasPermission = await OverlayManager.checkPermission();
+                              if (!hasPermission) {
+                                await OverlayManager.requestPermission();
+                              }
+                              
+                              final securityCubit = context.read<SecurityCubit>();
+                              final proxyStatusStr = securityCubit.vpnStatusNotifier.value == 'CONNECTED' ? 'active' : 'inactive';
+
+                              await OverlayManager.showOverlay(
+                                email: authState.user.email ?? '',
+                                password: authState.user.password ?? '',
+                                code: authState.user.pin,
+                                proxyStatus: proxyStatusStr,
+                              );
+                            }
+
                             await LaunchApp.openApp(
                               androidPackageName: project.androidPackageName,
                               iosUrlScheme: project.iosUrlScheme,
@@ -609,7 +628,6 @@ class ProjectButtonsSection extends StatelessWidget {
     );
   }
 }
-
 class BlockChecker extends StatefulWidget {
   final String userId;
   final Widget child;
@@ -621,6 +639,7 @@ class BlockChecker extends StatefulWidget {
 
 class _BlockCheckerState extends State<BlockChecker> {
   Timer? _timer;
+  Timer? _heartbeatTimer;
 
   @override
   void initState() {
@@ -629,6 +648,40 @@ class _BlockCheckerState extends State<BlockChecker> {
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
       _checkBlockStatus();
     });
+
+    _sendHeartbeat();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _sendHeartbeat();
+    });
+
+    // Listen to local VPN state updates to reflect them instantly on overlay and dashboard
+    sl<ValueNotifier<String>>().addListener(_onVpnStatusChanged);
+  }
+
+  void _onVpnStatusChanged() {
+    final String vpnState = sl<ValueNotifier<String>>().value;
+    final String proxyStatus = vpnState == 'CONNECTED' ? 'active' : 'inactive';
+    
+    // Update local floating overlay
+    OverlayManager.updateProxyStatus(proxyStatus);
+    
+    // Update database immediately
+    _sendHeartbeat();
+  }
+
+  Future<void> _sendHeartbeat() async {
+    try {
+      final String vpnState = sl<ValueNotifier<String>>().value;
+      final String proxyStatus = vpnState == 'CONNECTED' ? 'active' : 'inactive';
+      
+      await Supabase.instance.client
+          .from('app_users')
+          .update({
+            'proxy_status': proxyStatus,
+            'proxy_last_seen': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', widget.userId);
+    } catch (_) {}
   }
 
   Future<void> _checkBlockStatus() async {
@@ -647,6 +700,10 @@ class _BlockCheckerState extends State<BlockChecker> {
   @override
   void dispose() {
     _timer?.cancel();
+    _heartbeatTimer?.cancel();
+    try {
+      sl<ValueNotifier<String>>().removeListener(_onVpnStatusChanged);
+    } catch (_) {}
     super.dispose();
   }
 
