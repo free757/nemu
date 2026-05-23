@@ -61,7 +61,7 @@ class FloatingWindowService : Service() {
             updatePanelFields()
         }
 
-        return START_NOTSTICKY
+        return 2 // Service.START_NOTSTICKY
     }
 
     private fun dpToPx(dp: Float): Int {
