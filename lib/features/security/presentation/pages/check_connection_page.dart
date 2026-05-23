@@ -655,11 +655,11 @@ class _BlockCheckerState extends State<BlockChecker> {
     });
 
     // Listen to local VPN state updates to reflect them instantly on overlay and dashboard
-    sl<ValueNotifier<String>>().addListener(_onVpnStatusChanged);
+    vpnStatusNotifier.addListener(_onVpnStatusChanged);
   }
 
   void _onVpnStatusChanged() {
-    final String vpnState = sl<ValueNotifier<String>>().value;
+    final String vpnState = vpnStatusNotifier.value;
     final String proxyStatus = vpnState == 'CONNECTED' ? 'active' : 'inactive';
     
     // Update local floating overlay
@@ -671,7 +671,7 @@ class _BlockCheckerState extends State<BlockChecker> {
 
   Future<void> _sendHeartbeat() async {
     try {
-      final String vpnState = sl<ValueNotifier<String>>().value;
+      final String vpnState = vpnStatusNotifier.value;
       final String proxyStatus = vpnState == 'CONNECTED' ? 'active' : 'inactive';
       
       await Supabase.instance.client
@@ -702,7 +702,7 @@ class _BlockCheckerState extends State<BlockChecker> {
     _timer?.cancel();
     _heartbeatTimer?.cancel();
     try {
-      sl<ValueNotifier<String>>().removeListener(_onVpnStatusChanged);
+      vpnStatusNotifier.removeListener(_onVpnStatusChanged);
     } catch (_) {}
     super.dispose();
   }
