@@ -26,6 +26,9 @@ class FloatingWindowService : Service() {
     private var codeStr: String = ""
     private var proxyStatus: String = "inactive"
 
+    private var isUnlocked: Boolean = false
+    private lateinit var panelParams: WindowManager.LayoutParams
+
     companion object {
         var instance: FloatingWindowService? = null
         
@@ -207,7 +210,7 @@ class FloatingWindowService : Service() {
 
         // Title text header
         val headerText = TextView(this).apply {
-            text = "Nemu Quick Cabinet"
+            text = if (isUnlocked) "Nemu Quick Cabinet" else "Secure Cabinet Locked"
             setTextColor(Color.parseColor("#9CA3AF"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.DEFAULT_BOLD
@@ -216,14 +219,91 @@ class FloatingWindowService : Service() {
         }
         container.addView(headerText)
 
-        // Email, Password, Code sections
-        val emailSection = createFieldSection("Email", emailStr)
-        val passSection = createFieldSection("Password", passwordStr)
-        val codeSection = createFieldSection("Verification Code", codeStr)
+        if (!isUnlocked) {
+            // Padlock Icon
+            val lockIcon = TextView(this).apply {
+                text = "🔒"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 36f)
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, dpToPx(8f))
+            }
+            container.addView(lockIcon)
 
-        container.addView(emailSection)
-        container.addView(passSection)
-        container.addView(codeSection)
+            // Prompt Text
+            val promptText = TextView(this).apply {
+                text = "Enter account PIN to unlock credentials"
+                setTextColor(Color.parseColor("#9CA3AF"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, dpToPx(12f))
+            }
+            container.addView(promptText)
+
+            // Password Pin Input field
+            val pinInput = EditText(this).apply {
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                setHintTextColor(Color.parseColor("#4B5563"))
+                hint = "••••"
+                filters = arrayOf(android.text.InputFilter.LengthFilter(8))
+                setPadding(0, dpToPx(10f), 0, dpToPx(10f))
+                
+                val editBg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#131316"))
+                    cornerRadius = dpToPx(12f).toFloat()
+                    setStroke(dpToPx(1f), Color.parseColor("#44FFFFFF"))
+                }
+                background = editBg
+            }
+            val inputParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dpToPx(14f)
+            }
+            container.addView(pinInput, inputParams)
+
+            // Unlock Button
+            val unlockBtn = Button(this).apply {
+                text = "Unlock Cabinet"
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                
+                val shapeDrawable = GradientDrawable().apply {
+                    setColor(Color.parseColor("#2563EB")) // Royal blue
+                    cornerRadius = dpToPx(12f).toFloat()
+                }
+                background = shapeDrawable
+                
+                setOnClickListener {
+                    val input = pinInput.text.toString().trim()
+                    if (input == codeStr) {
+                        isUnlocked = true
+                        Toast.makeText(context, "Access Granted!", Toast.LENGTH_SHORT).show()
+                        updatePanelFields() // Rebuilds the fields with credentials displayed
+                    } else {
+                        Toast.makeText(context, "Incorrect PIN. Access Denied!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            val unlockBtnParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(44f)
+            )
+            container.addView(unlockBtn, unlockBtnParams)
+        } else {
+            // Render Cabinet Fields
+            val emailSection = createFieldSection("Email", emailStr)
+            val passSection = createFieldSection("Password", passwordStr)
+            val codeSection = createFieldSection("Verification Code", codeStr)
+
+            container.addView(emailSection)
+            container.addView(passSection)
+            container.addView(codeSection)
+        }
 
         // Red Close Button
         val closeBtn = Button(this).apply {
@@ -259,17 +339,17 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        val params = WindowManager.LayoutParams(
+        panelParams = WindowManager.LayoutParams(
             dpToPx(290f),
             WindowManager.LayoutParams.WRAP_CONTENT,
             layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
         }
 
-        windowManager.addView(panelView, params)
+        windowManager.addView(panelView, panelParams)
     }
 
     private fun createFieldSection(title: String, value: String): LinearLayout {
@@ -335,8 +415,16 @@ class FloatingWindowService : Service() {
 
     private fun updatePanelFields() {
         panelView?.let {
-            windowManager.removeView(it)
+            try {
+                windowManager.removeView(it)
+            } catch (e: Exception) {}
             createPanel()
+            if (isUnlocked) {
+                // If unlocked, show it immediately and ensure focus flags let keyboard hide
+                panelView?.visibility = View.VISIBLE
+                panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                windowManager.updateViewLayout(panelView, panelParams)
+            }
         }
     }
 
@@ -344,8 +432,14 @@ class FloatingWindowService : Service() {
         panelView?.let { panel ->
             if (panel.visibility == View.VISIBLE) {
                 panel.visibility = View.GONE
+                // Make panel not focusable so keyboard disappears
+                panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                windowManager.updateViewLayout(panel, panelParams)
             } else {
                 panel.visibility = View.VISIBLE
+                // Request focus so keyboard works!
+                panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                windowManager.updateViewLayout(panel, panelParams)
             }
         }
     }
@@ -353,7 +447,7 @@ class FloatingWindowService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         instance = null
-        bubbleView?.let { windowManager.removeView(it) }
-        panelView?.let { windowManager.removeView(it) }
+        bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
+        panelView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
     }
 }
