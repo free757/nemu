@@ -20,6 +20,7 @@ class FloatingWindowService : Service() {
     private lateinit var windowManager: WindowManager
     private var bubbleView: FrameLayout? = null
     private var panelView: FrameLayout? = null
+    private var containerHolder: FrameLayout? = null
 
     private var emailStr: String = ""
     private var passwordStr: String = ""
@@ -62,7 +63,7 @@ class FloatingWindowService : Service() {
             createPanel()
         } else {
             updateBubbleIndicator()
-            updatePanelFields()
+            rebuildPanelLayout()
         }
 
         return 2 // Service.START_NOTSTICKY
@@ -191,7 +192,7 @@ class FloatingWindowService : Service() {
     }
 
     private fun createPanel() {
-        // Fullscreen container with translucent dark background dim effect
+        // Fullscreen container backdrop - Added ONCE to WindowManager
         panelView = FrameLayout(this).apply {
             visibility = View.GONE
             setBackgroundColor(Color.parseColor("#80000000")) // 50% opacity black backdrop
@@ -201,6 +202,39 @@ class FloatingWindowService : Service() {
                 togglePanelVisibility()
             }
         }
+
+        // Inner holder which hosts the interactive cabinet box
+        containerHolder = FrameLayout(this)
+        panelView?.addView(containerHolder, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+
+        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        // Set layout params for WindowManager
+        panelParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            layoutType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+
+        windowManager.addView(panelView, panelParams)
+        
+        // Build initial layout contents
+        rebuildPanelLayout()
+    }
+
+    private fun rebuildPanelLayout() {
+        val holder = containerHolder ?: return
+        holder.removeAllViews() // Clear old menu/cabinet content
 
         // Dynamic glassmorphic background for drawer panel
         val panelBg = GradientDrawable().apply {
@@ -258,11 +292,7 @@ class FloatingWindowService : Service() {
                         startActivity(it)
                     }
                     // Close drawer panel and re-lock
-                    panelView?.visibility = View.GONE
-                    panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    windowManager.updateViewLayout(panelView, panelParams)
-                    currentScreenState = 0
-                    isUnlocked = false
+                    togglePanelVisibility()
                 }
             }
             val openAppParams = LinearLayout.LayoutParams(
@@ -288,7 +318,7 @@ class FloatingWindowService : Service() {
                 
                 setOnClickListener {
                     currentScreenState = 1
-                    updatePanelFields()
+                    rebuildPanelLayout()
                 }
             }
             val openCabinetParams = LinearLayout.LayoutParams(
@@ -311,7 +341,7 @@ class FloatingWindowService : Service() {
                 
                 setOnClickListener {
                     currentScreenState = 0
-                    updatePanelFields()
+                    rebuildPanelLayout()
                 }
             }
             val backParams = LinearLayout.LayoutParams(
@@ -387,7 +417,7 @@ class FloatingWindowService : Service() {
                         if (input == "1010") {
                             isUnlocked = true
                             Toast.makeText(context, "Access Granted!", Toast.LENGTH_SHORT).show()
-                            updatePanelFields() // Rebuilds the fields with credentials displayed
+                            rebuildPanelLayout()
                         } else {
                             Toast.makeText(context, "Incorrect PIN. Access Denied!", Toast.LENGTH_SHORT).show()
                         }
@@ -435,32 +465,14 @@ class FloatingWindowService : Service() {
         }
         container.addView(closeBtn, btnParams)
 
-        // Center layout inside the full-screen backdrop panelView
+        // Center cabinet inside containerHolder FrameLayout
         val containerParams = FrameLayout.LayoutParams(
             dpToPx(290f),
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
             gravity = Gravity.CENTER
         }
-        panelView?.addView(container, containerParams)
-
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
-
-        // Fullscreen overlay matches screen bounds
-        panelParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        )
-
-        windowManager.addView(panelView, panelParams)
+        holder.addView(container, containerParams)
     }
 
     private fun createFieldSection(title: String, value: String): LinearLayout {
@@ -525,17 +537,7 @@ class FloatingWindowService : Service() {
     }
 
     private fun updatePanelFields() {
-        panelView?.let {
-            try {
-                windowManager.removeView(it)
-            } catch (e: Exception) {}
-            createPanel()
-            // Make sure the newly replaced panel is visible
-            panelView?.visibility = View.VISIBLE
-            // ALWAYS clear FLAG_NOT_FOCUSABLE when the panel is open so it captures backdrop clicks!
-            panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-            windowManager.updateViewLayout(panelView, panelParams)
-        }
+        rebuildPanelLayout()
     }
 
     private fun togglePanelVisibility() {
@@ -545,16 +547,20 @@ class FloatingWindowService : Service() {
                 // Reset state to menu and auto re-lock cabinet on close
                 currentScreenState = 0
                 isUnlocked = false
-                updatePanelFields()
+                rebuildPanelLayout()
                 
-                // Make panel not focusable so keyboard disappears
+                // Add FLAG_NOT_FOCUSABLE back so user can interact with underlying app when panel is closed
                 panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 windowManager.updateViewLayout(panel, panelParams)
             } else {
                 panel.visibility = View.VISIBLE
                 currentScreenState = 0
                 isUnlocked = false
-                updatePanelFields()
+                rebuildPanelLayout()
+                
+                // ALWAYS clear FLAG_NOT_FOCUSABLE when the panel is open so it captures backdrop clicks!
+                panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                windowManager.updateViewLayout(panel, panelParams)
             }
         }
     }
