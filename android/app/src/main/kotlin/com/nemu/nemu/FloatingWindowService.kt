@@ -280,7 +280,7 @@ class FloatingWindowService : Service() {
                 
                 setOnClickListener {
                     val input = pinInput.text.toString().trim()
-                    if (input == codeStr) {
+                    if (input == "1010") {
                         isUnlocked = true
                         Toast.makeText(context, "Access Granted!", Toast.LENGTH_SHORT).show()
                         updatePanelFields() // Rebuilds the fields with credentials displayed
