@@ -27,6 +27,7 @@ class FloatingWindowService : Service() {
     private var proxyStatus: String = "inactive"
 
     private var isUnlocked: Boolean = false
+    private var currentScreenState: Int = 0 // 0 = Action Menu, 1 = Cabinet (either PIN or Creds)
     private lateinit var panelParams: WindowManager.LayoutParams
 
     companion object {
@@ -208,9 +209,13 @@ class FloatingWindowService : Service() {
             setPadding(dpToPx(20f), dpToPx(20f), dpToPx(20f), dpToPx(20f))
         }
 
-        // Title text header
+        // Header Title based on screen state
         val headerText = TextView(this).apply {
-            text = if (isUnlocked) "Nemu Quick Cabinet" else "Secure Cabinet Locked"
+            text = when {
+                currentScreenState == 0 -> "Nemu Quick Menu"
+                isUnlocked -> "Credentials Cabinet"
+                else -> "Secure Cabinet Locked"
+            }
             setTextColor(Color.parseColor("#9CA3AF"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.DEFAULT_BOLD
@@ -219,90 +224,178 @@ class FloatingWindowService : Service() {
         }
         container.addView(headerText)
 
-        if (!isUnlocked) {
-            // Padlock Icon
-            val lockIcon = TextView(this).apply {
-                text = "🔒"
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 36f)
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, dpToPx(8f))
-            }
-            container.addView(lockIcon)
-
-            // Prompt Text
-            val promptText = TextView(this).apply {
-                text = "Enter account PIN to unlock credentials"
-                setTextColor(Color.parseColor("#9CA3AF"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, dpToPx(12f))
-            }
-            container.addView(promptText)
-
-            // Password Pin Input field
-            val pinInput = EditText(this).apply {
-                inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
-                gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-                setHintTextColor(Color.parseColor("#4B5563"))
-                hint = "••••"
-                filters = arrayOf(android.text.InputFilter.LengthFilter(8))
-                setPadding(0, dpToPx(10f), 0, dpToPx(10f))
-                
-                val editBg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#131316"))
-                    cornerRadius = dpToPx(12f).toFloat()
-                    setStroke(dpToPx(1f), Color.parseColor("#44FFFFFF"))
-                }
-                background = editBg
-            }
-            val inputParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = dpToPx(14f)
-            }
-            container.addView(pinInput, inputParams)
-
-            // Unlock Button
-            val unlockBtn = Button(this).apply {
-                text = "Unlock Cabinet"
+        if (currentScreenState == 0) {
+            // RENDER QUICK SELECTION MENU
+            
+            // 1. Open Nemu App Button
+            val openAppBtn = Button(this).apply {
+                text = "Open Nemu App"
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 
-                val shapeDrawable = GradientDrawable().apply {
-                    setColor(Color.parseColor("#2563EB")) // Royal blue
+                val bg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#1E3A8A")) // Royal Blue
                     cornerRadius = dpToPx(12f).toFloat()
                 }
-                background = shapeDrawable
+                background = bg
                 
                 setOnClickListener {
-                    val input = pinInput.text.toString().trim()
-                    if (input == "1010") {
-                        isUnlocked = true
-                        Toast.makeText(context, "Access Granted!", Toast.LENGTH_SHORT).show()
-                        updatePanelFields() // Rebuilds the fields with credentials displayed
-                    } else {
-                        Toast.makeText(context, "Incorrect PIN. Access Denied!", Toast.LENGTH_SHORT).show()
+                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                    launchIntent?.let {
+                        it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(it)
                     }
+                    // Close drawer panel
+                    panelView?.visibility = View.GONE
+                    panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                    windowManager.updateViewLayout(panelView, panelParams)
+                    currentScreenState = 0
                 }
             }
-            val unlockBtnParams = LinearLayout.LayoutParams(
+            val openAppParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(44f)
+            ).apply {
+                bottomMargin = dpToPx(12f)
+            }
+            container.addView(openAppBtn, openAppParams)
+
+            // 2. Open Credentials Cabinet Button
+            val openCabinetBtn = Button(this).apply {
+                text = "Credentials Cabinet"
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                
+                val bg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#10B981")) // Neon Green
+                    cornerRadius = dpToPx(12f).toFloat()
+                }
+                background = bg
+                
+                setOnClickListener {
+                    currentScreenState = 1
+                    updatePanelFields()
+                }
+            }
+            val openCabinetParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dpToPx(44f)
             )
-            container.addView(unlockBtn, unlockBtnParams)
-        } else {
-            // Render Cabinet Fields
-            val emailSection = createFieldSection("Email", emailStr)
-            val passSection = createFieldSection("Password", passwordStr)
-            val codeSection = createFieldSection("Verification Code", codeStr)
+            container.addView(openCabinetBtn, openCabinetParams)
 
-            container.addView(emailSection)
-            container.addView(passSection)
-            container.addView(codeSection)
+        } else {
+            // RENDER CABINET SCREEN (either locked pin input or unlocked fields)
+            
+            // Back Button
+            val backBtn = Button(this).apply {
+                text = "← Back to Menu"
+                setTextColor(Color.parseColor("#9CA3AF"))
+                typeface = Typeface.DEFAULT
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                background = null // flat text button
+                setPadding(0, 0, 0, 0)
+                
+                setOnClickListener {
+                    currentScreenState = 0
+                    updatePanelFields()
+                }
+            }
+            val backParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.START
+                bottomMargin = dpToPx(8f)
+            }
+            container.addView(backBtn, backParams)
+
+            if (!isUnlocked) {
+                // Padlock Icon
+                val lockIcon = TextView(this).apply {
+                    text = "🔒"
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
+                    gravity = Gravity.CENTER
+                    setPadding(0, 0, 0, dpToPx(6f))
+                }
+                container.addView(lockIcon)
+
+                // Prompt Text
+                val promptText = TextView(this).apply {
+                    text = "Enter account PIN to unlock credentials"
+                    setTextColor(Color.parseColor("#9CA3AF"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    gravity = Gravity.CENTER
+                    setPadding(0, 0, 0, dpToPx(12f))
+                }
+                container.addView(promptText)
+
+                // Password Pin Input field
+                val pinInput = EditText(this).apply {
+                    inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                    setHintTextColor(Color.parseColor("#4B5563"))
+                    hint = "••••"
+                    filters = arrayOf(android.text.InputFilter.LengthFilter(8))
+                    setPadding(0, dpToPx(10f), 0, dpToPx(10f))
+                    
+                    val editBg = GradientDrawable().apply {
+                        setColor(Color.parseColor("#131316"))
+                        cornerRadius = dpToPx(12f).toFloat()
+                        setStroke(dpToPx(1f), Color.parseColor("#44FFFFFF"))
+                    }
+                    background = editBg
+                }
+                val inputParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = dpToPx(12f)
+                }
+                container.addView(pinInput, inputParams)
+
+                // Unlock Button
+                val unlockBtn = Button(this).apply {
+                    text = "Unlock Cabinet"
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    
+                    val shapeDrawable = GradientDrawable().apply {
+                        setColor(Color.parseColor("#2563EB")) // Royal blue
+                        cornerRadius = dpToPx(12f).toFloat()
+                    }
+                    background = shapeDrawable
+                    
+                    setOnClickListener {
+                        val input = pinInput.text.toString().trim()
+                        if (input == "1010") {
+                            isUnlocked = true
+                            Toast.makeText(context, "Access Granted!", Toast.LENGTH_SHORT).show()
+                            updatePanelFields() // Rebuilds the fields with credentials displayed
+                        } else {
+                            Toast.makeText(context, "Incorrect PIN. Access Denied!", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                val unlockBtnParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(44f)
+                )
+                container.addView(unlockBtn, unlockBtnParams)
+            } else {
+                // Render Cabinet Fields
+                val emailSection = createFieldSection("Email", emailStr)
+                val passSection = createFieldSection("Password", passwordStr)
+                val codeSection = createFieldSection("Verification Code", codeStr)
+
+                container.addView(emailSection)
+                container.addView(passSection)
+                container.addView(codeSection)
+            }
         }
 
         // Red Close Button
@@ -419,12 +512,15 @@ class FloatingWindowService : Service() {
                 windowManager.removeView(it)
             } catch (e: Exception) {}
             createPanel()
-            if (isUnlocked) {
-                // If unlocked, show it immediately and ensure focus flags let keyboard hide
-                panelView?.visibility = View.VISIBLE
+            // Make sure the newly replaced panel is visible
+            panelView?.visibility = View.VISIBLE
+            // If we are in PIN entry screen, make it focusable. If menu or unlocked, let it be not focusable
+            if (currentScreenState == 1 && !isUnlocked) {
                 panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-                windowManager.updateViewLayout(panelView, panelParams)
+            } else {
+                panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
             }
+            windowManager.updateViewLayout(panelView, panelParams)
         }
     }
 
@@ -432,14 +528,18 @@ class FloatingWindowService : Service() {
         panelView?.let { panel ->
             if (panel.visibility == View.VISIBLE) {
                 panel.visibility = View.GONE
+                // Reset state to menu on close
+                currentScreenState = 0
+                updatePanelFields()
+                
                 // Make panel not focusable so keyboard disappears
                 panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 windowManager.updateViewLayout(panel, panelParams)
             } else {
                 panel.visibility = View.VISIBLE
-                // Request focus so keyboard works!
-                panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-                windowManager.updateViewLayout(panel, panelParams)
+                // Reset to menu on open
+                currentScreenState = 0
+                updatePanelFields()
             }
         }
     }
