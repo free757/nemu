@@ -14,9 +14,16 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
 
   @override
   Future<ConnectionStatusModel> checkIP() async {
+    // Create a brand new Client instance for this check to completely avoid TCP socket caching/keep-alive reuse!
+    final freshClient = http.Client();
     try {
-      final response = await client
-          .get(Uri.parse('http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query'))
+      final response = await freshClient
+          .get(
+            Uri.parse('http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query'),
+            headers: {
+              'Connection': 'close', // Force closing the socket to prevent TCP connection reuse
+            },
+          )
           .timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
         return ConnectionStatusModel.fromJson(json.decode(response.body));
@@ -25,6 +32,8 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       }
     } on TimeoutException {
       throw Exception('Connection timed out. Please check your internet.');
+    } finally {
+      freshClient.close(); // Cleanly release the client and its sockets immediately
     }
   }
 }
