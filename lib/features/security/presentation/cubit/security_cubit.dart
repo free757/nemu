@@ -43,6 +43,8 @@ class SecurityCubit extends Cubit<SecurityState> {
         currentLoaded.status,
         isConnected: newIsConnected,
       ));
+      // Force connection verification whenever VPN status toggles to update IP/timezone instantly!
+      checkConnection();
     } else {
       // If we are in another state but VPN becomes connected, load a placeholder and check connection
       if (_isVpnConnected) {
