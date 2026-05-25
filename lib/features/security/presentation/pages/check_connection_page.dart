@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nemu/injection_container.dart';
 import 'package:nemu/features/remote_config/presentation/cubit/remote_config_cubit.dart';
@@ -11,6 +15,12 @@ import 'package:external_app_launcher/external_app_launcher.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:nemu/features/auth/data/models/user_model.dart';
+import 'package:nemu/features/app_update/presentation/cubit/app_update_cubit.dart';
+import 'package:nemu/features/app_update/presentation/widgets/update_icon_button.dart';
+import 'package:nemu/core/utils/constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+final ValueNotifier<bool> showOverlayNotifier = ValueNotifier<bool>(true);
 
 class CheckConnectionPage extends StatelessWidget {
   const CheckConnectionPage({super.key});
@@ -25,6 +35,9 @@ class CheckConnectionPage extends StatelessWidget {
         BlocProvider(
           create: (context) => sl<RemoteConfigCubit>()..fetchProjects(),
         ),
+        BlocProvider(
+          create: (context) => sl<AppUpdateCubit>(),
+        ),
       ],
       child: const CheckConnectionView(),
     );
@@ -38,15 +51,40 @@ class CheckConnectionView extends StatefulWidget {
   State<CheckConnectionView> createState() => _CheckConnectionViewState();
 }
 
-class _CheckConnectionViewState extends State<CheckConnectionView> {
+class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsBindingObserver {
   StreamSubscription<List<Map<String, dynamic>>>? _notificationsSubscription;
   List<Map<String, dynamic>> _notifications = [];
   int _lastSeenCount = 0;
+  bool _showOverlay = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _subscribeToNotifications();
+    _loadOverlayPreference();
+  }
+
+  Future<void> _loadOverlayPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final showOverlayPref = prefs.getBool('show_floating_overlay') ?? true;
+    showOverlayNotifier.value = showOverlayPref;
+    if (mounted) {
+      setState(() {
+        _showOverlay = showOverlayPref;
+      });
+    }
+  }
+
+  Future<void> _toggleOverlay(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('show_floating_overlay', value);
+    showOverlayNotifier.value = value;
+    if (mounted) {
+      setState(() {
+        _showOverlay = value;
+      });
+    }
   }
 
   void _subscribeToNotifications() {
@@ -281,8 +319,16 @@ class _CheckConnectionViewState extends State<CheckConnectionView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notificationsSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<SecurityCubit>().checkConnection();
+    }
   }
 
   @override
@@ -315,6 +361,8 @@ class _CheckConnectionViewState extends State<CheckConnectionView> {
                         child: Column(
                           children: [
                             _buildUserCard(user),
+                            const SizedBox(height: 12),
+                            _buildOverlayToggleCard(),
                             const SizedBox(height: 20),
                             _buildProxyCard(context, user),
                             const SizedBox(height: 30),
@@ -350,6 +398,8 @@ class _CheckConnectionViewState extends State<CheckConnectionView> {
           ),
           Row(
             children: [
+              const AppUpdateIconButton(currentVersion: AppConstants.appVersion),
+              const SizedBox(width: 8),
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -420,6 +470,52 @@ class _CheckConnectionViewState extends State<CheckConnectionView> {
                 Text(user.phoneNumber ?? 'No Phone', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 Text(user.email ?? 'No Email', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverlayToggleCard() {
+    return Card(
+      color: Colors.white.withOpacity(0.05),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.layers, color: Colors.blueAccent, size: 24),
+                ),
+                const SizedBox(width: 15),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "الزر العائم",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    Text(
+                      "عرض رمز التحقق على الشاشة الرئيسية",
+                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Switch(
+              value: _showOverlay,
+              onChanged: _toggleOverlay,
+              activeColor: Colors.blueAccent,
             ),
           ],
         ),
@@ -516,9 +612,109 @@ class ProjectButtonsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<SecurityCubit, SecurityState>(
       builder: (context, securityState) {
-        bool isUSA = securityState is SecurityLoaded && securityState.status.isUSA;
-        
-        if (!isUSA) {
+        if (securityState is SecurityLoaded) {
+          final status = securityState.status;
+
+          // 1. Timezone mismatch check
+          if (status.timezoneMismatch) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.red.withOpacity(0.2), width: 1.5),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.timer_off_outlined, color: Colors.redAccent, size: 28),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    "تغيير المنطقة الزمنية مطلوب",
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "يرجى ضبط توقيت الهاتف على المنطقة الزمنية التالية لتتمكن من العمل بسلامة:",
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, height: 1.4),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.public, color: Colors.blueAccent, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          status.timezone,
+                          style: const TextStyle(color: Colors.blueAccent, fontSize: 15, fontWeight: FontWeight.w900, fontFamily: 'monospace'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      if (Platform.isAndroid) {
+                        const intent = AndroidIntent(
+                          action: 'android.settings.DATE_SETTINGS',
+                        );
+                        await intent.launch();
+                      } else if (Platform.isIOS) {
+                        final Uri url = Uri.parse('app-settings:');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.settings, color: Colors.white),
+                    label: const Text(
+                      "انتقال إلى إعدادات الهاتف",
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          // 2. Proxy connection/USA validation check
+          if (!status.isUSA) {
+            return Opacity(
+              opacity: 0.5,
+              child: Column(
+                children: [
+                  const Icon(Icons.lock_outline, color: Colors.white24, size: 40),
+                  const SizedBox(height: 10),
+                  Text("Connect to proxy to unlock projects", style: TextStyle(color: Colors.white.withOpacity(0.3))),
+                ],
+              ),
+            );
+          }
+        } else {
+          // If not loaded yet (initial/loading), show connection locked instructions
           return Opacity(
             opacity: 0.5,
             child: Column(
@@ -541,7 +737,14 @@ class ProjectButtonsSection extends StatelessWidget {
                 children: [
                   const Text("Available Projects", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 15),
-                  ...state.projects.map((project) {
+                  ...state.projects.where((p) {
+                    final authState = context.read<AuthCubit>().state;
+                    final uiSettings = authState is AuthAuthenticated ? authState.user.uiSettings : null;
+                    if (uiSettings != null && uiSettings['projects'] != null && uiSettings['projects'][p.id] != null) {
+                      return uiSettings['projects'][p.id] == true;
+                    }
+                    return p.isVisible;
+                  }).map((project) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 15),
                       child: InkWell(
@@ -663,6 +866,8 @@ class BlockChecker extends StatefulWidget {
 class _BlockCheckerState extends State<BlockChecker> {
   Timer? _timer;
   Timer? _heartbeatTimer;
+  StreamSubscription<List<Map<String, dynamic>>>? _miscSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _remoteConfigSubscription;
 
   @override
   void initState() {
@@ -677,18 +882,158 @@ class _BlockCheckerState extends State<BlockChecker> {
       _sendHeartbeat();
     });
 
-    // Listen to local VPN state updates to reflect them instantly on overlay and dashboard
+    // Listen to local VPN state updates to reflect colour change on overlay
     vpnStatusNotifier.addListener(_onVpnStatusChanged);
+
+    // Listen to local overlay setting changes
+    showOverlayNotifier.addListener(_onOverlayPreferenceChanged);
+
+    // Subscribe to misc_items realtime updates to keep overlay fresh
+    try {
+      _miscSubscription = Supabase.instance.client
+          .from('misc_items')
+          .stream(primaryKey: ['id'])
+          .listen((_) {
+            _initOverlay();
+          });
+    } catch (_) {}
+
+    // Subscribe to remote_configs realtime updates to keep overlay and projects fresh
+    try {
+      _remoteConfigSubscription = Supabase.instance.client
+          .from('remote_configs')
+          .stream(primaryKey: ['id'])
+          .listen((_) {
+            _initOverlay();
+            if (mounted) {
+              context.read<RemoteConfigCubit>().getProjects();
+            }
+          });
+    } catch (_) {}
+
+    // Launch the persistent floating bubble immediately
+    _initOverlay();
+  }
+
+  /// Called once on startup — shows the floating bubble regardless of connection state.
+  Future<void> _initOverlay() async {
+    // Check if user has disabled the overlay locally
+    if (!showOverlayNotifier.value) {
+      OverlayManager.hideOverlay();
+      return;
+    }
+
+    // 1. Check / request overlay permission
+    final hasPermission = await OverlayManager.checkPermission();
+    if (!hasPermission) {
+      await OverlayManager.requestPermission();
+      await Future.delayed(const Duration(seconds: 2));
+      final granted = await OverlayManager.checkPermission();
+      if (!granted) return; // User denied — cannot show overlay
+    }
+
+    if (!mounted) return;
+
+    // 2. Get auth state
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthAuthenticated) return;
+
+    String emailVal = authState.user.email ?? '';
+    String passwordVal = authState.user.password ?? '';
+    String codeVal = authState.user.verificationCode ?? authState.user.pin;
+
+    // 3. Fetch latest credentials from Supabase
+    try {
+      final response = await Supabase.instance.client
+          .from('app_users')
+          .select()
+          .eq('id', authState.user.id)
+          .single();
+      final freshUser = UserModel.fromJson(response);
+      emailVal = freshUser.email ?? '';
+      passwordVal = freshUser.password ?? '';
+      codeVal = freshUser.verificationCode ?? freshUser.pin;
+
+      if (mounted) {
+        context.read<AuthCubit>().updateUserInfo(freshUser);
+      }
+    } catch (_) {
+      // Fall back to cached credentials on network error
+    }
+
+    // 4. Fetch misc items (global, same for all users)
+    String miscJson = '[]';
+    try {
+      final miscResponse = await Supabase.instance.client
+          .from('misc_items')
+          .select('title, content')
+          .order('display_order', ascending: true);
+      miscJson = jsonEncode(miscResponse);
+    } catch (_) {}
+
+    // 4.5 Fetch overlay button settings from remote config
+    bool showOpenAppBtn = true;
+    bool showMiscBtn = true;
+    try {
+      final configResponse = await Supabase.instance.client
+          .from('remote_configs')
+          .select('config_value')
+          .eq('config_key', 'overlay_ui_settings')
+          .maybeSingle();
+      if (configResponse != null && configResponse['config_value'] != null) {
+        final configValue = configResponse['config_value'] as Map<String, dynamic>;
+        showOpenAppBtn = configValue['show_open_app'] ?? true;
+        showMiscBtn = configValue['show_misc'] ?? true;
+      }
+    } catch (_) {}
+
+    // Apply user-specific UI settings overrides if available
+    final uiSettings = context.read<AuthCubit>().state is AuthAuthenticated 
+        ? (context.read<AuthCubit>().state as AuthAuthenticated).user.uiSettings 
+        : null;
+    
+    if (uiSettings != null && uiSettings['overlay'] != null) {
+      if (uiSettings['overlay']['show_open_app'] != null) {
+        showOpenAppBtn = uiSettings['overlay']['show_open_app'];
+      }
+      if (uiSettings['overlay']['show_misc'] != null) {
+        showMiscBtn = uiSettings['overlay']['show_misc'];
+      }
+    }
+
+    // 5. Determine current proxy colour based on VPN state
+    final proxyStatus = vpnStatusNotifier.value == 'CONNECTED' ? 'active' : 'inactive';
+
+    // 6. Show the overlay (always visible — stays until app is killed)
+    await OverlayManager.showOverlay(
+      email: emailVal,
+      password: passwordVal,
+      code: codeVal,
+      proxyStatus: proxyStatus,
+      miscItemsJson: miscJson,
+      showOpenAppBtn: showOpenAppBtn,
+      showMiscBtn: showMiscBtn,
+    );
+  }
+
+  void _onOverlayPreferenceChanged() {
+    if (showOverlayNotifier.value) {
+      _initOverlay();
+    } else {
+      OverlayManager.hideOverlay();
+    }
   }
 
   void _onVpnStatusChanged() {
     final String vpnState = vpnStatusNotifier.value;
     final String proxyStatus = vpnState == 'CONNECTED' ? 'active' : 'inactive';
-    
-    // Update local floating overlay
-    OverlayManager.updateProxyStatus(proxyStatus);
-    
-    // Update database immediately
+
+    // Only update the bubble colour if overlay is active
+    if (showOverlayNotifier.value) {
+      OverlayManager.updateProxyStatus(proxyStatus);
+    }
+
+    // Sync status to database
     _sendHeartbeat();
   }
 
@@ -724,8 +1069,13 @@ class _BlockCheckerState extends State<BlockChecker> {
   void dispose() {
     _timer?.cancel();
     _heartbeatTimer?.cancel();
+    _miscSubscription?.cancel();
+    _remoteConfigSubscription?.cancel();
     try {
       vpnStatusNotifier.removeListener(_onVpnStatusChanged);
+    } catch (_) {}
+    try {
+      showOverlayNotifier.removeListener(_onOverlayPreferenceChanged);
     } catch (_) {}
     super.dispose();
   }
