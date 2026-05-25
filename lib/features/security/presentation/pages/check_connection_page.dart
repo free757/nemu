@@ -541,7 +541,21 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Proxy Connection", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        const Text("Proxy Connection", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            context.read<SecurityCubit>().checkConnection();
+                          },
+                        ),
+                      ],
+                    ),
                     state is SecurityLoading
                         ? const SizedBox(
                             width: 24,
