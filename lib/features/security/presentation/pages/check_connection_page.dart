@@ -356,18 +356,30 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                   children: [
                     _buildHeader(context, user.username ?? 'User'),
                     Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        child: Column(
-                          children: [
-                            _buildUserCard(user),
-                            const SizedBox(height: 12),
-                            _buildOverlayToggleCard(),
-                            const SizedBox(height: 20),
-                            _buildProxyCard(context, user),
-                            const SizedBox(height: 30),
-                            const ProjectButtonsSection(),
-                          ],
+                      child: RefreshIndicator(
+                        color: Colors.greenAccent,
+                        backgroundColor: const Color(0xFF1E1E1E),
+                        onRefresh: () async {
+                          HapticFeedback.mediumImpact();
+                          await Future.wait([
+                            context.read<SecurityCubit>().checkConnection(),
+                            context.read<AppUpdateCubit>().checkForUpdate(AppConstants.appVersion),
+                          ]);
+                        },
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(), // Ensures pull-to-refresh works even on short screens
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          child: Column(
+                            children: [
+                              _buildUserCard(user),
+                              const SizedBox(height: 12),
+                              _buildOverlayToggleCard(),
+                              const SizedBox(height: 20),
+                              _buildProxyCard(context, user),
+                              const SizedBox(height: 30),
+                              const ProjectButtonsSection(),
+                            ],
+                          ),
                         ),
                       ),
                     ),
