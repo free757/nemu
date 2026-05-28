@@ -87,8 +87,12 @@ class MainActivity : FlutterActivity() {
                 }
                 "downloadAndInstallApk" -> {
                     val url = call.argument<String>("url") ?: ""
-                    downloadAndInstallApk(url)
-                    result.success(true)
+                    try {
+                        downloadAndInstallApk(url)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
                 }
                 else -> {
                     result.notImplemented()
@@ -128,7 +132,12 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
-        registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        }
     }
 
     private fun installApk(context: Context, file: File) {

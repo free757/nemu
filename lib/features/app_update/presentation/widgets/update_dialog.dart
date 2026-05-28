@@ -16,7 +16,16 @@ class UpdateDialog extends StatelessWidget {
 
   Future<void> _launchDownload() async {
     if (Platform.isAndroid) {
-      await OverlayManager.downloadAndInstallApk(updateInfo.downloadUrl);
+      final success = await OverlayManager.downloadAndInstallApk(updateInfo.downloadUrl);
+      if (!success) {
+        // Fallback to launching in browser if direct background download failed (e.g. permission or system DownloadManager disabled)
+        final Uri url = Uri.parse(updateInfo.downloadUrl);
+        try {
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          }
+        } catch (_) {}
+      }
     } else {
       final Uri url = Uri.parse(updateInfo.downloadUrl);
       try {

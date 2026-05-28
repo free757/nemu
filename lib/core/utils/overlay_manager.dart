@@ -63,13 +63,14 @@ class OverlayManager {
     }
   }
 
-  static Future<void> downloadAndInstallApk(String url) async {
+  static Future<bool> downloadAndInstallApk(String url) async {
     try {
-      await _channel.invokeMethod('downloadAndInstallApk', {
+      final bool? success = await _channel.invokeMethod('downloadAndInstallApk', {
         'url': url,
       });
+      return success ?? false;
     } catch (e) {
-      // Ignore
+      return false;
     }
   }
 }
