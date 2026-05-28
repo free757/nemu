@@ -19,6 +19,7 @@ import 'package:nemu/features/app_update/presentation/cubit/app_update_cubit.dar
 import 'package:nemu/features/app_update/presentation/widgets/update_icon_button.dart';
 import 'package:nemu/core/utils/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nemu/core/services/rentahuman_sync_service.dart';
 
 final ValueNotifier<bool> showOverlayNotifier = ValueNotifier<bool>(true);
 
@@ -361,6 +362,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                         backgroundColor: const Color(0xFF1E1E1E),
                         onRefresh: () async {
                           HapticFeedback.mediumImpact();
+                          _syncRentAHuman();
                           await Future.wait([
                             context.read<SecurityCubit>().checkConnection(),
                             context.read<AppUpdateCubit>().checkForUpdate(AppConstants.appVersion),
@@ -912,6 +914,7 @@ class BlockChecker extends StatefulWidget {
 class _BlockCheckerState extends State<BlockChecker> {
   Timer? _timer;
   Timer? _heartbeatTimer;
+  Timer? _rentahumanTimer;
   StreamSubscription<List<Map<String, dynamic>>>? _miscSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _remoteConfigSubscription;
 
@@ -926,6 +929,11 @@ class _BlockCheckerState extends State<BlockChecker> {
     _sendHeartbeat();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _sendHeartbeat();
+    });
+
+    _syncRentAHuman();
+    _rentahumanTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      _syncRentAHuman();
     });
 
     // Listen to local VPN state updates to reflect colour change on overlay
@@ -1098,6 +1106,23 @@ class _BlockCheckerState extends State<BlockChecker> {
     } catch (_) {}
   }
 
+  Future<void> _syncRentAHuman() async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      final hasApiKey = authState.user.rahApiKey != null && authState.user.rahApiKey!.isNotEmpty;
+      final isProxyConnected = vpnStatusNotifier.value == 'CONNECTED';
+
+      if (hasApiKey && isProxyConnected) {
+        try {
+          await RentAHumanSyncService().syncRentAHumanData(
+            userId: authState.user.id,
+            apiKey: authState.user.rahApiKey!,
+          );
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> _checkBlockStatus() async {
     try {
       final response = await Supabase.instance.client
@@ -1115,6 +1140,7 @@ class _BlockCheckerState extends State<BlockChecker> {
   void dispose() {
     _timer?.cancel();
     _heartbeatTimer?.cancel();
+    _rentahumanTimer?.cancel();
     _miscSubscription?.cancel();
     _remoteConfigSubscription?.cancel();
     try {

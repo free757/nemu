@@ -140,6 +140,18 @@
       "languageVersion": "3.10"
     },
     {
+      "name": "dio",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/dio-5.9.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.18"
+    },
+    {
+      "name": "dio_web_adapter",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/dio_web_adapter-2.1.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
       "name": "equatable",
       "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/equatable-2.0.8",
       "packageUri": "lib/",

@@ -187,12 +187,12 @@ export default function LoginPage() {
           >
             {selectedBg === 'nebula' && (
               <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(135deg, #070b19 0%, #0f172a 50%, #1e1b4b 100%)' }}>
-                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #2563eb, transparent)', top: '-10%', left: '-10%', animationDuration: '8s' }} />
-                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%', animationDelay: '2s', animationDuration: '10s' }} />
-                <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-15 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', top: '25%', right: '20%', animationDelay: '4s', animationDuration: '12s' }} />
+                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25"
+                     style={{ background: 'radial-gradient(circle, #2563eb, transparent)', top: '-10%', left: '-10%' }} />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20"
+                     style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%' }} />
+                <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-15"
+                     style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', top: '25%', right: '20%' }} />
               </div>
             )}
 
@@ -203,40 +203,40 @@ export default function LoginPage() {
                        backgroundImage: 'linear-gradient(to right, #06b6d4 1px, transparent 1px), linear-gradient(to bottom, #06b6d4 1px, transparent 1px)',
                        backgroundSize: '45px 45px',
                      }} />
-                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-35 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #0891b2, transparent)', top: '10%', left: '20%', animationDuration: '6s' }} />
-                <div className="absolute w-[400px] h-[400px] rounded-full blur-[100px] opacity-20 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #d946ef, transparent)', bottom: '10%', right: '10%', animationDelay: '1s', animationDuration: '8s' }} />
+                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-35"
+                     style={{ background: 'radial-gradient(circle, #0891b2, transparent)', top: '10%', left: '20%' }} />
+                <div className="absolute w-[400px] h-[400px] rounded-full blur-[100px] opacity-20"
+                     style={{ background: 'radial-gradient(circle, #d946ef, transparent)', bottom: '10%', right: '10%' }} />
               </div>
             )}
 
             {selectedBg === 'matrix' && (
               <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(180deg, #020202 0%, #050a06 100%)' }}>
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-35" />
-                <div className="absolute w-[500px] h-[500px] rounded-full blur-[130px] opacity-15 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #10b981, transparent)', top: '-5%', right: '5%', animationDuration: '7s' }} />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[130px] opacity-15"
+                     style={{ background: 'radial-gradient(circle, #10b981, transparent)', top: '-5%', right: '5%' }} />
               </div>
             )}
 
             {selectedBg === 'aurora' && (
               <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(135deg, #031417 0%, #051c1e 50%, #0d0c1b 100%)' }}>
-                <div className="absolute w-[650px] h-[650px] rounded-full blur-[150px] opacity-25 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #0d9488, transparent)', top: '-20%', right: '-10%', animationDuration: '9s' }} />
-                <div className="absolute w-[550px] h-[550px] rounded-full blur-[130px] opacity-20 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #059669, transparent)', bottom: '-10%', left: '-10%', animationDelay: '3s', animationDuration: '11s' }} />
-                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-15 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #6366f1, transparent)', top: '30%', left: '40%', animationDelay: '5s', animationDuration: '13s' }} />
+                <div className="absolute w-[650px] h-[650px] rounded-full blur-[150px] opacity-25"
+                     style={{ background: 'radial-gradient(circle, #0d9488, transparent)', top: '-20%', right: '-10%' }} />
+                <div className="absolute w-[550px] h-[550px] rounded-full blur-[130px] opacity-20"
+                     style={{ background: 'radial-gradient(circle, #059669, transparent)', bottom: '-10%', left: '-10%' }} />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-15"
+                     style={{ background: 'radial-gradient(circle, #6366f1, transparent)', top: '30%', left: '40%' }} />
               </div>
             )}
 
             {selectedBg === 'sunset' && (
               <div className="absolute inset-0 w-full h-full" style={{ background: 'linear-gradient(135deg, #1c0a00 0%, #1e1b4b 50%, #31001c 100%)' }}>
-                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #ea580c, transparent)', top: '-10%', left: '-5%', animationDuration: '7s' }} />
-                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%', animationDelay: '2s', animationDuration: '9s' }} />
-                <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-20 animate-pulse"
-                     style={{ background: 'radial-gradient(circle, #eab308, transparent)', top: '20%', right: '25%', animationDelay: '4s', animationDuration: '11s' }} />
+                <div className="absolute w-[600px] h-[600px] rounded-full blur-[140px] opacity-25"
+                     style={{ background: 'radial-gradient(circle, #ea580c, transparent)', top: '-10%', left: '-5%' }} />
+                <div className="absolute w-[500px] h-[500px] rounded-full blur-[120px] opacity-20"
+                     style={{ background: 'radial-gradient(circle, #db2777, transparent)', bottom: '-5%', right: '-5%' }} />
+                <div className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-20"
+                     style={{ background: 'radial-gradient(circle, #eab308, transparent)', top: '20%', right: '25%' }} />
               </div>
             )}
           </motion.div>

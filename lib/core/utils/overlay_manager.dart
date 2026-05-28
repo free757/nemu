@@ -25,6 +25,9 @@ class OverlayManager {
     required String password,
     required String code,
     required String proxyStatus,
+    String miscItemsJson = '[]',
+    bool showOpenAppBtn = true,
+    bool showMiscBtn = true,
   }) async {
     try {
       final bool success = await _channel.invokeMethod('showOverlay', {
@@ -32,6 +35,9 @@ class OverlayManager {
         'password': password,
         'code': code,
         'proxy_status': proxyStatus,
+        'misc_items': miscItemsJson,
+        'show_open_app': showOpenAppBtn,
+        'show_misc': showMiscBtn,
       });
       return success;
     } catch (e) {
@@ -52,6 +58,16 @@ class OverlayManager {
   static Future<void> hideOverlay() async {
     try {
       await _channel.invokeMethod('hideOverlay');
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  static Future<void> downloadAndInstallApk(String url) async {
+    try {
+      await _channel.invokeMethod('downloadAndInstallApk', {
+        'url': url,
+      });
     } catch (e) {
       // Ignore
     }

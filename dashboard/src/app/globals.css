@@ -51,3 +51,19 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(156, 163, 175, 0.12) transparent;
 }
+
+/* --- High-Performance GPU Scrolling & Rendering Optimizations --- */
+.scroll-gpu {
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Enable hardware acceleration for repeating table rows to eliminate repaint lag */
+tr, tbody {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}

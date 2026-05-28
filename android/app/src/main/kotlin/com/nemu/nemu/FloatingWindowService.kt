@@ -1,5 +1,8 @@
 package com.nemu.nemu
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -9,31 +12,24 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.IBinder
 import android.util.TypedValue
 import android.view.*
 import android.widget.*
+import androidx.core.app.NotificationCompat
+import org.json.JSONArray
 
 class FloatingWindowService : Service() {
 
-    private lateinit var windowManager: WindowManager
-    private var bubbleView: FrameLayout? = null
-    private var panelView: FrameLayout? = null
-    private var containerHolder: FrameLayout? = null
-
-    private var emailStr: String = ""
-    private var passwordStr: String = ""
-    private var codeStr: String = ""
-    private var proxyStatus: String = "inactive"
-
-    private var isUnlocked: Boolean = false
-    private var currentScreenState: Int = 0 // 0 = Action Menu, 1 = Cabinet (either PIN or Creds)
-    private lateinit var panelParams: WindowManager.LayoutParams
-
     companion object {
+        private const val CHANNEL_ID = "nemu_overlay_channel"
+        private const val NOTIFICATION_ID = 1001
+
         var instance: FloatingWindowService? = null
-        
+
         fun updateStatus(status: String) {
             instance?.let { service ->
                 service.proxyStatus = status
@@ -42,12 +38,80 @@ class FloatingWindowService : Service() {
         }
     }
 
+    private lateinit var windowManager: WindowManager
+    private var bubbleView: FrameLayout? = null
+    private var panelView: FrameLayout? = null
+    private var containerHolder: FrameLayout? = null
+ 
+    private val vpnCheckHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val vpnCheckRunnable = object : Runnable {
+        override fun run() {
+            checkNativeVpnStatus()
+            vpnCheckHandler.postDelayed(this, 3000) // check every 3 seconds
+        }
+    }
+
+    private var emailStr: String = ""
+    private var passwordStr: String = ""
+    private var codeStr: String = ""
+    private var proxyStatus: String = "inactive"
+    private var miscItemsJson: String = "[]"
+    private var showOpenAppBtn: Boolean = true
+    private var showMiscBtn: Boolean = true
+
+    // 0 = credentials view, 1 = misc list view
+    private var currentPanel: Int = 0
+
+    private lateinit var panelParams: WindowManager.LayoutParams
+
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        startForegroundWithNotification()
+        vpnCheckHandler.post(vpnCheckRunnable)
+    }
+
+    private fun startForegroundWithNotification() {
+        // Create notification channel (required for Android 8+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Nemu Floating Overlay",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Nemu overlay is active"
+                setShowBadge(false)
+            }
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        // Launch intent to open the app when notification is tapped
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val pendingIntent = PendingIntent.getActivity(this, 0, launchIntent, pendingFlags)
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Nemu")
+            .setContentText("Floating overlay is active")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .build()
+
+        startForeground(NOTIFICATION_ID, notification)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -56,6 +120,9 @@ class FloatingWindowService : Service() {
             passwordStr = it.getStringExtra("password") ?: ""
             codeStr = it.getStringExtra("code") ?: ""
             proxyStatus = it.getStringExtra("proxy_status") ?: "inactive"
+            miscItemsJson = it.getStringExtra("misc_items") ?: "[]"
+            showOpenAppBtn = it.getBooleanExtra("show_open_app", true)
+            showMiscBtn = it.getBooleanExtra("show_misc", true)
         }
 
         if (bubbleView == null) {
@@ -238,245 +305,177 @@ class FloatingWindowService : Service() {
 
     private fun rebuildPanelLayout() {
         val holder = containerHolder ?: return
-        holder.removeAllViews() // Clear old menu/cabinet content
+        holder.removeAllViews()
 
-        // Dynamic glassmorphic background for drawer panel
+        // Glassmorphic card background
         val panelBg = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dpToPx(24f).toFloat()
-            setColor(Color.parseColor("#F218181C")) // Deep translucent dark theme
-            setStroke(dpToPx(1f), Color.parseColor("#33FFFFFF")) // Elegant frosted border
+            setColor(Color.parseColor("#F218181C"))
+            setStroke(dpToPx(1f), Color.parseColor("#33FFFFFF"))
         }
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = panelBg
             setPadding(dpToPx(20f), dpToPx(20f), dpToPx(20f), dpToPx(20f))
-            
-            // Consume clicks inside container so they do not close the cabinet
             setOnTouchListener { _, _ -> true }
-            setOnClickListener { /* No-op, consume click */ }
+            setOnClickListener { /* consume clicks */ }
         }
 
-        // Header Title based on screen state
+        // ── Header ───────────────────────────────────────────────
         val headerText = TextView(this).apply {
-            text = when {
-                currentScreenState == 0 -> "Nemu Quick Menu"
-                isUnlocked -> "Credentials Cabinet"
-                else -> "Secure Cabinet Locked"
-            }
+            text = "Nemu Credentials"
             setTextColor(Color.parseColor("#9CA3AF"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, dpToPx(14f))
+            setPadding(0, 0, 0, dpToPx(16f))
         }
         container.addView(headerText)
 
-        if (currentScreenState == 0) {
-            // RENDER QUICK SELECTION MENU
-            
-            // 1. Open Nemu App Button
-            val openAppBtn = Button(this).apply {
-                text = "Open Nemu App"
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                
-                val bg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#1E3A8A")) // Royal Blue
-                    cornerRadius = dpToPx(12f).toFloat()
-                }
-                background = bg
-                
-                setOnClickListener {
-                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-                    launchIntent?.let {
-                        it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(it)
-                    }
-                    // Close drawer panel and re-lock
-                    togglePanelVisibility()
-                }
-            }
-            val openAppParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dpToPx(44f)
-            ).apply {
-                bottomMargin = dpToPx(12f)
-            }
-            container.addView(openAppBtn, openAppParams)
+        if (currentPanel == 0) {
+            // ── Credentials view ──────────────────────────────────
+            container.addView(createFieldSection("Email", emailStr))
+            container.addView(createFieldSection("Password", passwordStr))
+            container.addView(createFieldSection("Verification Code", codeStr))
 
-            // 2. Open Credentials Cabinet Button
-            val openCabinetBtn = Button(this).apply {
-                text = "Credentials Cabinet"
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                
-                val bg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#10B981")) // Neon Green
-                    cornerRadius = dpToPx(12f).toFloat()
-                }
-                background = bg
-                
-                setOnClickListener {
-                    currentScreenState = 1
-                    rebuildPanelLayout()
-                }
-            }
-            val openCabinetParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dpToPx(44f)
-            )
-            container.addView(openCabinetBtn, openCabinetParams)
-
-        } else {
-            // RENDER CABINET SCREEN (either locked pin input or unlocked fields)
-            
-            // Back Button
-            val backBtn = Button(this).apply {
-                text = "← Back to Menu"
-                setTextColor(Color.parseColor("#9CA3AF"))
-                typeface = Typeface.DEFAULT
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-                background = null // flat text button
-                setPadding(0, 0, 0, 0)
-                
-                setOnClickListener {
-                    currentScreenState = 0
-                    rebuildPanelLayout()
-                }
-            }
-            val backParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.START
-                bottomMargin = dpToPx(8f)
-            }
-            container.addView(backBtn, backParams)
-
-            if (!isUnlocked) {
-                // Padlock Icon
-                val lockIcon = TextView(this).apply {
-                    text = "🔒"
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
-                    gravity = Gravity.CENTER
-                    setPadding(0, 0, 0, dpToPx(6f))
-                }
-                container.addView(lockIcon)
-
-                // Prompt Text
-                val promptText = TextView(this).apply {
-                    text = "Enter account PIN to unlock credentials"
-                    setTextColor(Color.parseColor("#9CA3AF"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                    gravity = Gravity.CENTER
-                    setPadding(0, 0, 0, dpToPx(12f))
-                }
-                container.addView(promptText)
-
-                // Password Pin Input field
-                val pinInput = EditText(this).apply {
-                    inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
-                    gravity = Gravity.CENTER
-                    setTextColor(Color.WHITE)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-                    setHintTextColor(Color.parseColor("#4B5563"))
-                    hint = "••••"
-                    filters = arrayOf(android.text.InputFilter.LengthFilter(8))
-                    setPadding(0, dpToPx(10f), 0, dpToPx(10f))
-                    
-                    val editBg = GradientDrawable().apply {
-                        setColor(Color.parseColor("#131316"))
-                        cornerRadius = dpToPx(12f).toFloat()
-                        setStroke(dpToPx(1f), Color.parseColor("#44FFFFFF"))
-                    }
-                    background = editBg
-                }
-                val inputParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = dpToPx(12f)
-                }
-                container.addView(pinInput, inputParams)
-
-                // Unlock Button
-                val unlockBtn = Button(this).apply {
-                    text = "Unlock Cabinet"
+            // ── Open Nemu App button ──────────────────────────────
+            if (showOpenAppBtn) {
+                val openAppBtn = Button(this).apply {
+                    text = "Open Nemu App"
                     setTextColor(Color.WHITE)
                     typeface = Typeface.DEFAULT_BOLD
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                    
-                    val shapeDrawable = GradientDrawable().apply {
-                        setColor(Color.parseColor("#2563EB")) // Royal blue
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#1E3A8A"))
                         cornerRadius = dpToPx(12f).toFloat()
                     }
-                    background = shapeDrawable
-                    
                     setOnClickListener {
-                        val input = pinInput.text.toString().trim()
-                        if (input == "1010") {
-                            isUnlocked = true
-                            Toast.makeText(context, "Access Granted!", Toast.LENGTH_SHORT).show()
-                            rebuildPanelLayout()
-                        } else {
-                            Toast.makeText(context, "Incorrect PIN. Access Denied!", Toast.LENGTH_SHORT).show()
+                        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                        launchIntent?.let {
+                            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            startActivity(it)
                         }
+                        togglePanelVisibility()
                     }
                 }
-                val unlockBtnParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dpToPx(44f)
-                )
-                container.addView(unlockBtn, unlockBtnParams)
-            } else {
-                // Render Cabinet Fields
-                val emailSection = createFieldSection("Email", emailStr)
-                val passSection = createFieldSection("Password", passwordStr)
-                val codeSection = createFieldSection("Verification Code", codeStr)
-
-                container.addView(emailSection)
-                container.addView(passSection)
-                container.addView(codeSection)
+                container.addView(openAppBtn, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(44f)
+                ).apply { topMargin = dpToPx(14f) })
             }
+
+            // ── Misc button ───────────────────────────────────────
+            if (showMiscBtn) {
+                val miscBtn = Button(this).apply {
+                    text = "Misc"
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#6D28D9")) // Purple
+                        cornerRadius = dpToPx(12f).toFloat()
+                    }
+                    setOnClickListener {
+                        currentPanel = 1
+                        rebuildPanelLayout()
+                    }
+                }
+                container.addView(miscBtn, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(44f)
+                ).apply { topMargin = dpToPx(8f) })
+            }
+
+            // ── Close button ──────────────────────────────────────
+            val closeBtn = Button(this).apply {
+                text = "Close"
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#EF4444"))
+                    cornerRadius = dpToPx(12f).toFloat()
+                }
+                setOnClickListener { togglePanelVisibility() }
+            }
+            container.addView(closeBtn, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(44f)
+            ).apply { topMargin = dpToPx(8f) })
+
+        } else {
+            // ── Misc list view ────────────────────────────────────
+
+            // Back button
+            val backBtn = Button(this).apply {
+                text = "\u2190 Back"
+                setTextColor(Color.parseColor("#9CA3AF"))
+                typeface = Typeface.DEFAULT_BOLD
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                background = null
+                setPadding(0, 0, 0, 0)
+                setOnClickListener {
+                    currentPanel = 0
+                    rebuildPanelLayout()
+                }
+            }
+            container.addView(backBtn, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dpToPx(8f) })
+
+            // Parse and render misc items
+            try {
+                val arr = JSONArray(miscItemsJson)
+                if (arr.length() == 0) {
+                    val emptyText = TextView(this).apply {
+                        text = "No items yet."
+                        setTextColor(Color.parseColor("#6B7280"))
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                        gravity = Gravity.CENTER
+                        setPadding(0, dpToPx(12f), 0, dpToPx(12f))
+                    }
+                    container.addView(emptyText)
+                } else {
+                    for (i in 0 until arr.length()) {
+                        val item = arr.getJSONObject(i)
+                        val title = item.optString("title", "")
+                        val content = item.optString("content", "")
+                        container.addView(createMiscRow(title, content))
+                    }
+                }
+            } catch (e: Exception) {
+                val errText = TextView(this).apply {
+                    text = "Failed to load items."
+                    setTextColor(Color.parseColor("#EF4444"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                }
+                container.addView(errText)
+            }
+
+            // Close button at bottom
+            val closeBtn2 = Button(this).apply {
+                text = "Close"
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#EF4444"))
+                    cornerRadius = dpToPx(12f).toFloat()
+                }
+                setOnClickListener { togglePanelVisibility() }
+            }
+            container.addView(closeBtn2, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(44f)
+            ).apply { topMargin = dpToPx(14f) })
         }
 
-        // Red Dismiss Overlay Button (Simply closes panel/drawer, KEEPS bubble button visible)
-        val closeBtn = Button(this).apply {
-            text = "Dismiss Overlay"
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            
-            val shapeDrawable = GradientDrawable().apply {
-                setColor(Color.parseColor("#EF4444")) // Red warning close button color
-                cornerRadius = dpToPx(12f).toFloat()
+        // Centre the card on screen
+        holder.addView(
+            container,
+            FrameLayout.LayoutParams(dpToPx(290f), FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER
             }
-            background = shapeDrawable
-            
-            setOnClickListener {
-                togglePanelVisibility()
-            }
-        }
-        val btnParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            dpToPx(44f)
-        ).apply {
-            topMargin = dpToPx(12f)
-        }
-        container.addView(closeBtn, btnParams)
-
-        // Center cabinet inside containerHolder FrameLayout
-        val containerParams = FrameLayout.LayoutParams(
-            dpToPx(290f),
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.CENTER
-        }
-        holder.addView(container, containerParams)
+        )
     }
 
     private fun createFieldSection(title: String, value: String): LinearLayout {
@@ -544,34 +543,106 @@ class FloatingWindowService : Service() {
         rebuildPanelLayout()
     }
 
+    /** Misc list row: title on the left, purple COPY button on the right (copies content) */
+    private fun createMiscRow(title: String, content: String): LinearLayout {
+        val wrapper = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dpToPx(8f), 0, dpToPx(8f))
+            
+            // Make the entire row clickable to copy
+            setOnClickListener {
+                if (content.isNotEmpty()) {
+                    val cb = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cb.setPrimaryClip(ClipData.newPlainText("Nemu Misc", content))
+                    Toast.makeText(context, "'$title' copied!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        val titleView = TextView(this).apply {
+            text = title
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            typeface = Typeface.DEFAULT_BOLD
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        row.addView(titleView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f))
+
+        val copyBtn = TextView(this).apply {
+            text = "COPY"
+            setTextColor(Color.parseColor("#A78BFA"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dpToPx(10f), dpToPx(5f), dpToPx(10f), dpToPx(5f))
+            background = GradientDrawable().apply {
+                setColor(0x336D28D9.toInt())
+                cornerRadius = dpToPx(8f).toFloat()
+                setStroke(dpToPx(1f), Color.parseColor("#7C3AED"))
+            }
+        }
+        row.addView(copyBtn)
+        wrapper.addView(row)
+
+        // Thin divider
+        val divider = View(this).apply { setBackgroundColor(Color.parseColor("#1F2937")) }
+        wrapper.addView(divider, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1))
+
+        return wrapper
+    }
+
     private fun togglePanelVisibility() {
         panelView?.let { panel ->
             if (panel.visibility == View.VISIBLE) {
                 panel.visibility = View.GONE
-                // Reset state to menu and auto re-lock cabinet on close
-                currentScreenState = 0
-                isUnlocked = false
-                rebuildPanelLayout()
-                
-                // Add FLAG_NOT_FOCUSABLE back so user can interact with underlying app when panel is closed
+                currentPanel = 0  // always reset to credentials on close
                 panelParams.flags = panelParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 windowManager.updateViewLayout(panel, panelParams)
             } else {
                 panel.visibility = View.VISIBLE
-                currentScreenState = 0
-                isUnlocked = false
                 rebuildPanelLayout()
-                
-                // ALWAYS clear FLAG_NOT_FOCUSABLE when the panel is open so it captures backdrop clicks!
                 panelParams.flags = panelParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
                 windowManager.updateViewLayout(panel, panelParams)
             }
         }
     }
 
+
+    private fun checkNativeVpnStatus() {
+        val active = isVpnActive()
+        val newStatus = if (active) "active" else "inactive"
+        if (proxyStatus != newStatus) {
+            proxyStatus = newStatus
+            updateBubbleIndicator()
+        }
+    }
+
+    private fun isVpnActive(): Boolean {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val activeNetwork = cm.activeNetwork ?: return false
+            val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        } else {
+            @Suppress("DEPRECATION")
+            val networks = cm.allNetworks
+            for (network in networks) {
+                val capabilities = cm.getNetworkCapabilities(network)
+                if (capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                    return true
+                }
+            }
+            false
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        vpnCheckHandler.removeCallbacks(vpnCheckRunnable)
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         panelView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
     }

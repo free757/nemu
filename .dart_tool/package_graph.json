@@ -5,12 +5,13 @@
   "packages": [
     {
       "name": "nemu",
-      "version": "1.0.0+1",
+      "version": "1.0.4+7",
       "dependencies": [
         "android_intent_plus",
         "cupertino_icons",
         "dartz",
         "device_info_plus",
+        "dio",
         "equatable",
         "external_app_launcher",
         "flutter",
@@ -67,6 +68,19 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "dio",
+      "version": "5.9.2",
+      "dependencies": [
+        "async",
+        "collection",
+        "dio_web_adapter",
+        "http_parser",
+        "meta",
+        "mime",
+        "path"
       ]
     },
     {
@@ -380,6 +394,39 @@
       ]
     },
     {
+      "name": "dio_web_adapter",
+      "version": "2.1.2",
+      "dependencies": [
+        "dio",
+        "http_parser",
+        "meta",
+        "web"
+      ]
+    },
+    {
+      "name": "mime",
+      "version": "2.0.0",
+      "dependencies": []
+    },
+    {
+      "name": "http_parser",
+      "version": "4.1.2",
+      "dependencies": [
+        "collection",
+        "source_span",
+        "string_scanner",
+        "typed_data"
+      ]
+    },
+    {
+      "name": "async",
+      "version": "2.13.1",
+      "dependencies": [
+        "collection",
+        "meta"
+      ]
+    },
+    {
       "name": "win32_registry",
       "version": "3.0.3",
       "dependencies": [
@@ -451,14 +498,6 @@
       "name": "bloc",
       "version": "9.2.1",
       "dependencies": [
-        "meta"
-      ]
-    },
-    {
-      "name": "async",
-      "version": "2.13.1",
-      "dependencies": [
-        "collection",
         "meta"
       ]
     },
@@ -683,16 +722,6 @@
       ]
     },
     {
-      "name": "http_parser",
-      "version": "4.1.2",
-      "dependencies": [
-        "collection",
-        "source_span",
-        "string_scanner",
-        "typed_data"
-      ]
-    },
-    {
       "name": "webview_flutter_wkwebview",
       "version": "3.25.1",
       "dependencies": [
@@ -801,6 +830,13 @@
       "dependencies": [
         "source_span",
         "string_scanner"
+      ]
+    },
+    {
+      "name": "typed_data",
+      "version": "1.4.0",
+      "dependencies": [
+        "collection"
       ]
     },
     {
@@ -971,13 +1007,6 @@
       ]
     },
     {
-      "name": "typed_data",
-      "version": "1.4.0",
-      "dependencies": [
-        "collection"
-      ]
-    },
-    {
       "name": "app_links_web",
       "version": "1.0.4",
       "dependencies": [
@@ -1098,11 +1127,6 @@
     {
       "name": "retry",
       "version": "3.1.2",
-      "dependencies": []
-    },
-    {
-      "name": "mime",
-      "version": "2.0.0",
       "dependencies": []
     },
     {

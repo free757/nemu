@@ -10,6 +10,7 @@ class ProjectConfig extends Equatable {
   final String? androidPackageName;
   final String? iosUrlScheme;
   final String? appStoreLink;
+  final bool isVisible;
 
   const ProjectConfig({
     required this.id,
@@ -21,6 +22,7 @@ class ProjectConfig extends Equatable {
     this.androidPackageName,
     this.iosUrlScheme,
     this.appStoreLink,
+    this.isVisible = true,
   });
 
   @override
@@ -34,5 +36,6 @@ class ProjectConfig extends Equatable {
         androidPackageName,
         iosUrlScheme,
         appStoreLink,
+        isVisible,
       ];
 }

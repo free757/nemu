@@ -11,6 +11,7 @@ class ProjectConfigModel extends ProjectConfig {
     super.androidPackageName,
     super.iosUrlScheme,
     super.appStoreLink,
+    super.isVisible = true,
   });
 
   factory ProjectConfigModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +25,7 @@ class ProjectConfigModel extends ProjectConfig {
       androidPackageName: json['android_package_name'] as String?,
       iosUrlScheme: json['ios_url_scheme'] as String?,
       appStoreLink: json['app_store_link'] as String?,
+      isVisible: json['is_visible'] as bool? ?? true,
     );
   }
 
@@ -38,6 +40,7 @@ class ProjectConfigModel extends ProjectConfig {
       'android_package_name': androidPackageName,
       'ios_url_scheme': iosUrlScheme,
       'app_store_link': appStoreLink,
+      'is_visible': isVisible,
     };
   }
 }

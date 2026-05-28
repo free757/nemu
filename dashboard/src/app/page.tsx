@@ -4,6 +4,7 @@
 const DEBUG_PIPELINE_LOGS = false;
 
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { sanitizeTranscript } from '@/lib/speechManager';
@@ -30,7 +31,15 @@ import {
   MicOff,
   Ban,
   Bell,
-  Clock
+  Clock,
+  Layers,
+  SlidersHorizontal,
+  Sparkles,
+  DollarSign,
+  TrendingUp,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -47,6 +56,20 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationFormData, setNotificationFormData] = useState({ title: '', content: '' });
+
+  // Misc items state
+  const [miscItems, setMiscItems] = useState<any[]>([]);
+  const [isMiscModalOpen, setIsMiscModalOpen] = useState(false);
+  const [editingMisc, setEditingMisc] = useState<any>(null);
+  const [miscFormData, setMiscFormData] = useState({ title: '', content: '', display_order: 0 });
+
+  // Overlay UI Settings state
+  const [overlayUiSettings, setOverlayUiSettings] = useState({ show_open_app: true, show_misc: true });
+  const [overlayUiConfigId, setOverlayUiConfigId] = useState<string | null>(null);
+
+  // Per-user settings modal
+  const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
+  const [selectedUserForSettings, setSelectedUserForSettings] = useState<any>(null);
 
   // ── Auth Guard ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -74,31 +97,13 @@ export default function Dashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
-
   useEffect(() => {
-    setCurrentTime(new Date());
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
+    const saved = localStorage.getItem('isSidebarCollapsed');
+    if (saved !== null) {
+      setIsSidebarCollapsed(saved === 'true');
+    }
   }, []);
 
-  const formatTimeForTimezone = (timezone: string) => {
-    if (!currentTime) return '';
-    try {
-      return new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone.trim(),
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      }).format(currentTime);
-    } catch (e) {
-      return '';
-    }
-  };
-  
   const isProxyOnline = (user: any) => {
     if (user.proxy_status !== 'active' || !user.proxy_last_seen) return false;
     try {
@@ -107,6 +112,56 @@ export default function Dashboard() {
       return now - lastSeen < 120000; // 2 minutes
     } catch (e) {
       return false;
+    }
+  };
+
+  const formatLastSeen = (lastSeenStr: string, lang: string) => {
+    if (!lastSeenStr) return lang === 'ar' ? 'لم يتصل بعد' : 'Never';
+    try {
+      const lastSeen = new Date(lastSeenStr).getTime();
+      const now = new Date().getTime();
+      const diffMs = now - lastSeen;
+      if (diffMs < 0) return lang === 'ar' ? 'منذ ثوانٍ' : 'just now';
+
+      const diffSecs = Math.floor(diffMs / 1000);
+      if (diffSecs < 60) {
+        return lang === 'ar' ? 'منذ ثوانٍ' : 'just now';
+      }
+
+      const diffMins = Math.floor(diffSecs / 60);
+      if (diffMins < 60) {
+        if (lang === 'ar') {
+          if (diffMins === 1) return 'منذ دقيقة';
+          if (diffMins === 2) return 'منذ دقيقتين';
+          if (diffMins <= 10) return `منذ ${diffMins} دقائق`;
+          return `منذ ${diffMins} دقيقة`;
+        }
+        return `${diffMins}m`;
+      }
+
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) {
+        if (lang === 'ar') {
+          if (diffHours === 1) return 'منذ ساعة';
+          if (diffHours === 2) return 'منذ ساعتين';
+          if (diffHours <= 10) return `منذ ${diffHours} ساعات`;
+          return `منذ ${diffHours} ساعة`;
+        }
+        return `${diffHours}h`;
+      }
+
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays === 1) {
+        return lang === 'ar' ? 'أمس' : 'yesterday';
+      }
+      if (lang === 'ar') {
+        if (diffDays === 2) return 'منذ يومين';
+        if (diffDays <= 10) return `منذ ${diffDays} أيام`;
+        return `منذ ${diffDays} يوم`;
+      }
+      return `${diffDays}d`;
+    } catch (e) {
+      return lang === 'ar' ? 'غير معروف' : 'unknown';
     }
   };
   
@@ -193,6 +248,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeTab === 'tools') fetchProfiles();
     if (activeTab === 'notifications') fetchNotifications();
+    if (activeTab === 'misc') fetchMiscItems();
   }, [activeTab]);
 
 
@@ -210,7 +266,14 @@ export default function Dashboard() {
     is_manager: false,
     email: '',
     password: '',
-    verification_code: ''
+    verification_code: '',
+    rah_human_id: '',
+    rah_api_key: '',
+    rah_hours_offset: '',
+    rah_earnings_offset: '',
+    rah_rate_override: '',
+    rah_egp_rate: '',
+    rah_exchange_rate: ''
   });
 
   const [quickPaste, setQuickPaste] = useState('');
@@ -250,17 +313,21 @@ export default function Dashboard() {
       config: 'Remote Config',
       tools: 'AI Tools',
       notifications: 'Notification Center',
+      misc: 'Misc Items',
       signOut: 'Sign Out',
       title: 'Manage Users',
       configTitle: 'Remote Configuration',
       toolsTitle: 'AI Tools Suite',
       notificationsTitle: 'Global Notifications',
+      miscTitle: 'Misc Overlay Items',
       subtitle: 'Control everything in real-time from one place.',
       toolsSubtitle: 'Your personal AI productivity and career suite.',
       notificationsSubtitle: 'Send messages and instructions to all mobile employees instantly.',
+      miscSubtitle: 'Manage quick copy items shown in the floating mobile overlay.',
       addNew: 'Add New User',
       addConfig: 'Add New Config',
       addNotification: 'Send Notification',
+      addMisc: 'Add Misc Item',
       search: 'Search users by name or PIN...',
       profile: 'User Profile',
       pin: 'PIN',
@@ -304,24 +371,31 @@ export default function Dashboard() {
       microsoftCreds: 'Microsoft Auto-Login Credentials',
       microsoftEmail: 'Microsoft Email',
       microsoftPassword: 'Microsoft Password',
-      verificationCode: 'Verification Code (OTP)'
+      verificationCode: 'Verification Code (OTP)',
+      rahTitle: 'RentAHuman Integration',
+      rahHumanId: 'RentAHuman Human ID',
+      rahApiKey: 'RentAHuman API Key (Optional)'
     },
     ar: {
       users: 'إدارة المستخدمين',
       config: 'الإعدادات عن بعد',
       tools: 'أدوات الذكاء الاصطناعي',
       notifications: 'مركز الإشعارات',
+      misc: 'عناصر منوعة (Misc)',
       signOut: 'تسجيل الخروج',
       title: 'إدارة المستخدمين',
       configTitle: 'الإعدادات عن بعد',
       toolsTitle: 'حزمة أدوات الذكاء الاصطناعي',
       notificationsTitle: 'الإشعارات العامة',
+      miscTitle: 'عناصر القائمة العائمة',
       subtitle: 'تحكم في كل شيء في الوقت الفعلي من مكان واحد.',
       toolsSubtitle: 'حزمة أدواتك الشخصية للإنتاجية والمسار المهني.',
       notificationsSubtitle: 'أرسل رسائل وتوجيهات لجميع الموظفين على الهواتف فوراً.',
+      miscSubtitle: 'أدر العناصر السريعة التي تظهر في القائمة العائمة للنسخ السريع.',
       addNew: 'إضافة مستخدم جديد',
       addConfig: 'إضافة إعداد جديد',
       addNotification: 'إرسال إشعار جديد',
+      addMisc: 'إضافة عنصر جديد',
       search: 'ابحث عن المستخدمين بالاسم أو الـ PIN...',
       profile: 'ملف المستخدم',
       pin: 'كود الدخول',
@@ -365,7 +439,10 @@ export default function Dashboard() {
       microsoftCreds: 'بيانات تسجيل الدخول التلقائي لمايكروسوفت',
       microsoftEmail: 'بريد مايكروسوفت الإلكتروني',
       microsoftPassword: 'كلمة سر مايكروسوفت',
-      verificationCode: 'رمز التحقق (OTP)'
+      verificationCode: 'رمز التحقق (OTP)',
+      rahTitle: 'إعدادات RentAHuman',
+      rahHumanId: 'معرف المستخدم (Human ID)',
+      rahApiKey: 'مفتاح الـ API (اختياري)'
     }
   }[lang];
 
@@ -415,10 +492,124 @@ export default function Dashboard() {
     }
   };
 
+  const fetchMiscItems = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('misc_items').select('*').order('display_order', { ascending: true });
+    if (!error) setMiscItems(data);
+    setLoading(false);
+  };
+
+  const fetchOverlayUiSettings = async () => {
+    const { data, error } = await supabase.from('remote_configs').select('*').eq('config_key', 'overlay_ui_settings').maybeSingle();
+    if (data) {
+      setOverlayUiConfigId(data.id);
+      setOverlayUiSettings(data.config_value);
+    } else if (!error || error.code === 'PGRST116') {
+      // Create it if it doesn't exist
+      const defaultSettings = { show_open_app: true, show_misc: true };
+      const { data: newData, error: insertError } = await supabase.from('remote_configs').insert([{
+        config_key: 'overlay_ui_settings',
+        config_value: defaultSettings,
+        is_enabled: true
+      }]).select().single();
+      
+      if (!insertError && newData) {
+        setOverlayUiConfigId(newData.id);
+        setOverlayUiSettings(newData.config_value);
+      }
+    }
+  };
+
+  const toggleOverlayUiSetting = async (key: 'show_open_app' | 'show_misc') => {
+    const newSettings = { ...overlayUiSettings, [key]: !overlayUiSettings[key] };
+    setOverlayUiSettings(newSettings);
+    
+    if (overlayUiConfigId) {
+      await supabase.from('remote_configs').update({ config_value: newSettings }).eq('id', overlayUiConfigId);
+    }
+  };
+
+  const handleOpenUserSettings = (user: any) => {
+    setSelectedUserForSettings(user);
+    setIsUserSettingsOpen(true);
+  };
+
+  const toggleUserProjectVisibility = async (projectId: string) => {
+    if (!selectedUserForSettings) return;
+    const currentSettings = selectedUserForSettings.ui_settings || {};
+    const currentProjects = currentSettings.projects || {};
+    const currentValue = currentProjects[projectId];
+    // undefined/true => visible, false => hidden. Toggle it.
+    const newValue = currentValue === false ? true : false;
+    const newSettings = {
+      ...currentSettings,
+      projects: { ...currentProjects, [projectId]: newValue }
+    };
+    // Optimistic UI
+    setSelectedUserForSettings({ ...selectedUserForSettings, ui_settings: newSettings });
+    setUsers((prev: any[]) => prev.map((u: any) => u.id === selectedUserForSettings.id ? { ...u, ui_settings: newSettings } : u));
+    const { error } = await supabase.from('app_users').update({ ui_settings: newSettings }).eq('id', selectedUserForSettings.id);
+    if (error) alert(error.message);
+  };
+
+  const toggleUserOverlayBtn = async (key: 'show_open_app' | 'show_misc') => {
+    if (!selectedUserForSettings) return;
+    const currentSettings = selectedUserForSettings.ui_settings || {};
+    const currentOverlay = currentSettings.overlay || {};
+    const newValue = currentOverlay[key] === false ? true : false;
+    const newSettings = {
+      ...currentSettings,
+      overlay: { ...currentOverlay, [key]: newValue }
+    };
+    setSelectedUserForSettings({ ...selectedUserForSettings, ui_settings: newSettings });
+    setUsers((prev: any[]) => prev.map((u: any) => u.id === selectedUserForSettings.id ? { ...u, ui_settings: newSettings } : u));
+    const { error } = await supabase.from('app_users').update({ ui_settings: newSettings }).eq('id', selectedUserForSettings.id);
+    if (error) alert(error.message);
+  };
+
+  const handleMiscSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!miscFormData.title || !miscFormData.content) {
+      alert(lang === 'ar' ? 'يرجى ملء جميع الحقول!' : 'Please fill all fields!');
+      return;
+    }
+    
+    let error;
+    if (editingMisc) {
+      const { error: err } = await supabase.from('misc_items').update(miscFormData).eq('id', editingMisc.id);
+      error = err;
+    } else {
+      const { error: err } = await supabase.from('misc_items').insert([miscFormData]);
+      error = err;
+    }
+
+    if (!error) {
+      setIsMiscModalOpen(false);
+      setEditingMisc(null);
+      setMiscFormData({ title: '', content: '', display_order: 0 });
+      fetchMiscItems();
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const handleDeleteMisc = async (id: string) => {
+    if (confirm(lang === 'ar' ? 'هل أنت متأكد من الحذف؟' : 'Are you sure you want to delete this?')) {
+      const { error } = await supabase.from('misc_items').delete().eq('id', id);
+      if (!error) {
+        fetchMiscItems();
+      } else {
+        alert(error.message);
+      }
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchConfigs();
     fetchNotifications();
+    fetchMiscItems();
+    fetchOverlayUiSettings();
 
     // Realtime channel for app_users updates
     const channel = supabase
@@ -501,7 +692,14 @@ export default function Dashboard() {
       is_manager: user.is_manager || false,
       email: user.email || '',
       password: user.password || '',
-      verification_code: user.verification_code || ''
+      verification_code: user.verification_code || '',
+      rah_human_id: user.rah_human_id || '',
+      rah_api_key: user.rah_api_key || '',
+      rah_hours_offset: user.ui_settings?.rah?.hours_offset?.toString() || '',
+      rah_earnings_offset: user.ui_settings?.rah?.earnings_offset?.toString() || '',
+      rah_rate_override: user.ui_settings?.rah?.rate_override?.toString() || '',
+      rah_egp_rate: user.ui_settings?.rah?.egp_rate?.toString() || '',
+      rah_exchange_rate: user.ui_settings?.rah?.exchange_rate?.toString() || ''
     });
     setIsModalOpen(true);
   };
@@ -541,7 +739,10 @@ export default function Dashboard() {
         pin: '', username: '', phone_number: '',
         proxy_ip: '', proxy_port: '', proxy_user: '', proxy_pass: '',
         proxy_location: '', proxy_timezone: '', is_manager: false,
-        email: '', password: '', verification_code: ''
+        email: '', password: '', verification_code: '',
+        rah_human_id: '', rah_api_key: '',
+        rah_hours_offset: '', rah_earnings_offset: '', rah_rate_override: '',
+        rah_egp_rate: '', rah_exchange_rate: ''
       });
       setIsModalOpen(true);
     } else {
@@ -646,8 +847,22 @@ export default function Dashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const originalUiSettings = editingUser?.ui_settings || {};
+    const ui_settings = {
+      ...originalUiSettings,
+      rah: {
+        hours_offset: formData.rah_hours_offset ? parseFloat(formData.rah_hours_offset) : 0,
+        earnings_offset: formData.rah_earnings_offset ? parseFloat(formData.rah_earnings_offset) : 0,
+        rate_override: formData.rah_rate_override ? parseFloat(formData.rah_rate_override) : null,
+        egp_rate: formData.rah_egp_rate ? parseFloat(formData.rah_egp_rate) : null,
+        exchange_rate: formData.rah_exchange_rate ? parseFloat(formData.rah_exchange_rate) : null,
+      }
+    };
+
     const payload = {
-      ...formData,
+      pin: formData.pin,
+      username: formData.username,
       proxy_ip: formData.proxy_ip?.trim() || null,
       proxy_port: formData.proxy_port ? parseInt(formData.proxy_port) : null,
       proxy_user: formData.proxy_user?.trim() || null,
@@ -657,7 +872,10 @@ export default function Dashboard() {
       phone_number: formData.phone_number?.trim() || null,
       email: formData.email?.trim() || null,
       password: formData.password?.trim() || null,
-      verification_code: formData.verification_code?.trim() || null
+      verification_code: formData.verification_code?.trim() || null,
+      rah_human_id: formData.rah_human_id?.trim() || null,
+      rah_api_key: formData.rah_api_key?.trim() || null,
+      ui_settings
     };
 
     let error;
@@ -1074,9 +1292,18 @@ export default function Dashboard() {
     user.username?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     user.pin?.includes(searchQuery)
   ).sort((a, b) => {
+    // 1. Manager check: managers always first
     if (a.is_manager && !b.is_manager) return -1;
     if (!a.is_manager && b.is_manager) return 1;
-    return 0;
+
+    // 2. Online check: online users first
+    const aOnline = isProxyOnline(a);
+    const bOnline = isProxyOnline(b);
+    if (aOnline && !bOnline) return -1;
+    if (!aOnline && bOnline) return 1;
+
+    // 3. Fallback: alphabetical sorting by username
+    return (a.username || '').localeCompare(b.username || '');
   });
 
   // ── Auth Guard (placed after all hooks) ──────────────────────────────────
@@ -1129,7 +1356,11 @@ export default function Dashboard() {
             >
               {/* Toggle Button (Desktop only) */}
               <button 
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                onClick={() => {
+                  const val = !isSidebarCollapsed;
+                  setIsSidebarCollapsed(val);
+                  localStorage.setItem('isSidebarCollapsed', String(val));
+                }}
                 className={`hidden md:flex absolute -right-3 top-10 w-6 h-6 rounded-full border items-center justify-center z-10 transition-all ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10 text-gray-400 hover:text-white' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-900 shadow-sm'}`}
               >
                 {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -1179,6 +1410,13 @@ export default function Dashboard() {
                   <Bell className="w-5 h-5 flex-shrink-0" />
                   {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.notifications}</motion.span>}
                 </button>
+                <button 
+                  onClick={() => { setActiveTab('misc'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'misc' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <Layers className="w-5 h-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.misc}</motion.span>}
+                </button>
               </nav>
 
               <div className={`p-4 border-t border-white/5 space-y-4 ${isSidebarCollapsed ? 'items-center flex flex-col px-0' : ''}`}>
@@ -1213,40 +1451,65 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+      <main className="flex-1 overflow-y-auto scroll-gpu">
+        <header className={`sticky top-0 z-30 px-4 md:px-8 py-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 ${theme === 'dark' ? 'bg-[#0a0a0a] border-white/5' : 'bg-[#f8f9fa] border-gray-200'}`}>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">
-              {activeTab === 'users' ? t.title : activeTab === 'config' ? t.configTitle : activeTab === 'notifications' ? t.notificationsTitle : t.toolsTitle}
+            <h1 className="text-2xl font-bold mb-1">
+              {activeTab === 'users' ? t.title : activeTab === 'config' ? t.configTitle : activeTab === 'notifications' ? t.notificationsTitle : activeTab === 'misc' ? t.miscTitle : t.toolsTitle}
             </h1>
-            <p className="text-gray-500 text-sm md:text-base">
-              {activeTab === 'users' ? t.subtitle : activeTab === 'config' ? t.subtitle : activeTab === 'notifications' ? t.notificationsSubtitle : t.toolsSubtitle}
+            <p className="text-gray-500 text-xs md:text-sm">
+              {activeTab === 'users' ? t.subtitle : activeTab === 'config' ? t.subtitle : activeTab === 'notifications' ? t.notificationsSubtitle : activeTab === 'misc' ? t.miscSubtitle : t.toolsSubtitle}
             </p>
           </div>
           
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {activeTab === 'users' && (() => {
+              const nm = users.filter(u => !u.is_manager);
+              const on = nm.filter(u => isProxyOnline(u)).length;
+              return (
+                <div className="flex items-center gap-2 mr-2">
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}`}>
+                    <Users className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-gray-400">{lang === 'ar' ? 'الكل' : 'Total'}</span>
+                    <span className="font-bold ml-1">{nm.length}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs font-semibold text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                    <span>{lang === 'ar' ? 'متصل' : 'Online'}</span>
+                    <span className="font-bold ml-1">{on}</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold text-gray-400 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
+                    <span>{lang === 'ar' ? 'غير متصل' : 'Offline'}</span>
+                    <span className="font-bold ml-1">{nm.length - on}</span>
+                  </div>
+                </div>
+              );
+            })()}
             {activeTab !== 'tools' && (
               <>
                 <button 
-                  onClick={activeTab === 'users' ? fetchUsers : activeTab === 'config' ? fetchConfigs : fetchNotifications}
-                  className={`p-3 border rounded-xl transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+                  onClick={activeTab === 'users' ? fetchUsers : activeTab === 'config' ? fetchConfigs : activeTab === 'misc' ? fetchMiscItems : fetchNotifications}
+                  className={`p-2.5 border rounded-xl transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
                 >
-                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
                 <button 
-                  onClick={activeTab === 'notifications' ? () => setIsNotificationModalOpen(true) : handleOpenAdd}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20"
+                  onClick={activeTab === 'notifications' ? () => setIsNotificationModalOpen(true) : activeTab === 'misc' ? () => { setEditingMisc(null); setMiscFormData({ title: '', content: '', display_order: 0 }); setIsMiscModalOpen(true); } : handleOpenAdd}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20 text-sm"
                 >
-                  <Plus className="w-5 h-5" />
-                  <span>{activeTab === 'users' ? t.addNew : activeTab === 'config' ? t.addConfig : t.addNotification}</span>
+                  <Plus className="w-4 h-4" />
+                  <span>{activeTab === 'users' ? t.addNew : activeTab === 'config' ? t.addConfig : activeTab === 'misc' ? t.addMisc : t.addNotification}</span>
                 </button>
               </>
             )}
           </div>
         </header>
 
+        <div className="p-4 md:p-8">
         {activeTab === 'users' ? (
           <div className="space-y-6">
+
             {/* Search Bar */}
             <div className="relative max-w-md">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
@@ -1267,6 +1530,7 @@ export default function Dashboard() {
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.profile}</th>
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.pin}</th>
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.proxy}</th>
+                    <th className="px-6 py-5 text-gray-400 font-medium">RentAHuman</th>
                     <th className="px-6 py-5 text-gray-400 font-medium text-right">{t.actions}</th>
                   </tr>
                 </thead>
@@ -1326,7 +1590,7 @@ export default function Dashboard() {
                         <td className="px-6 py-5">
                           {user.is_manager ? (
                             <div className="flex items-center gap-2 bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-xl w-max font-bold text-xs border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]">
-                              <ShieldCheck className="w-4 h-4 text-amber-400 animate-pulse" strokeWidth={2.5} />
+                              <ShieldCheck className="w-4 h-4 text-amber-400" strokeWidth={2.5} />
                               <span>{lang === 'ar' ? 'مدير النظام (صلاحيات كاملة)' : 'System Administrator'}</span>
                             </div>
                           ) : (
@@ -1339,29 +1603,37 @@ export default function Dashboard() {
                                  <MapPin className="w-3 h-3" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
                               </p>
                               <div className="flex items-center gap-2 mt-1.5">
-                                {user.proxy_timezone && formatTimeForTimezone(user.proxy_timezone) && (
-                                  <div className="flex items-center gap-1 bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full w-max font-mono text-[10px] border border-blue-500/10">
-                                    <Clock className="w-2.5 h-2.5 animate-pulse" />
-                                    <span>{formatTimeForTimezone(user.proxy_timezone)}</span>
-                                  </div>
-                                )}
+                                {user.proxy_timezone && <UserTimezoneDisplay timezone={user.proxy_timezone} small />}
                                 {isProxyOnline(user) ? (
                                   <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full w-max font-semibold text-[10px] border border-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                     <span>ONLINE</span>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-1 bg-gray-500/10 text-gray-400 px-2 py-0.5 rounded-full w-max font-medium text-[10px] border border-gray-500/10">
+                                  <div 
+                                    className="flex items-center gap-1 bg-gray-500/10 text-gray-400 px-2 py-0.5 rounded-full w-max font-medium text-[10px] border border-gray-500/10 cursor-help"
+                                    title={user.proxy_last_seen ? new Date(user.proxy_last_seen).toLocaleString() : undefined}
+                                  >
                                     <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                                    <span>OFFLINE</span>
+                                    <span>{lang === 'ar' ? `آخر ظهور: ${formatLastSeen(user.proxy_last_seen, 'ar')}` : `LAST SEEN: ${formatLastSeen(user.proxy_last_seen, 'en').toUpperCase()}`}</span>
                                   </div>
                                 )}
                               </div>
                             </div>
                           )}
                         </td>
+                        <td className="px-6 py-5">
+                          <RentAHumanDisplay user={user} theme={theme} lang={lang} />
+                        </td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => handleOpenUserSettings(user)}
+                              className="p-2 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all"
+                              title="User Button Settings"
+                            >
+                              <SlidersHorizontal className="w-4 h-4" />
+                            </button>
                             <button 
                               onClick={() => handleToggleBlock(user)}
                               className={`p-2 rounded-lg transition-all ${user.is_blocked ? 'text-red-500 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-400 hover:bg-red-500/5'}`}
@@ -1441,10 +1713,12 @@ export default function Dashboard() {
                     </span>
                   </div>
 
+                  <RentAHumanDisplay user={user} theme={theme} lang={lang} isMobile />
+
                   {user.is_manager ? (
                     <div className={`p-5 rounded-2xl border flex flex-col items-center text-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.05)] ${theme === 'dark' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/50 border-amber-200'}`}>
                       <div className="p-3 bg-amber-500/10 rounded-full text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-                        <ShieldCheck className="w-6 h-6 animate-pulse" strokeWidth={2.5} />
+                        <ShieldCheck className="w-6 h-6" strokeWidth={2.5} />
                       </div>
                       <p className="text-sm font-bold text-amber-500">{lang === 'ar' ? 'مدير النظام (صلاحيات كاملة)' : 'System Administrator'}</p>
                       <p className="text-xs text-gray-500 max-w-[240px]">
@@ -1462,21 +1736,19 @@ export default function Dashboard() {
                          <MapPin className="w-4 h-4" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
-                        {user.proxy_timezone && formatTimeForTimezone(user.proxy_timezone) && (
-                          <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-xl w-max font-mono text-xs border border-blue-500/10">
-                            <Clock className="w-3.5 h-3.5 animate-pulse" />
-                            <span>{formatTimeForTimezone(user.proxy_timezone)}</span>
-                          </div>
-                        )}
+                        {user.proxy_timezone && <UserTimezoneDisplay timezone={user.proxy_timezone} />}
                         {isProxyOnline(user) ? (
                           <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-xl w-max font-semibold text-xs border border-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
                             <span>ONLINE</span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 bg-gray-500/10 text-gray-400 px-3 py-1 rounded-xl w-max font-medium text-xs border border-gray-500/10">
+                          <div 
+                            className="flex items-center gap-1.5 bg-gray-500/10 text-gray-400 px-3 py-1 rounded-xl w-max font-medium text-xs border border-gray-500/10 cursor-help"
+                            title={user.proxy_last_seen ? new Date(user.proxy_last_seen).toLocaleString() : undefined}
+                          >
                             <span className="w-2 h-2 rounded-full bg-gray-400" />
-                            <span>OFFLINE</span>
+                            <span>{lang === 'ar' ? `آخر ظهور: ${formatLastSeen(user.proxy_last_seen, 'ar')}` : `LAST SEEN: ${formatLastSeen(user.proxy_last_seen, 'en').toUpperCase()}`}</span>
                           </div>
                         )}
                       </div>
@@ -1520,7 +1792,7 @@ export default function Dashboard() {
           <div>
             {remoteConfigs.length === 0 ? (
               <div className={`p-16 text-center rounded-[2rem] border ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'} flex flex-col items-center justify-center space-y-4`}>
-                <Settings className="w-12 h-12 text-gray-500 animate-pulse" />
+                <Settings className="w-12 h-12 text-gray-500" />
                 <h3 className="text-xl font-bold">{lang === 'ar' ? 'لا توجد إعدادات مضافة' : 'No Configurations Found'}</h3>
                 <p className="text-sm text-gray-500 max-w-sm">
                   {lang === 'ar' 
@@ -1564,9 +1836,12 @@ export default function Dashboard() {
                         </button>
                       </div>
                     </div>
-                    <div className={`rounded-2xl p-4 font-mono overflow-x-auto max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-black/50' : 'bg-gray-50 border border-gray-100'}`}>
-                      <pre className={`text-blue-400 ${lang === 'ar' ? 'text-right' : 'text-left'} text-xs md:text-sm`}>{JSON.stringify(config.config_value, null, 2)}</pre>
-                    </div>
+
+                    {config.config_key !== 'overlay_ui_settings' && (
+                      <div className={`rounded-2xl p-4 font-mono overflow-x-auto max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-black/50' : 'bg-gray-50 border border-gray-100'}`}>
+                        <pre className={`text-blue-400 ${lang === 'ar' ? 'text-right' : 'text-left'} text-xs md:text-sm`}>{JSON.stringify(config.config_value, null, 2)}</pre>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1576,7 +1851,7 @@ export default function Dashboard() {
           <div className="space-y-6 max-w-5xl">
             {notifications.length === 0 ? (
               <div className={`p-16 text-center rounded-[2rem] border ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'} flex flex-col items-center justify-center space-y-4`}>
-                <Bell className="w-12 h-12 text-gray-500 animate-bounce" />
+                <Bell className="w-12 h-12 text-gray-500" />
                 <h3 className="text-xl font-bold">{t.noNotifications}</h3>
                 <p className="text-sm text-gray-500 max-w-sm">
                   {lang === 'ar' 
@@ -1613,6 +1888,59 @@ export default function Dashboard() {
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'misc' ? (
+          <div className="space-y-6 max-w-5xl">
+            {miscItems.length === 0 ? (
+              <div className={`p-16 text-center rounded-[2rem] border ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'} flex flex-col items-center justify-center space-y-4`}>
+                <Layers className="w-12 h-12 text-gray-500" />
+                <h3 className="text-xl font-bold">No Misc Items Yet</h3>
+                <p className="text-sm text-gray-500 max-w-sm">
+                  {lang === 'ar' 
+                    ? 'لم تقم بإضافة أي عناصر منوعة للنسخ السريع بعد.' 
+                    : 'Get started by creating quick copy items for your overlay.'}
+                </p>
+                <button
+                  onClick={() => setIsMiscModalOpen(true)}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                >
+                  <Plus className="w-5 h-5" />
+                  {t.addMisc}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {miscItems.map((item) => (
+                  <div key={item.id} className={`p-6 rounded-3xl border flex flex-col gap-4 transition-all hover:scale-[1.01] ${theme === 'dark' ? 'bg-[#111] border-white/5 hover:border-white/10' : 'bg-white border-gray-200 hover:shadow-lg'}`}>
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-purple-600/10 text-purple-500 rounded-lg flex items-center justify-center">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <h4 className="text-lg font-bold">{item.title}</h4>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => { setEditingMisc(item); setMiscFormData({ title: item.title, content: item.content, display_order: item.display_order }); setIsMiscModalOpen(true); }}
+                          className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteMisc(item.id)}
+                          className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className={`p-3 rounded-xl font-mono text-sm max-h-32 overflow-y-auto ${theme === 'dark' ? 'bg-black/50 text-gray-300' : 'bg-gray-50 text-gray-700 border border-gray-100'}`}>
+                      {item.content}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1668,7 +1996,7 @@ export default function Dashboard() {
             {/* Interview Assistant Placeholder / Active Session */}
             {!isSessionActive ? (
               <div className={`p-8 rounded-3xl border flex flex-col items-center justify-center text-center space-y-6 min-h-[400px] ${theme === 'dark' ? 'bg-gradient-to-b from-[#111] to-black border-white/5' : 'bg-gradient-to-b from-white to-gray-50 border-gray-200'}`}>
-                <div className="w-20 h-20 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center animate-pulse">
+                <div className="w-20 h-20 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center">
                   <Bot className="w-10 h-10" />
                 </div>
                 <h2 className="text-3xl font-bold">Interview Pilot</h2>
@@ -2043,6 +2371,7 @@ export default function Dashboard() {
             ) : null}
           </div>
         )}
+        </div>
       </main>
 
       {/* Add/Edit Config Modal */}
@@ -2506,6 +2835,121 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* RentAHuman Integration Section */}
+                <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="text-sm font-bold text-purple-500 flex items-center gap-2 uppercase tracking-widest">
+                    <Bot className="w-4 h-4" /> {t.rahTitle}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                        {t.rahHumanId}
+                      </label>
+                      <input 
+                        type="text"
+                        value={formData.rah_human_id}
+                        onChange={e => setFormData({...formData, rah_human_id: e.target.value})}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                        placeholder="e.g. secretboss001 or Pt4Z1msFXpnKAZvTtPbL"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                        {t.rahApiKey}
+                      </label>
+                      <input 
+                        type="text"
+                        value={formData.rah_api_key}
+                        onChange={e => setFormData({...formData, rah_api_key: e.target.value})}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                        placeholder="rah_live_..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-dashed border-white/10 pt-4 space-y-4">
+                    <span className="text-xs font-bold text-purple-400 block uppercase tracking-wider">
+                      {lang === 'ar' ? 'تصحيح المقاييس اليدوي (للأعمال المعلقة)' : 'Manual Metrics Adjustments (Pending Work)'}
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                          {lang === 'ar' ? 'ساعات معلقة إضافية' : 'Pending Hours Offset'}
+                        </label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={formData.rah_hours_offset}
+                          onChange={e => setFormData({...formData, rah_hours_offset: e.target.value})}
+                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                          placeholder="e.g. 11.9"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                          {lang === 'ar' ? 'أرباح معلقة إضافية ($)' : 'Pending Earnings Offset ($)'}
+                        </label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={formData.rah_earnings_offset}
+                          onChange={e => setFormData({...formData, rah_earnings_offset: e.target.value})}
+                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                          placeholder="e.g. 124.27"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                          {lang === 'ar' ? 'تجاوز أجر الساعة ($)' : 'Hourly Rate Override ($)'}
+                        </label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={formData.rah_rate_override}
+                          onChange={e => setFormData({...formData, rah_rate_override: e.target.value})}
+                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                          placeholder="e.g. 10.0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-dashed border-white/10 pt-4 space-y-4">
+                    <span className="text-xs font-bold text-emerald-400 block uppercase tracking-wider">
+                      {lang === 'ar' ? 'حسابات الدفع والربح بالجنيه المصري (EGP Payout Accounting)' : 'EGP Payout Accounting & Exchange Rate'}
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                          {lang === 'ar' ? 'سعر ساعة الموظف بالجنيه المصري (EGP/hr)' : 'Employee Hourly Rate in EGP'}
+                        </label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={formData.rah_egp_rate}
+                          onChange={e => setFormData({...formData, rah_egp_rate: e.target.value})}
+                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                          placeholder="e.g. 100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                          {lang === 'ar' ? 'سعر صرف الدولار مقابل الجنيه (EGP/$)' : 'USD to EGP Exchange Rate'}
+                        </label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={formData.rah_exchange_rate}
+                          onChange={e => setFormData({...formData, rah_exchange_rate: e.target.value})}
+                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                          placeholder="e.g. 48.5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
                   <h3 className="text-sm font-bold text-blue-500 flex items-center gap-2 uppercase tracking-widest">
                     <Globe className="w-4 h-4" /> {t.proxyConfig}
@@ -2590,6 +3034,100 @@ export default function Dashboard() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Per-User Button Settings Modal */}
+      <AnimatePresence>
+        {isUserSettingsOpen && selectedUserForSettings && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsUserSettingsOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={`relative w-full max-w-md rounded-[2.5rem] border p-8 shadow-2xl ${theme === 'dark' ? 'bg-[#111] border-white/10' : 'bg-white border-gray-200'}`}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-purple-600/30">
+                  {selectedUserForSettings.username?.charAt(0)?.toUpperCase()}
+                </div>
+                <div>
+                  <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{selectedUserForSettings.username}</h2>
+                  <p className="text-gray-500 text-sm">{lang === 'ar' ? 'إعدادات الأزرار الخاصة بالمستخدم' : 'Per-User Button Visibility'}</p>
+                </div>
+              </div>
+
+              {/* Overlay Buttons Section */}
+              <div className="space-y-4 mb-6">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">{lang === 'ar' ? 'أزرار النافذة العائمة' : 'Floating Overlay Buttons'}</h3>
+                {([
+                  { key: 'show_open_app' as const, label: lang === 'ar' ? 'زر فتح التطبيق' : 'Open App Button', color: '#1E3A8A' },
+                  { key: 'show_misc' as const, label: lang === 'ar' ? 'زر المتنوعات' : 'Misc Button', color: '#6D28D9' }
+                ]).map(({ key, label, color }) => {
+                  const overlaySettings = selectedUserForSettings.ui_settings?.overlay || {};
+                  const isOn = overlaySettings[key] !== false;
+                  return (
+                    <div key={key} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: color + '30' }}>
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                        </div>
+                        <span className="font-semibold text-sm">{label}</span>
+                      </div>
+                      <label className="flex items-center cursor-pointer relative">
+                        <input type="checkbox" className="sr-only" checked={isOn} onChange={() => toggleUserOverlayBtn(key)} />
+                        <div className={`block w-12 h-7 rounded-full transition-colors ${isOn ? 'bg-blue-500' : theme === 'dark' ? 'bg-white/10' : 'bg-gray-300'}`} />
+                        <div className={`dot absolute left-1 top-1 bg-white w-5 h-5 rounded-full shadow transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Projects Section */}
+              {remoteConfigs.find((c: any) => c.config_key === 'projects') && (
+                <div className="space-y-4 mb-6">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">{lang === 'ar' ? 'أزرار المشاريع' : 'Project Buttons'}</h3>
+                  {(remoteConfigs.find((c: any) => c.config_key === 'projects')?.config_value || []).map((project: any) => {
+                    const userProjects = selectedUserForSettings.ui_settings?.projects || {};
+                    // default is the project's global is_visible (defaults to true)
+                    const globalVisible = project.is_visible !== false;
+                    const isOn = userProjects[project.id] !== undefined ? userProjects[project.id] !== false : globalVisible;
+                    return (
+                      <div key={project.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: project.color ? project.color.replace('0xFF', '#') : '#1E3A8A' }}>
+                            {project.name?.charAt(0)?.toUpperCase()}
+                          </div>
+                          <span className="font-semibold text-sm">{project.name}</span>
+                        </div>
+                        <label className="flex items-center cursor-pointer relative">
+                          <input type="checkbox" className="sr-only" checked={isOn} onChange={() => toggleUserProjectVisibility(project.id)} />
+                          <div className={`block w-12 h-7 rounded-full transition-colors ${isOn ? 'bg-blue-500' : theme === 'dark' ? 'bg-white/10' : 'bg-gray-300'}`} />
+                          <div className={`dot absolute left-1 top-1 bg-white w-5 h-5 rounded-full shadow transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0'}`} />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <button
+                onClick={() => setIsUserSettingsOpen(false)}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all"
+              >
+                {lang === 'ar' ? 'حفظ وإغلاق' : 'Done'}
+              </button>
             </motion.div>
           </div>
         )}
@@ -2688,7 +3226,723 @@ export default function Dashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Add/Edit Misc Modal */}
+      {isMiscModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className={`w-full max-w-lg rounded-[2rem] p-8 shadow-2xl border ${theme === 'dark' ? 'bg-[#111] border-white/10' : 'bg-white border-gray-200'}`}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-purple-600/20 text-purple-500 rounded-xl flex items-center justify-center">
+                {editingMisc ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+              </div>
+              <h2 className="text-2xl font-bold">{editingMisc ? (lang === 'ar' ? 'تعديل العنصر' : 'Edit Misc Item') : t.addMisc}</h2>
+            </div>
+
+            <form onSubmit={handleMiscSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">{lang === 'ar' ? 'العنوان' : 'Title'}</label>
+                <input
+                  required
+                  type="text"
+                  value={miscFormData.title}
+                  onChange={(e) => setMiscFormData({...miscFormData, title: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-purple-500 outline-none transition-all ${theme === 'dark' ? 'bg-black/50 border-white/10 focus:border-purple-500/50' : 'bg-gray-50 border-gray-200 focus:border-purple-500'}`}
+                  placeholder={lang === 'ar' ? 'مثال: رقم الحساب البنكي' : 'e.g., Bank Account'}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">{lang === 'ar' ? 'المحتوى (الذي سيتم نسخه)' : 'Content (to be copied)'}</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={miscFormData.content}
+                  onChange={(e) => setMiscFormData({...miscFormData, content: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-purple-500 outline-none transition-all resize-none ${theme === 'dark' ? 'bg-black/50 border-white/10 focus:border-purple-500/50' : 'bg-gray-50 border-gray-200 focus:border-purple-500'}`}
+                  placeholder={lang === 'ar' ? 'أدخل النص هنا...' : 'Enter text here...'}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">{lang === 'ar' ? 'ترتيب العرض (0 هو الأول)' : 'Display Order (0 is first)'}</label>
+                <input
+                  type="number"
+                  value={miscFormData.display_order}
+                  onChange={(e) => setMiscFormData({...miscFormData, display_order: parseInt(e.target.value) || 0})}
+                  className={`w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-purple-500 outline-none transition-all ${theme === 'dark' ? 'bg-black/50 border-white/10 focus:border-purple-500/50' : 'bg-gray-50 border-gray-200 focus:border-purple-500'}`}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsMiscModalOpen(false)}
+                  className={`flex-1 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg shadow-purple-600/20 transition-all"
+                >
+                  {t.save}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
     </div>
   );
 }
 
+// ─── Isolated clock component — renders independently every second ───────────
+function UserTimezoneDisplay({ timezone, small = false }: { timezone: string; small?: boolean }) {
+  const [time, setTime] = useState('');
+
+  useEffect(() => {
+    const tick = () => {
+      try {
+        setTime(new Intl.DateTimeFormat('en-US', {
+          timeZone: timezone.trim(),
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        }).format(new Date()));
+      } catch { setTime(''); }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [timezone]);
+
+  if (!time) return null;
+
+  if (small) {
+    return (
+      <div className="flex items-center gap-1 bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full w-max font-mono text-[10px] border border-blue-500/10">
+        <Clock className="w-2.5 h-2.5" />
+        <span>{time}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-xl w-max font-mono text-xs border border-blue-500/10">
+      <Clock className="w-3.5 h-3.5" />
+      <span>{time}</span>
+    </div>
+  );
+}
+
+// ─── RentAHuman Integration Display Component ──────────────────────────────
+
+interface RentAHumanProfile {
+  id: string;
+  name: string;
+  headline?: string;
+  hourlyRate?: number;
+  currency?: string;
+  rating?: number;
+  reviewCount?: number;
+  totalBookings?: number;
+  isAvailable?: boolean;
+  isVerified?: boolean;
+  avatarUrl?: string;
+  activeRentalsCount?: number;
+  rentalsSummary?: {
+    active: number;
+    completed: number;
+    cancelled: number;
+  } | null;
+  totalDeposited?: number;
+  walletBalance?: number;
+  currentlyDue?: number;
+  transactions?: Array<{
+    id: string;
+    type: string;
+    amount: number;
+    balanceAfter: number;
+    description: string;
+    createdAt: string;
+  }>;
+}
+
+function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any; theme: string; lang: 'en' | 'ar'; isMobile?: boolean }) {
+  const [profile, setProfile] = useState<RentAHumanProfile | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!user.rah_human_id) {
+      setProfile(null);
+      setError(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchProfile = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/rentahuman?humanId=${encodeURIComponent(user.rah_human_id)}&apiKey=${encodeURIComponent(user.rah_api_key || '')}`);
+        if (!res.ok) {
+          throw new Error('Not Found');
+        }
+        const data = await res.json();
+        if (isMounted) {
+          if (data.success && data.human) {
+            setProfile(data.human);
+          } else {
+            throw new Error('Invalid response');
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err.message || 'API Error');
+          setProfile(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user.rah_human_id, user.rah_api_key]);
+
+  if (!user.rah_human_id) {
+    return (
+      <div className={`text-xs py-2 px-3 rounded-2xl border border-dashed flex items-center justify-center gap-1.5 font-medium ${
+        theme === 'dark' ? 'border-white/10 text-gray-500 bg-white/[0.01]' : 'border-gray-200 text-gray-400 bg-gray-50/50'
+      }`}>
+        <Sparkles className="w-3.5 h-3.5 opacity-60" />
+        <span>{lang === 'ar' ? 'غير متصل بـ RentAHuman' : 'Not Connected'}</span>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-gray-400 py-1 font-medium">
+        <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
+        <span>{lang === 'ar' ? 'جاري التحميل...' : 'Loading metrics...'}</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 py-1.5 px-3 rounded-2xl w-max font-medium">
+        <Ban className="w-3.5 h-3.5" />
+        <span>{lang === 'ar' ? 'خطأ في الربط' : 'API Connection Error'}</span>
+      </div>
+    );
+  }
+
+  if (!profile) return null;
+
+  const bookings = profile.totalBookings || 0;
+  const rating = profile.rating || 0;
+  const reviews = profile.reviewCount || 0;
+  const currency = profile.currency || 'USD';
+  
+  // ─── Fintech Metrics Calculations from Wallet Transaction History ───
+  // 1. Determine hourly rate (Manager override or RentAHuman profile rate, fallback to $10/hr)
+  const customRate = Number(user.ui_settings?.rah?.rate_override || profile.hourlyRate || 10);
+  
+  // 2. Fetch transactions and aggregate bounty earnings
+  const transactions = profile.transactions || [];
+  let paidEarnings = 0;
+  if (transactions.length > 0) {
+    paidEarnings = transactions
+      .filter((tx: any) => 
+        tx.type === 'figure_ongoing_payout' || 
+        tx.type === 'admin_credit' || 
+        tx.description?.toLowerCase().includes('payout') || 
+        tx.description?.toLowerCase().includes('bonus') ||
+        tx.description?.toLowerCase().includes('ongoing_')
+      )
+      .reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0) / 100;
+  } else {
+    // Safety fallback to lifetime deposited
+    paidEarnings = (profile.totalDeposited || 0) / 100;
+  }
+
+  // 3. Calculate automated paid hours
+  const paidHours = customRate > 0 ? Number((paidEarnings / customRate).toFixed(1)) : 0;
+
+  // 4. Load manual offset adjustments (for unpaid/pending program work)
+  const hoursOffset = Number(user.ui_settings?.rah?.hours_offset || 0);
+  const earningsOffset = Number(user.ui_settings?.rah?.earnings_offset || 0);
+
+  // 5. Final aggregate figures (exact summation)
+  const totalEarnings = paidEarnings + earningsOffset;
+  const totalHours = Number((paidHours + hoursOffset).toFixed(1));
+
+  // 6. EGP Worker Payout and Net Profit calculations
+  const egpRate = Number(user.ui_settings?.rah?.egp_rate || 0);
+  const exchangeRate = Number(user.ui_settings?.rah?.exchange_rate || 48.5); // Fallback to current EGP exchange rate if not overridden
+  const platformRevenueEGP = totalEarnings * exchangeRate;
+  const workerPayoutEGP = totalHours * egpRate;
+  const netProfitEGP = platformRevenueEGP - workerPayoutEGP;
+  const profitMarginPct = platformRevenueEGP > 0 ? (netProfitEGP / platformRevenueEGP) * 100 : 0;
+
+
+  const badgeClass = theme === 'dark' 
+    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20' 
+    : 'bg-purple-50 text-purple-600 border border-purple-100 hover:bg-purple-100/50';
+
+  const formatTxDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const handleOpenDetails = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDetailsOpen(true);
+  };
+
+  if (isMobile) {
+    return (
+      <div 
+        onClick={handleOpenDetails}
+        className={`p-4 rounded-2xl border space-y-3 cursor-pointer transition-all hover:scale-[1.01] ${
+          theme === 'dark' ? 'bg-purple-500/[0.02] border-purple-500/10 hover:border-purple-500/30' : 'bg-purple-50/20 border-purple-100/50 hover:border-purple-200'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bot className="w-4 h-4 text-purple-500" />
+            <span className={`text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`}>
+              RentAHuman Profile
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {profile.activeRentalsCount && profile.activeRentalsCount > 0 ? (
+              <span className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                {lang === 'ar' ? 'يعمل حالياً' : 'Active Now'} ({profile.activeRentalsCount})
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 bg-gray-500/10 text-gray-400 border border-gray-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                {lang === 'ar' ? 'متصل' : 'Connected'}
+              </span>
+            )}
+            {profile.isVerified && (
+              <span className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+                <ShieldCheck className="w-3.5 h-3.5" /> VERIFIED
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className={`p-2.5 rounded-xl border ${theme === 'dark' ? 'bg-black/25 border-white/5' : 'bg-white border-gray-100'}`}>
+            <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">
+              {lang === 'ar' ? 'ساعات العمل' : 'Total Hours'}
+            </span>
+            <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              {totalHours} hrs
+            </span>
+          </div>
+          
+          <div className={`p-2.5 rounded-xl border ${theme === 'dark' ? 'bg-black/25 border-white/5' : 'bg-white border-gray-100'}`}>
+            <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">
+              {lang === 'ar' ? 'إجمالي الأرباح' : 'Total Earnings'}
+            </span>
+            <span className={`font-bold text-purple-400`}>
+              ${totalEarnings.toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        {/* Details Dialog / Portal Rendering inside component */}
+        {mounted && typeof window !== 'undefined' && createPortal(
+          <AnimatePresence>
+            {detailsOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={(e) => { e.stopPropagation(); setDetailsOpen(false); }}
+                className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`relative w-full max-w-lg rounded-[2.5rem] border p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh] ${
+                  theme === 'dark' ? 'bg-[#111] border-white/10' : 'bg-white border-gray-200'
+                }`}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-600/20 text-purple-400 border border-purple-500/20 flex items-center justify-center font-bold text-xl">
+                      {profile.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{profile.name}</h3>
+                      <p className="text-xs text-gray-500 font-medium">RentAHuman integration stats</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setDetailsOpen(false)}
+                    className={`p-2 rounded-xl text-xs font-bold transition-all ${
+                      theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Fintech Performance Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className={`p-4 rounded-3xl border ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'إجمالي الساعات' : 'Total Hours'}</span>
+                      <TrendingUp className="w-4 h-4 text-purple-500" />
+                    </div>
+                    <div className="text-2xl font-black mb-1">{totalHours} hrs</div>
+                    <div className="text-[10px] text-gray-500 font-medium">
+                      {paidHours}h paid + {hoursOffset}h pending
+                    </div>
+                  </div>
+
+                  <div className={`p-4 rounded-3xl border ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'إجمالي الأرباح' : 'Total Earnings'}</span>
+                      <DollarSign className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <div className="text-2xl font-black mb-1 text-emerald-400">${totalEarnings.toFixed(2)}</div>
+                    <div className="text-[10px] text-gray-500 font-medium">
+                      ${paidEarnings.toFixed(2)} paid + ${earningsOffset.toFixed(2)} pending
+                    </div>
+                  </div>
+
+                  <div className={`p-4 rounded-3xl border ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'المستحق حالياً' : 'Currently Due'}</span>
+                      <Clock className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div className="text-2xl font-black mb-1 text-amber-400">${((profile.currentlyDue || 0) / 100).toFixed(2)}</div>
+                    <div className="text-[10px] text-gray-500 font-medium">
+                      {lang === 'ar' ? 'بانتظار الإفراج من الضمان' : 'Awaiting escrow release'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center mb-6">
+                  <div className={`p-3 rounded-2xl border text-xs ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-100'}`}>
+                    <span className="text-gray-400 block text-[9px] uppercase font-bold mb-0.5">{lang === 'ar' ? 'أجر الساعة' : 'Rate'}</span>
+                    <span className="font-bold">${customRate}/hr</span>
+                  </div>
+                  <div className={`p-3 rounded-2xl border text-xs ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-100'}`}>
+                    <span className="text-gray-400 block text-[9px] uppercase font-bold mb-0.5">{lang === 'ar' ? 'الحجوزات' : 'Bookings'}</span>
+                    <span className="font-bold">{bookings}</span>
+                  </div>
+                  <div className={`p-3 rounded-2xl border text-xs ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-100'}`}>
+                    <span className="text-gray-400 block text-[9px] uppercase font-bold mb-0.5">{lang === 'ar' ? 'التقييم' : 'Rating'}</span>
+                    <span className="font-bold flex justify-center items-center gap-0.5">★ {rating.toFixed(1)}</span>
+                  </div>
+                </div>
+
+                {/* Financial Ledger Section */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                    {lang === 'ar' ? 'دفتر المعاملات المالية (المحفظة)' : 'Financial Transaction Ledger'}
+                  </h4>
+
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {transactions.map((tx: any) => {
+                      const isCredit = tx.amount > 0;
+                      return (
+                        <div key={tx.id} className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+                          theme === 'dark' ? 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03]' : 'bg-gray-50 border-gray-100 hover:bg-gray-100/50'
+                        } transition-all`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                              isCredit ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                            }`}>
+                              {isCredit ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{tx.description}</p>
+                              <span className="text-[9px] text-gray-500 font-medium block mt-0.5">{formatTxDate(tx.createdAt)}</span>
+                            </div>
+                          </div>
+                          <span className={`text-xs font-black shrink-0 ${isCredit ? 'text-green-400' : 'text-red-400'}`}>
+                            {isCredit ? '+' : '-'}${Math.abs(tx.amount / 100).toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {transactions.length === 0 && (
+                      <div className="py-8 text-center text-xs text-gray-500 border border-dashed border-white/5 rounded-2xl">
+                        No transactions registered yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 px-1 min-w-[130px]">
+      <div className="flex items-center gap-1.5">
+        <button 
+          onClick={handleOpenDetails}
+          className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold border transition-all ${badgeClass}`}
+          title="Click to view detailed metrics & financial ledger"
+        >
+          <Bot className="w-3.5 h-3.5 shrink-0 text-purple-400" />
+          <span>{totalHours} hrs</span>
+        </button>
+        {profile.isVerified && (
+          <span className="p-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md shrink-0" title="Verified Human">
+            <ShieldCheck className="w-3 h-3" />
+          </span>
+        )}
+        {profile.activeRentalsCount && profile.activeRentalsCount > 0 ? (
+          <span className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-md text-[9px] font-bold animate-pulse shrink-0" title={`${profile.activeRentalsCount} active rental(s)`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            {lang === 'ar' ? 'نشط' : 'Active'}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 bg-gray-500/10 text-gray-400 border border-gray-500/20 px-1.5 py-0.5 rounded-md text-[9px] font-bold shrink-0" title="Connected">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+            {lang === 'ar' ? 'متصل' : 'Connected'}
+          </span>
+        )}
+      </div>
+      
+      <div className="text-[10px] text-gray-400 flex flex-col gap-0.5 font-medium ml-1">
+        <span className="flex items-center gap-1">
+          💼 {bookings} bookings • <span className="text-purple-400 font-bold">${totalEarnings.toFixed(1)}</span>
+        </span>
+        {rating > 0 && (
+          <span className="flex items-center gap-1 text-amber-400 font-bold">
+            ★ {rating.toFixed(1)} <span className="text-gray-500 font-normal">({reviews})</span>
+          </span>
+        )}
+        {egpRate > 0 && (
+          <div className="flex flex-col border-t border-white/5 mt-1 pt-1 space-y-0.5">
+            <span className="text-emerald-400 font-semibold flex items-center gap-1" title={`EGP Payout: ${totalHours} hrs * ${egpRate} EGP/hr`}>
+              🇪🇬 {workerPayoutEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP Pay
+            </span>
+            <span className={`text-[9px] font-bold ${netProfitEGP >= 0 ? 'text-blue-400' : 'text-red-400'}`} title={`Net Profit: Platform EGP (${platformRevenueEGP.toFixed(0)}) - Worker Payout EGP (${workerPayoutEGP.toFixed(0)})`}>
+              Profit: {netProfitEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP ({profitMarginPct.toFixed(0)}%)
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Details Dialog / Portal Rendering inside desktop view */}
+      {mounted && typeof window !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {detailsOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={(e) => { e.stopPropagation(); setDetailsOpen(false); }}
+              className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`relative w-full max-w-lg rounded-[2.5rem] border p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh] ${
+                theme === 'dark' ? 'bg-[#111] border-white/10' : 'bg-white border-gray-200'
+              }`}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-600/20 text-purple-400 border border-purple-500/20 flex items-center justify-center font-bold text-xl">
+                    {profile.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{profile.name}</h3>
+                    <p className="text-xs text-gray-500 font-medium">RentAHuman Integration Performance</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setDetailsOpen(false)}
+                  className={`p-2 rounded-xl text-xs font-bold transition-all ${
+                    theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Fintech Performance Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className={`p-4 rounded-3xl border ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'إجمالي الساعات' : 'Total Hours'}</span>
+                    <TrendingUp className="w-4 h-4 text-purple-500" />
+                  </div>
+                  <div className="text-2xl font-black mb-1">{totalHours} hrs</div>
+                  <div className="text-[10px] text-gray-500 font-medium">
+                    {paidHours}h paid + {hoursOffset}h pending
+                  </div>
+                </div>
+
+                <div className={`p-4 rounded-3xl border ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'إجمالي الأرباح' : 'Total Earnings'}</span>
+                    <DollarSign className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-2xl font-black mb-1 text-emerald-400">${totalEarnings.toFixed(2)}</div>
+                  <div className="text-[10px] text-gray-500 font-medium">
+                    ${paidEarnings.toFixed(2)} paid + ${earningsOffset.toFixed(2)} pending
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center mb-6">
+                <div className={`p-3 rounded-2xl border text-xs ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-100'}`}>
+                  <span className="text-gray-400 block text-[9px] uppercase font-bold mb-0.5">{lang === 'ar' ? 'أجر الساعة' : 'Rate'}</span>
+                  <span className="font-bold">${customRate}/hr</span>
+                </div>
+                <div className={`p-3 rounded-2xl border text-xs ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-100'}`}>
+                  <span className="text-gray-400 block text-[9px] uppercase font-bold mb-0.5">{lang === 'ar' ? 'الحجوزات' : 'Bookings'}</span>
+                  <span className="font-bold">{bookings}</span>
+                </div>
+                <div className={`p-3 rounded-2xl border text-xs ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-100'}`}>
+                  <span className="text-gray-400 block text-[9px] uppercase font-bold mb-0.5">{lang === 'ar' ? 'التقييم' : 'Rating'}</span>
+                  <span className="font-bold flex justify-center items-center gap-0.5 font-sans">★ {rating.toFixed(1)}</span>
+                </div>
+              </div>
+
+              {/* EGP Accounting & Net Profit Calculator */}
+              {egpRate > 0 && (
+                <div className={`p-5 rounded-3xl border mb-6 bg-gradient-to-br from-emerald-500/10 to-blue-500/10 ${theme === 'dark' ? 'border-emerald-500/20' : 'border-emerald-200'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs text-emerald-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                      🇪🇬 {lang === 'ar' ? 'حسابات الدفع بالجنيه المصري والربح الصافي' : 'EGP Payout & Net Profit'}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      Exchange: {exchangeRate} EGP/$
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-gray-400 block font-medium">{lang === 'ar' ? 'مستحقات العامل بالجنيه' : 'Worker Share (EGP)'}</span>
+                      <div className="text-xl font-bold text-white">
+                        {workerPayoutEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP
+                      </div>
+                      <span className="text-[9px] text-gray-500 block">
+                        {totalHours} hrs × {egpRate} EGP/hr
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-1 text-right">
+                      <span className="text-[10px] text-gray-400 block font-medium">{lang === 'ar' ? 'ربحك الصافي بالجنيه' : 'Manager Net Profit (EGP)'}</span>
+                      <div className={`text-xl font-black ${netProfitEGP >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {netProfitEGP >= 0 ? '+' : ''}{netProfitEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP
+                      </div>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded inline-block ${netProfitEGP >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                        Margin: {profitMarginPct.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-dashed border-white/10 flex justify-between text-[10px] text-gray-500 font-medium">
+                    <span>{lang === 'ar' ? 'إيراد المنصة بالدولار:' : 'Platform Revenue:'} <strong className="text-gray-300">${totalEarnings.toFixed(2)}</strong></span>
+                    <span>{lang === 'ar' ? 'بالجنيه المصري:' : 'EGP Equivalent:'} <strong className="text-gray-300">{platformRevenueEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP</strong></span>
+                  </div>
+                </div>
+              )}
+
+              {/* Financial Ledger Section */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                  {lang === 'ar' ? 'دفتر المعاملات المالية (المحفظة)' : 'Financial Transaction Ledger'}
+                </h4>
+
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {transactions.map((tx: any) => {
+                    const isCredit = tx.amount > 0;
+                    return (
+                      <div key={tx.id} className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+                        theme === 'dark' ? 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03]' : 'bg-gray-50 border-gray-100 hover:bg-gray-100/50'
+                      } transition-all`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                            isCredit ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                          }`}>
+                            {isCredit ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{tx.description}</p>
+                            <span className="text-[9px] text-gray-500 font-medium block mt-0.5">{formatTxDate(tx.createdAt)}</span>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-black shrink-0 ${isCredit ? 'text-green-400' : 'text-red-400'}`}>
+                          {isCredit ? '+' : '-'}${Math.abs(tx.amount / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {transactions.length === 0 && (
+                    <div className="py-8 text-center text-xs text-gray-500 border border-dashed border-white/5 rounded-2xl">
+                      No transactions registered yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>,
+      document.body
+    )}
+    </div>
+  );
+}

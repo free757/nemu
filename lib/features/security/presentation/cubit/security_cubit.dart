@@ -68,18 +68,41 @@ class SecurityCubit extends Cubit<SecurityState> {
     }
   }
 
-  Future<void> checkConnection() async {
-    debugPrint('[SecurityCubit] checkConnection() triggered. Current state: $state');
-    emit(SecurityLoading());
+  Future<void> checkConnection({int retryCount = 0}) async {
+    debugPrint('[SecurityCubit] checkConnection() triggered. Retry count: $retryCount. Current state: $state');
+    
+    // Only emit SecurityLoading on the first attempt to prevent visual blinking
+    if (retryCount == 0) {
+      emit(SecurityLoading());
+    }
+    
     final failureOrStatus = await checkConnectionUseCase();
-    failureOrStatus.fold(
-      (failure) {
+    
+    await failureOrStatus.fold(
+      (failure) async {
         debugPrint('[SecurityCubit] checkConnection failed: ${failure.message}');
+        
+        // If VPN is reported connected, retry after a delay
+        if (_isVpnConnected && retryCount < 4) {
+          debugPrint('[SecurityCubit] VPN is connected but check failed. Retrying in 2 seconds...');
+          await Future.delayed(const Duration(seconds: 2));
+          return checkConnection(retryCount: retryCount + 1);
+        }
+        
         emit(SecurityError(failure.message));
       },
-      (status) {
+      (status) async {
         final isConn = _isVpnConnected;
         debugPrint('[SecurityCubit] checkConnection success. IP: ${status.ip}, Country: ${status.country}, isUSA: ${status.isUSA}, isVpnConnected: $isConn');
+        
+        // If VPN is reported connected, but we fetched a non-USA IP, the routing is not ready yet!
+        // Retry checking after a short delay!
+        if (isConn && !status.isUSA && retryCount < 4) {
+          debugPrint('[SecurityCubit] VPN is connected but fetched non-USA IP (${status.ip}). Routing is not fully ready. Retrying in 2 seconds...');
+          await Future.delayed(const Duration(seconds: 2));
+          return checkConnection(retryCount: retryCount + 1);
+        }
+        
         emit(SecurityLoaded(status, isConnected: isConn));
       },
     );

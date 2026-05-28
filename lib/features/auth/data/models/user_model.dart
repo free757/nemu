@@ -14,6 +14,11 @@ class UserModel extends UserEntity {
     super.proxyPass,
     super.lastDeviceId,
     super.verificationCode,
+    super.uiSettings,
+    super.rahHumanId,
+    super.rahApiKey,
+    super.rahBalance,
+    super.rahEarnings,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +35,11 @@ class UserModel extends UserEntity {
       proxyPass: json['proxy_pass'],
       lastDeviceId: json['last_device_id'],
       verificationCode: json['verification_code'],
+      uiSettings: json['ui_settings'] as Map<String, dynamic>?,
+      rahHumanId: json['rah_human_id'],
+      rahApiKey: json['rah_api_key'],
+      rahBalance: json['rah_balance'] != null ? (json['rah_balance'] as num).toDouble() : null,
+      rahEarnings: json['rah_earnings'] as List<dynamic>?,
     );
   }
 
@@ -47,6 +57,11 @@ class UserModel extends UserEntity {
       'proxy_pass': proxyPass,
       'last_device_id': lastDeviceId,
       'verification_code': verificationCode,
+      'ui_settings': uiSettings,
+      'rah_human_id': rahHumanId,
+      'rah_api_key': rahApiKey,
+      'rah_balance': rahBalance,
+      'rah_earnings': rahEarnings,
     };
   }
 }

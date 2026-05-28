@@ -13,6 +13,11 @@ class UserEntity extends Equatable {
   final String? proxyPass;
   final String? lastDeviceId;
   final String? verificationCode;
+  final Map<String, dynamic>? uiSettings;
+  final String? rahHumanId;
+  final String? rahApiKey;
+  final double? rahBalance;
+  final List<dynamic>? rahEarnings;
 
   const UserEntity({
     required this.id,
@@ -27,6 +32,11 @@ class UserEntity extends Equatable {
     this.proxyPass,
     this.lastDeviceId,
     this.verificationCode,
+    this.uiSettings,
+    this.rahHumanId,
+    this.rahApiKey,
+    this.rahBalance,
+    this.rahEarnings,
   });
 
   @override
@@ -43,5 +53,10 @@ class UserEntity extends Equatable {
         proxyPass,
         lastDeviceId,
         verificationCode,
+        uiSettings,
+        rahHumanId,
+        rahApiKey,
+        rahBalance,
+        rahEarnings,
       ];
 }

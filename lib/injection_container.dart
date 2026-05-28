@@ -22,6 +22,12 @@ import 'package:nemu/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:nemu/features/auth/domain/repositories/auth_repository.dart';
 import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 
+import 'package:nemu/features/app_update/data/datasources/app_update_remote_datasource.dart';
+import 'package:nemu/features/app_update/data/repositories/app_update_repository_impl.dart';
+import 'package:nemu/features/app_update/domain/repositories/app_update_repository.dart';
+import 'package:nemu/features/app_update/domain/usecases/get_latest_update_info.dart';
+import 'package:nemu/features/app_update/presentation/cubit/app_update_cubit.dart';
+
 final sl = GetIt.instance;
 
 /// Global notifier for V2Ray connection state — updated by onStatusChanged callback
@@ -52,6 +58,20 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<RemoteConfigRemoteDataSource>(
     () => RemoteConfigRemoteDataSourceImpl(supabaseClient: sl()),
+  );
+
+  //! Features - App Update
+  // Cubit
+  sl.registerFactory(() => AppUpdateCubit(getLatestUpdateInfo: sl()));
+  // Use cases
+  sl.registerLazySingleton(() => GetLatestUpdateInfo(sl()));
+  // Repository
+  sl.registerLazySingleton<AppUpdateRepository>(
+    () => AppUpdateRepositoryImpl(remoteDataSource: sl()),
+  );
+  // Data sources
+  sl.registerLazySingleton<AppUpdateRemoteDataSource>(
+    () => AppUpdateRemoteDataSourceImpl(supabaseClient: sl()),
   );
 
   //! Features - Security

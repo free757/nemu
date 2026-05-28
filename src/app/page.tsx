@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sanitizeTranscript } from '@/lib/speechManager';
 import { 
@@ -42,6 +42,7 @@ export default function Dashboard() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   
 
 
@@ -135,7 +136,9 @@ export default function Dashboard() {
     proxy_user: '',
     proxy_pass: '',
     proxy_location: '',
-    proxy_timezone: ''
+    proxy_timezone: '',
+    rah_api_key: '',
+    rah_human_id: ''
   });
 
   const [quickPaste, setQuickPaste] = useState('');
@@ -310,7 +313,9 @@ export default function Dashboard() {
       proxy_user: user.proxy_user || '',
       proxy_pass: user.proxy_pass || '',
       proxy_location: user.proxy_location || '',
-      proxy_timezone: user.proxy_timezone || ''
+      proxy_timezone: user.proxy_timezone || '',
+      rah_api_key: user.rah_api_key || '',
+      rah_human_id: user.rah_human_id || ''
     });
     setIsModalOpen(true);
   };
@@ -332,7 +337,8 @@ export default function Dashboard() {
       setFormData({
         pin: '', username: '', phone_number: '',
         proxy_ip: '', proxy_port: '', proxy_user: '', proxy_pass: '',
-        proxy_location: '', proxy_timezone: ''
+        proxy_location: '', proxy_timezone: '',
+        rah_api_key: '', rah_human_id: ''
       });
       setIsModalOpen(true);
     } else {
@@ -406,7 +412,7 @@ export default function Dashboard() {
     e.preventDefault();
     const payload = {
       ...formData,
-      proxy_port: parseInt(formData.proxy_port)
+      proxy_port: formData.proxy_port ? parseInt(formData.proxy_port) : null
     };
 
     let error;
@@ -874,57 +880,133 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-white/5">
                   <AnimatePresence>
                     {filteredUsers.map((user) => (
-                      <motion.tr 
-                        key={user.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        className={`transition-all group ${theme === 'dark' ? 'hover:bg-white/[0.02] divide-white/5' : 'hover:bg-gray-50 divide-gray-100'}`}
-                      >
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg text-white">
-                              {user.username?.charAt(0).toUpperCase()}
+                      <React.Fragment key={user.id}>
+                        <motion.tr 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          className={`transition-all group cursor-pointer ${theme === 'dark' ? 'hover:bg-white/[0.02] divide-white/5' : 'hover:bg-gray-50 divide-gray-100'} ${expandedUserId === user.id ? (theme === 'dark' ? 'bg-white/[0.03]' : 'bg-gray-100/50') : ''}`}
+                          onClick={() => setExpandedUserId(expandedUserId === user.id ? null : user.id)}
+                        >
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg text-white">
+                                {user.username?.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</p>
+                                <p className="text-gray-500 text-sm">{user.phone_number}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</p>
-                              <p className="text-gray-500 text-sm">{user.phone_number}</p>
+                          </td>
+                          <td className="px-6 py-5">
+                            <span className={`px-3 py-1 border rounded-lg font-mono text-blue-400 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
+                              {user.pin}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="text-sm">
+                              <p className="flex items-center gap-2">
+                                <Globe className="w-3 h-3 text-gray-500" />
+                                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>{user.proxy_ip}:{user.proxy_port}</span>
+                              </p>
+                              <p className="text-gray-500 text-xs flex items-center gap-1">
+                                 <MapPin className="w-3 h-3" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
+                              </p>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <span className={`px-3 py-1 border rounded-lg font-mono text-blue-400 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
-                            {user.pin}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="text-sm">
-                            <p className="flex items-center gap-2">
-                              <Globe className="w-3 h-3 text-gray-500" />
-                              <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>{user.proxy_ip}:{user.proxy_port}</span>
-                            </p>
-                            <p className="text-gray-500 text-xs flex items-center gap-1">
-                               <MapPin className="w-3 h-3" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button 
-                              onClick={() => handleOpenEdit(user)}
-                              className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteClick(user.id, user.username)}
-                              className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </motion.tr>
+                          </td>
+                          <td className="px-6 py-5 text-right">
+                            <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                              <button 
+                                onClick={() => handleOpenEdit(user)}
+                                className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteClick(user.id, user.username)}
+                                className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                        
+                        {expandedUserId === user.id && (
+                          <tr className={theme === 'dark' ? 'bg-[#0f0f0f]/40' : 'bg-gray-50/20'}>
+                            <td colSpan={4} className="px-8 py-6 border-t border-b border-white/5">
+                              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left Section: Balance Card */}
+                                <div className={`p-6 rounded-3xl border flex flex-col justify-between ${theme === 'dark' ? 'bg-[#151515] border-white/10' : 'bg-white border-gray-200'}`}>
+                                  <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                      <span className="text-xs font-bold text-purple-500 uppercase tracking-widest">
+                                        {lang === 'ar' ? 'حساب RentAHuman' : 'RentAHuman Account'}
+                                      </span>
+                                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${user.rah_api_key ? 'bg-purple-500/10 text-purple-400' : 'bg-gray-500/10 text-gray-500'}`}>
+                                        {user.rah_api_key ? 'CONNECTED' : 'DISCONNECTED'}
+                                      </span>
+                                    </div>
+                                    <p className="text-gray-500 text-sm">{lang === 'ar' ? 'الرصيد المتاح' : 'Available Balance'}</p>
+                                    <p className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 mt-1">
+                                      ${user.rah_balance !== undefined && user.rah_balance !== null ? Number(user.rah_balance).toFixed(2) : '0.00'}
+                                    </p>
+                                  </div>
+                                  <div className="mt-6 pt-4 border-t border-white/5 space-y-2 text-xs text-gray-500">
+                                    <div className="flex justify-between">
+                                      <span>Human ID:</span>
+                                      <span className="font-mono text-gray-300">{user.rah_human_id || 'N/A'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span>{lang === 'ar' ? 'آخر تحديث:' : 'Last Synced:'}</span>
+                                      <span>{user.proxy_last_seen ? new Date(user.proxy_last_seen).toLocaleTimeString() : 'Never'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Right Section: Transactions table */}
+                                <div className={`lg:col-span-2 p-6 rounded-3xl border ${theme === 'dark' ? 'bg-[#151515] border-white/10' : 'bg-white border-gray-200'}`}>
+                                  <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                    {lang === 'ar' ? 'سجل الأرباح والتحويلات' : 'Earnings & Transfers'}
+                                  </h4>
+                                  
+                                  <div className="max-h-48 overflow-y-auto pr-2 space-y-3">
+                                    {user.rah_earnings && user.rah_earnings.length > 0 ? (
+                                      user.rah_earnings.map((tx: any, idx: number) => {
+                                        const date = tx.created_at ? new Date(tx.created_at).toLocaleDateString() : 'N/A';
+                                        const isReceived = tx.direction === 'received';
+                                        
+                                        return (
+                                          <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border text-sm ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                                            <div className="flex items-center gap-3">
+                                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${isReceived ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                {isReceived ? '+' : '-'}
+                                              </div>
+                                              <div>
+                                                <p className="font-semibold">{tx.description || (isReceived ? 'Payout received' : 'Transfer sent')}</p>
+                                                <p className="text-gray-500 text-xs">{date} • Status: <span className={tx.status === 'completed' ? 'text-green-500' : 'text-amber-500'}>{tx.status}</span></p>
+                                              </div>
+                                            </div>
+                                            <span className={`font-mono font-bold ${isReceived ? 'text-green-500' : 'text-red-400'}`}>
+                                              {isReceived ? '+' : '-'}${tx.amount ? Number(tx.amount).toFixed(2) : '0.00'}
+                                            </span>
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <div className="text-center py-10 text-gray-500 text-xs">
+                                        {lang === 'ar' ? 'لا يوجد سجل معاملات مالية بعد.' : 'No transaction history logged yet.'}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </AnimatePresence>
                 </tbody>
@@ -938,7 +1020,8 @@ export default function Dashboard() {
                   key={user.id}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className={`p-6 rounded-3xl border shadow-sm space-y-6 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
+                  className={`p-6 rounded-3xl border shadow-sm space-y-6 cursor-pointer transition-all ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'} ${expandedUserId === user.id ? 'ring-2 ring-purple-500/50' : ''}`}
+                  onClick={() => setExpandedUserId(expandedUserId === user.id ? null : user.id)}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -966,7 +1049,63 @@ export default function Dashboard() {
                     </p>
                   </div>
 
-                  <div className="flex gap-2">
+                  {expandedUserId === user.id && (
+                    <div className="space-y-4 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-200" onClick={(e) => e.stopPropagation()}>
+                      {/* Mobile RentAHuman Section */}
+                      <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-black/30 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-purple-500 uppercase tracking-wider">
+                            RentAHuman Account
+                          </span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${user.rah_api_key ? 'bg-purple-500/10 text-purple-400' : 'bg-gray-500/10 text-gray-500'}`}>
+                            {user.rah_api_key ? 'CONNECTED' : 'DISCONNECTED'}
+                          </span>
+                        </div>
+                        <p className="text-gray-500 text-xs">{lang === 'ar' ? 'الرصيد المتاح' : 'Available Balance'}</p>
+                        <p className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 mt-0.5">
+                          ${user.rah_balance !== undefined && user.rah_balance !== null ? Number(user.rah_balance).toFixed(2) : '0.00'}
+                        </p>
+                        <div className="mt-3 pt-3 border-t border-white/5 space-y-1 text-xs text-gray-500">
+                          <div className="flex justify-between">
+                            <span>Human ID:</span>
+                            <span className="font-mono text-gray-300">{user.rah_human_id || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mobile Transactions List */}
+                      <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-black/30 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                        <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-gray-400">
+                          {lang === 'ar' ? 'سجل الأرباح والتحويلات' : 'Earnings & Transfers'}
+                        </h4>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {user.rah_earnings && user.rah_earnings.length > 0 ? (
+                            user.rah_earnings.map((tx: any, idx: number) => {
+                              const date = tx.created_at ? new Date(tx.created_at).toLocaleDateString() : 'N/A';
+                              const isReceived = tx.direction === 'received';
+                              return (
+                                <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-black/10 text-xs">
+                                  <div>
+                                    <p className="font-semibold text-gray-200">{tx.description || (isReceived ? 'Payout' : 'Transfer')}</p>
+                                    <p className="text-gray-500 text-[10px]">{date}</p>
+                                  </div>
+                                  <span className={`font-mono font-bold ${isReceived ? 'text-green-500' : 'text-red-400'}`}>
+                                    {isReceived ? '+' : '-'}${tx.amount ? Number(tx.amount).toFixed(2) : '0.00'}
+                                  </span>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-center py-6 text-gray-500 text-xs">
+                              {lang === 'ar' ? 'لا يوجد سجل معاملات مالية بعد.' : 'No transactions logged.'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <button 
                       onClick={() => handleOpenEdit(user)}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
@@ -1610,6 +1749,32 @@ export default function Dashboard() {
                       className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
                       placeholder={t.timezone}
                     />
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="text-sm font-bold text-purple-500 flex items-center gap-2 uppercase tracking-widest">
+                    <Settings className="w-4 h-4" /> RentAHuman Integration
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400 ml-1">RentAHuman API Key</label>
+                      <input 
+                        value={formData.rah_api_key}
+                        onChange={e => setFormData({...formData, rah_api_key: e.target.value})}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono text-sm ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                        placeholder="sb_publishable_..."
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-400 ml-1">RentAHuman Human ID</label>
+                      <input 
+                        value={formData.rah_human_id}
+                        onChange={e => setFormData({...formData, rah_human_id: e.target.value})}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all text-sm ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200'}`}
+                        placeholder="e.g. human_..."
+                      />
+                    </div>
                   </div>
                 </div>
 
