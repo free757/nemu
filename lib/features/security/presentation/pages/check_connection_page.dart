@@ -88,6 +88,23 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
     }
   }
 
+  Future<void> _syncRentAHuman() async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      final hasApiKey = authState.user.rahApiKey != null && authState.user.rahApiKey!.isNotEmpty;
+      final isProxyConnected = vpnStatusNotifier.value == 'CONNECTED';
+
+      if (hasApiKey && isProxyConnected) {
+        try {
+          await RentAHumanSyncService().syncRentAHumanData(
+            userId: authState.user.id,
+            apiKey: authState.user.rahApiKey!,
+          );
+        } catch (_) {}
+      }
+    }
+  }
+
   void _subscribeToNotifications() {
     try {
       _notificationsSubscription = Supabase.instance.client
