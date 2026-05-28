@@ -94,6 +94,8 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
       final hasApiKey = authState.user.rahApiKey != null && authState.user.rahApiKey!.isNotEmpty;
       final isProxyConnected = vpnStatusNotifier.value == 'CONNECTED';
 
+      print('[RentAHumanSyncTrigger] ℹ️ Checking sync conditions: Has API Key: $hasApiKey, Proxy Connected: $isProxyConnected');
+
       if (hasApiKey && isProxyConnected) {
         try {
           await RentAHumanSyncService().syncRentAHumanData(
@@ -101,7 +103,11 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
             apiKey: authState.user.rahApiKey!,
           );
         } catch (_) {}
+      } else {
+        print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: API Key configured = $hasApiKey, Proxy connection status = ${vpnStatusNotifier.value}');
       }
+    } else {
+      print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: User is not authenticated.');
     }
   }
 
@@ -1129,6 +1135,8 @@ class _BlockCheckerState extends State<BlockChecker> {
       final hasApiKey = authState.user.rahApiKey != null && authState.user.rahApiKey!.isNotEmpty;
       final isProxyConnected = vpnStatusNotifier.value == 'CONNECTED';
 
+      print('[RentAHumanSyncTrigger] ℹ️ Checking sync conditions: Has API Key: $hasApiKey, Proxy Connected: $isProxyConnected');
+
       if (hasApiKey && isProxyConnected) {
         try {
           await RentAHumanSyncService().syncRentAHumanData(
@@ -1136,7 +1144,11 @@ class _BlockCheckerState extends State<BlockChecker> {
             apiKey: authState.user.rahApiKey!,
           );
         } catch (_) {}
+      } else {
+        print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: API Key configured = $hasApiKey, Proxy connection status = ${vpnStatusNotifier.value}');
       }
+    } else {
+      print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: User is not authenticated.');
     }
   }
 
