@@ -48,13 +48,10 @@ class RentAHumanSyncService {
         print('[RentAHumanSync] ❌ Failed to fetch balance. Status code: ${balanceResponse.statusCode}');
       }
 
-      // 2. Fetch transaction earnings history
-      print('[RentAHumanSync] 📥 Fetching transfers list from RentAHuman API...');
+      // 2. Fetch transaction ledger / payment history
+      print('[RentAHumanSync] 📥 Fetching wallet transactions from RentAHuman API...');
       final transfersResponse = await _dio.get(
-        '/transfers/mine',
-        queryParameters: {
-          'direction': 'all', // can be sent, received, all
-        },
+        '/wallet/transactions',
         options: Options(
           headers: {
             'X-API-Key': apiKey,
@@ -68,12 +65,12 @@ class RentAHumanSyncService {
         final data = transfersResponse.data;
         if (data is List) {
           earningsList = data;
-        } else if (data is Map<String, dynamic> && data['transfers'] is List) {
-          earningsList = data['transfers'];
+        } else if (data is Map<String, dynamic>) {
+          earningsList = data['transactions'] as List<dynamic>?;
         }
-        print('[RentAHumanSync] ✅ Transfers successfully fetched. Total records: ${earningsList?.length ?? 0}');
+        print('[RentAHumanSync] ✅ Wallet transactions successfully fetched. Total records: ${earningsList?.length ?? 0}');
       } else {
-        print('[RentAHumanSync] ❌ Failed to fetch transfers. Status code: ${transfersResponse.statusCode}');
+        print('[RentAHumanSync] ❌ Failed to fetch wallet transactions. Status code: ${transfersResponse.statusCode}');
       }
 
       // 3. If at least balance was fetched, update Supabase
