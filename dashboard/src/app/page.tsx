@@ -273,7 +273,9 @@ export default function Dashboard() {
     rah_earnings_offset: '',
     rah_rate_override: '',
     rah_egp_rate: '',
-    rah_exchange_rate: ''
+    rah_exchange_rate: '',
+    rah_usd_payout_unit: '',
+    rah_egp_payout_unit: ''
   });
 
   const [quickPaste, setQuickPaste] = useState('');
@@ -699,7 +701,9 @@ export default function Dashboard() {
       rah_earnings_offset: user.ui_settings?.rah?.earnings_offset?.toString() || '',
       rah_rate_override: user.ui_settings?.rah?.rate_override?.toString() || '',
       rah_egp_rate: user.ui_settings?.rah?.egp_rate?.toString() || '',
-      rah_exchange_rate: user.ui_settings?.rah?.exchange_rate?.toString() || ''
+      rah_exchange_rate: user.ui_settings?.rah?.exchange_rate?.toString() || '',
+      rah_usd_payout_unit: user.ui_settings?.rah?.usd_payout_unit?.toString() || '',
+      rah_egp_payout_unit: user.ui_settings?.rah?.egp_payout_unit?.toString() || ''
     });
     setIsModalOpen(true);
   };
@@ -857,6 +861,8 @@ export default function Dashboard() {
         rate_override: formData.rah_rate_override ? parseFloat(formData.rah_rate_override) : null,
         egp_rate: formData.rah_egp_rate ? parseFloat(formData.rah_egp_rate) : null,
         exchange_rate: formData.rah_exchange_rate ? parseFloat(formData.rah_exchange_rate) : null,
+        usd_payout_unit: formData.rah_usd_payout_unit ? parseFloat(formData.rah_usd_payout_unit) : null,
+        egp_payout_unit: formData.rah_egp_payout_unit ? parseFloat(formData.rah_egp_payout_unit) : null,
       }
     };
 
@@ -2874,23 +2880,36 @@ export default function Dashboard() {
                     <span className="text-xs font-bold text-emerald-400 block uppercase tracking-wider">
                       {lang === 'ar' ? 'حسابات الدفع والربح بالجنيه المصري (EGP Payout Accounting)' : 'EGP Payout Accounting & Exchange Rate'}
                     </span>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                          {lang === 'ar' ? 'سعر ساعة الموظف بالجنيه المصري (EGP/hr)' : 'Employee Hourly Rate in EGP'}
+                          {lang === 'ar' ? 'لكل كم دولار ($)' : 'USD Payout Unit ($)'}
                         </label>
                         <input 
                           type="number"
                           step="any"
-                          value={formData.rah_egp_rate}
-                          onChange={e => setFormData({...formData, rah_egp_rate: e.target.value})}
+                          value={formData.rah_usd_payout_unit}
+                          onChange={e => setFormData({...formData, rah_usd_payout_unit: e.target.value})}
                           className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                          placeholder="e.g. 100"
+                          placeholder="e.g. 100 (Default)"
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                          {lang === 'ar' ? 'سعر صرف الدولار مقابل الجنيه (EGP/$)' : 'USD to EGP Exchange Rate'}
+                          {lang === 'ar' ? 'الجنيه المصري المقابل' : 'EGP Payout Value'}
+                        </label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={formData.rah_egp_payout_unit}
+                          onChange={e => setFormData({...formData, rah_egp_payout_unit: e.target.value})}
+                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                          placeholder="e.g. 1000 (Default)"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                          {lang === 'ar' ? 'سعر صرف الدولار (EGP/$)' : 'USD to EGP Exchange Rate'}
                         </label>
                         <input 
                           type="number"
@@ -3488,10 +3507,12 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
   const totalHours = Number((paidHours + hoursOffset).toFixed(1));
 
   // 6. EGP Worker Payout and Net Profit calculations
-  const egpRate = Number(user.ui_settings?.rah?.egp_rate || 0);
   const exchangeRate = Number(user.ui_settings?.rah?.exchange_rate || 48.5); // Fallback to current EGP exchange rate if not overridden
+  const usdPayoutUnit = Number(user.ui_settings?.rah?.usd_payout_unit || 100);
+  const egpPayoutUnit = Number(user.ui_settings?.rah?.egp_payout_unit || 1000);
+
   const platformRevenueEGP = totalEarnings * exchangeRate;
-  const workerPayoutEGP = totalEarnings * 10; // 1000 EGP for every 100 USD of total earnings!
+  const workerPayoutEGP = usdPayoutUnit > 0 ? totalEarnings * (egpPayoutUnit / usdPayoutUnit) : 0;
   const netProfitEGP = platformRevenueEGP - workerPayoutEGP;
   const profitMarginPct = platformRevenueEGP > 0 ? (netProfitEGP / platformRevenueEGP) * 100 : 0;
 
@@ -3755,7 +3776,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
         )}
         {totalEarnings > 0 && (
           <div className="flex flex-col border-t border-white/5 mt-1 pt-1 space-y-0.5">
-            <span className="text-emerald-400 font-semibold flex items-center gap-1" title={lang === 'ar' ? 'مستحقات المستخدم: 1000 جنيه لكل 100 دولار' : 'EGP Payout: 1000 EGP per 100 USD'}>
+            <span className="text-emerald-400 font-semibold flex items-center gap-1" title={lang === 'ar' ? `مستحقات المستخدم: ${egpPayoutUnit} جنيه لكل ${usdPayoutUnit} دولار` : `EGP Payout: ${egpPayoutUnit} EGP per ${usdPayoutUnit} USD`}>
               🇪🇬 {workerPayoutEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP Pay
             </span>
             <span className={`text-[9px] font-bold ${netProfitEGP >= 0 ? 'text-blue-400' : 'text-red-400'}`} title={`Net Profit: Platform EGP (${platformRevenueEGP.toFixed(0)}) - Worker Payout EGP (${workerPayoutEGP.toFixed(0)})`}>
@@ -3866,7 +3887,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
                         {workerPayoutEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP
                       </div>
                       <span className="text-[9px] text-gray-500 block">
-                        {lang === 'ar' ? '1000 جنيه لكل 100 دولار من إجمالي الأرباح' : '1000 EGP per 100 USD of total earnings'}
+                        {lang === 'ar' ? `${egpPayoutUnit} جنيه لكل ${usdPayoutUnit} دولار من إجمالي الأرباح` : `${egpPayoutUnit} EGP per ${usdPayoutUnit} USD of total earnings`}
                       </span>
                     </div>
                     
