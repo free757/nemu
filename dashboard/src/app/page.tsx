@@ -3491,7 +3491,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
   const egpRate = Number(user.ui_settings?.rah?.egp_rate || 0);
   const exchangeRate = Number(user.ui_settings?.rah?.exchange_rate || 48.5); // Fallback to current EGP exchange rate if not overridden
   const platformRevenueEGP = totalEarnings * exchangeRate;
-  const workerPayoutEGP = totalHours * egpRate;
+  const workerPayoutEGP = totalEarnings * 10; // 1000 EGP for every 100 USD of total earnings!
   const netProfitEGP = platformRevenueEGP - workerPayoutEGP;
   const profitMarginPct = platformRevenueEGP > 0 ? (netProfitEGP / platformRevenueEGP) * 100 : 0;
 
@@ -3753,9 +3753,9 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
             ★ {rating.toFixed(1)} <span className="text-gray-500 font-normal">({reviews})</span>
           </span>
         )}
-        {egpRate > 0 && (
+        {totalEarnings > 0 && (
           <div className="flex flex-col border-t border-white/5 mt-1 pt-1 space-y-0.5">
-            <span className="text-emerald-400 font-semibold flex items-center gap-1" title={`EGP Payout: ${totalHours} hrs * ${egpRate} EGP/hr`}>
+            <span className="text-emerald-400 font-semibold flex items-center gap-1" title={lang === 'ar' ? 'مستحقات المستخدم: 1000 جنيه لكل 100 دولار' : 'EGP Payout: 1000 EGP per 100 USD'}>
               🇪🇬 {workerPayoutEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP Pay
             </span>
             <span className={`text-[9px] font-bold ${netProfitEGP >= 0 ? 'text-blue-400' : 'text-red-400'}`} title={`Net Profit: Platform EGP (${platformRevenueEGP.toFixed(0)}) - Worker Payout EGP (${workerPayoutEGP.toFixed(0)})`}>
@@ -3866,7 +3866,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
                         {workerPayoutEGP.toLocaleString(undefined, {maximumFractionDigits:0})} EGP
                       </div>
                       <span className="text-[9px] text-gray-500 block">
-                        {totalHours} hrs × {egpRate} EGP/hr
+                        {lang === 'ar' ? '1000 جنيه لكل 100 دولار من إجمالي الأرباح' : '1000 EGP per 100 USD of total earnings'}
                       </span>
                     </div>
                     
