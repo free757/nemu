@@ -373,8 +373,8 @@ export default function Dashboard() {
       microsoftPassword: 'Microsoft Password',
       verificationCode: 'Verification Code (OTP)',
       rahTitle: 'RentAHuman Integration',
-      rahHumanId: 'RentAHuman Human ID',
-      rahApiKey: 'RentAHuman API Key (Optional)'
+      rahHumanId: 'RentAHuman Human ID (Optional)',
+      rahApiKey: 'RentAHuman API Key'
     },
     ar: {
       users: 'إدارة المستخدمين',
@@ -441,8 +441,8 @@ export default function Dashboard() {
       microsoftPassword: 'كلمة سر مايكروسوفت',
       verificationCode: 'رمز التحقق (OTP)',
       rahTitle: 'إعدادات RentAHuman',
-      rahHumanId: 'معرف المستخدم (Human ID)',
-      rahApiKey: 'مفتاح الـ API (اختياري)'
+      rahHumanId: 'معرف المستخدم (Human ID - اختياري)',
+      rahApiKey: 'مفتاح الـ API لـ RentAHuman'
     }
   }[lang];
 
@@ -3387,8 +3387,32 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
 
   useEffect(() => {
     if (!user.rah_human_id) {
-      setProfile(null);
-      setError(null);
+      if (user.rah_api_key && user.rah_balance !== undefined && user.rah_balance !== null) {
+        // Construct synthetic profile from Supabase fields synced by the mobile client!
+        setProfile({
+          id: user.id || 'synthetic-id',
+          name: user.username || 'Worker',
+          hourlyRate: user.ui_settings?.rah?.rate_override || 10,
+          currentlyDue: (user.ui_settings?.rah?.earnings_offset || user.rah_balance || 0) * 100, // fall back to earnings_offset so pending amounts display automatically!
+          transactions: (user.rah_earnings || []).map((tx: any) => ({
+            id: tx.id || '',
+            amount: tx.amount * 100, // convert to cents
+            type: tx.type || (tx.direction === 'received' ? 'figure_ongoing_payout' : 'transfer'),
+            description: tx.description || '',
+            createdAt: tx.created_at || tx.timestamp || '',
+            balanceAfter: tx.balance_after || tx.balanceAfter || 0
+          })),
+          totalBookings: 0,
+          rating: 5,
+          reviewCount: 0,
+          currency: 'USD',
+          totalDeposited: 0
+        });
+        setError(null);
+      } else {
+        setProfile(null);
+        setError(null);
+      }
       return;
     }
 
@@ -3426,15 +3450,26 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
     return () => {
       isMounted = false;
     };
-  }, [user.rah_human_id, user.rah_api_key]);
+  }, [user.rah_human_id, user.rah_api_key, user.rah_balance, user.rah_earnings]);
 
-  if (!user.rah_human_id) {
+  if (!user.rah_human_id && !user.rah_api_key) {
     return (
       <div className={`text-xs py-2 px-3 rounded-2xl border border-dashed flex items-center justify-center gap-1.5 font-medium ${
         theme === 'dark' ? 'border-white/10 text-gray-500 bg-white/[0.01]' : 'border-gray-200 text-gray-400 bg-gray-50/50'
       }`}>
         <Sparkles className="w-3.5 h-3.5 opacity-60" />
         <span>{lang === 'ar' ? 'غير متصل بـ RentAHuman' : 'Not Connected'}</span>
+      </div>
+    );
+  }
+
+  if (!user.rah_human_id && user.rah_api_key && (user.rah_balance === undefined || user.rah_balance === null)) {
+    return (
+      <div className={`text-xs py-2 px-3 rounded-2xl border border-dashed flex items-center justify-center gap-1.5 font-medium ${
+        theme === 'dark' ? 'border-purple-500/20 text-purple-400 bg-purple-500/[0.01]' : 'border-purple-200 text-purple-600 bg-purple-50/50'
+      }`}>
+        <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-500" />
+        <span>{lang === 'ar' ? 'بانتظار المزامنة الأولى من الهاتف...' : 'Awaiting first mobile sync...'}</span>
       </div>
     );
   }
