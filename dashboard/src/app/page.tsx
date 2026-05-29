@@ -3396,7 +3396,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
           currentlyDue: (user.ui_settings?.rah?.earnings_offset || user.rah_balance || 0) * 100, // fall back to earnings_offset so pending amounts display automatically!
           transactions: (user.rah_earnings || []).map((tx: any) => ({
             id: tx.id || '',
-            amount: tx.amount * 100, // convert to cents
+            amount: tx.amount, // already in cents in the database!
             type: tx.type || (tx.direction === 'received' ? 'figure_ongoing_payout' : 'transfer'),
             description: tx.description || '',
             createdAt: tx.created_at || tx.timestamp || '',
