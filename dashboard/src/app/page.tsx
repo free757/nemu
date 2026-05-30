@@ -3367,13 +3367,12 @@ function UserTimezoneDisplay({ timezone, small = false }: { timezone: string; sm
           timeZone: timezone.trim(),
           hour: '2-digit',
           minute: '2-digit',
-          second: '2-digit',
           hour12: true
         }).format(new Date()));
       } catch { setTime(''); }
     };
     tick();
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, 10000);
     return () => clearInterval(id);
   }, [timezone]);
 
