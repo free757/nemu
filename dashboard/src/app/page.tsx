@@ -1494,6 +1494,7 @@ export default function Dashboard() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
+            <DashboardLiveClock lang={lang} theme={theme} />
             {activeTab === 'users' && (() => {
               const nm = users.filter(u => !u.is_manager);
               const on = nm.filter(u => isProxyOnline(u)).length;
@@ -3352,6 +3353,56 @@ export default function Dashboard() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// ─── Dashboard Live Header Clock Component ───────────
+function DashboardLiveClock({ lang, theme }: { lang: string; theme: string }) {
+  const [timeStr, setTimeStr] = useState('');
+  const [dateStr, setDateStr] = useState('');
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      try {
+        setTimeStr(now.toLocaleTimeString(lang === 'ar' ? 'ar-EG' : 'en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }));
+        setDateStr(now.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric'
+        }));
+      } catch {
+        setTimeStr('');
+        setDateStr('');
+      }
+    };
+    tick();
+    const id = setInterval(tick, 10000);
+    return () => clearInterval(id);
+  }, [lang]);
+
+  if (!timeStr) return null;
+
+  return (
+    <div className={`hidden sm:flex items-center gap-2.5 px-4 py-2 rounded-2xl border text-xs font-semibold shadow-sm transition-all ${
+      theme === 'dark' 
+        ? 'bg-white/[0.02] border-white/5 text-gray-300' 
+        : 'bg-white border-gray-200 text-gray-700'
+    }`}>
+      <div className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+      </div>
+      <div className="flex items-center gap-1.5 font-mono">
+        <span className="text-gray-400 font-sans">{dateStr}</span>
+        <span className="text-gray-500">•</span>
+        <span className="text-blue-400 font-bold">{timeStr}</span>
+      </div>
     </div>
   );
 }
