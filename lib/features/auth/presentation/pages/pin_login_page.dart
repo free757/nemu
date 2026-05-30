@@ -62,6 +62,24 @@ class _PinLoginPageState extends State<PinLoginPage> {
               if (state is AuthError) {
                 _shakeController.shake();
                 HapticFeedback.heavyImpact();
+                
+                // Show floating premium error snackbar
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      state.message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: Colors.redAccent.withOpacity(0.95),
+                    behavior: SnackBarBehavior.floating,
+                    margin: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    duration: const Duration(seconds: 4),
+                  ),
+                );
+
                 // Clear PIN after shake completes
                 Future.delayed(const Duration(milliseconds: 600), () {
                   setState(() {

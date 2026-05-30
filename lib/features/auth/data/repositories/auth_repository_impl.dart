@@ -43,6 +43,15 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, void>> logout() async {
     try {
+      final jsonString = sharedPreferences.getString('saved_user');
+      if (jsonString != null) {
+        try {
+          final user = UserModel.fromJson(jsonDecode(jsonString));
+          await remoteDataSource.clearDeviceId(user.pin);
+        } catch (_) {
+          // If remote clear fails (e.g. offline), still proceed to log out locally
+        }
+      }
       await sharedPreferences.remove('saved_user');
       return const Right(null);
     } catch (e) {
