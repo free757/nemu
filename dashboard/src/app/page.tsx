@@ -57,6 +57,7 @@ export default function Dashboard() {
   // Notifications state
   const [notifications, setNotifications] = useState<any[]>([]);
   const [expandedNotifications, setExpandedNotifications] = useState<Record<string, boolean>>({});
+  const [editingNotification, setEditingNotification] = useState<any | null>(null);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationFormData, setNotificationFormData] = useState({ title: '', content: '' });
 
@@ -476,13 +477,33 @@ export default function Dashboard() {
       alert(lang === 'ar' ? 'يرجى ملء جميع الحقول!' : 'Please fill all fields!');
       return;
     }
-    const { error } = await supabase.from('notifications').insert([notificationFormData]);
-    if (!error) {
-      setIsNotificationModalOpen(false);
-      setNotificationFormData({ title: '', content: '' });
-      fetchNotifications();
+    
+    if (editingNotification) {
+      const { error } = await supabase
+        .from('notifications')
+        .update({
+          title: notificationFormData.title,
+          content: notificationFormData.content
+        })
+        .eq('id', editingNotification.id);
+        
+      if (!error) {
+        setIsNotificationModalOpen(false);
+        setEditingNotification(null);
+        setNotificationFormData({ title: '', content: '' });
+        fetchNotifications();
+      } else {
+        alert(error.message);
+      }
     } else {
-      alert(error.message);
+      const { error } = await supabase.from('notifications').insert([notificationFormData]);
+      if (!error) {
+        setIsNotificationModalOpen(false);
+        setNotificationFormData({ title: '', content: '' });
+        fetchNotifications();
+      } else {
+        alert(error.message);
+      }
     }
   };
 
@@ -1924,12 +1945,25 @@ export default function Dashboard() {
                           {new Date(notif.created_at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}
                         </span>
                       </div>
-                      <button 
-                        onClick={() => handleDeleteNotification(notif.id)}
-                        className="p-3 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all self-start"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex gap-2 self-start">
+                        <button 
+                          onClick={() => {
+                            setEditingNotification(notif);
+                            setNotificationFormData({ title: notif.title || '', content: notif.content || '' });
+                            setIsNotificationModalOpen(true);
+                          }}
+                          className="p-3 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-xl transition-all"
+                          title={lang === 'ar' ? 'تعديل الإشعار' : 'Edit Notification'}
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteNotification(notif.id)}
+                          className="p-3 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -2725,7 +2759,11 @@ export default function Dashboard() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className={`relative w-full max-w-lg rounded-[2.5rem] border p-8 shadow-2xl ${theme === 'dark' ? 'bg-[#111] border-white/10' : 'bg-white border-gray-200'}`}
             >
-              <h2 className={`text-2xl font-bold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{t.addNotification}</h2>
+              <h2 className={`text-2xl font-bold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {editingNotification 
+                  ? (lang === 'ar' ? 'تعديل الإشعار العام' : 'Edit Global Notification')
+                  : t.addNotification}
+              </h2>
               <form onSubmit={handleNotificationSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-sm text-gray-400 ml-1">{t.notifTitle}</label>
@@ -2751,7 +2789,11 @@ export default function Dashboard() {
                 <div className="flex gap-4 pt-4">
                   <button 
                     type="button"
-                    onClick={() => setIsNotificationModalOpen(false)}
+                    onClick={() => {
+                      setIsNotificationModalOpen(false);
+                      setEditingNotification(null);
+                      setNotificationFormData({ title: '', content: '' });
+                    }}
                     className={`flex-1 px-6 py-4 rounded-2xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
                   >
                     {t.cancel}
@@ -2760,7 +2802,9 @@ export default function Dashboard() {
                     type="submit"
                     className="flex-1 px-6 py-4 bg-blue-600 rounded-2xl font-bold hover:bg-blue-500 transition-all text-white shadow-lg shadow-blue-600/20"
                   >
-                    {t.send}
+                    {editingNotification 
+                      ? (lang === 'ar' ? 'حفظ التعديلات' : 'Save Changes')
+                      : t.send}
                   </button>
                 </div>
               </form>
