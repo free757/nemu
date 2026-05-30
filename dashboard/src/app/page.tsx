@@ -283,6 +283,8 @@ export default function Dashboard() {
   });
 
   const [quickPaste, setQuickPaste] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const handleQuickPasteChange = (value: string) => {
     setQuickPaste(value);
@@ -703,6 +705,8 @@ export default function Dashboard() {
   };
 
   const handleOpenEdit = (user: any) => {
+    setPinError('');
+    setEmailError('');
     setEditingUser(user);
     setQuickPaste('');
     setFormData({
@@ -761,6 +765,8 @@ export default function Dashboard() {
 
   const handleOpenAdd = () => {
     if (activeTab === 'users') {
+      setPinError('');
+      setEmailError('');
       setEditingUser(null);
       setQuickPaste('');
       setFormData({
@@ -908,6 +914,21 @@ export default function Dashboard() {
       rah_api_key: formData.rah_api_key?.trim() || null,
       ui_settings
     };
+
+    // Double check duplicate validation just in case
+    const pinDuplicate = users.find(u => u.pin === formData.pin && (!editingUser || u.id !== editingUser.id));
+    if (pinDuplicate) {
+      alert(lang === 'ar' ? `⚠️ رمز الـ PIN هذا مستخدم بالفعل من قبل الموظف: ${pinDuplicate.username}` : `⚠️ This PIN is already used by: ${pinDuplicate.username}`);
+      return;
+    }
+    if (formData.email?.trim()) {
+      const emailTrimmed = formData.email.trim().toLowerCase();
+      const emailDuplicate = users.find(u => u.email?.trim().toLowerCase() === emailTrimmed && (!editingUser || u.id !== editingUser.id));
+      if (emailDuplicate) {
+        alert(lang === 'ar' ? `⚠️ البريد الإلكتروني مستخدم بالفعل من قبل الموظف: ${emailDuplicate.username}` : `⚠️ This email is already used by: ${emailDuplicate.username}`);
+        return;
+      }
+    }
 
     let error;
     if (editingUser) {
@@ -2850,10 +2871,26 @@ export default function Dashboard() {
                     <input 
                       required
                       value={formData.pin}
-                      onChange={e => setFormData({...formData, pin: e.target.value})}
-                      className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData({...formData, pin: val});
+                        if (!val) {
+                          setPinError('');
+                        } else {
+                          const duplicate = users.find(u => u.pin === val && (!editingUser || u.id !== editingUser.id));
+                          if (duplicate) {
+                            setPinError(lang === 'ar' ? `⚠️ هذا الـ PIN مستخدم بالفعل من قبل الموظف: ${duplicate.username}` : `⚠️ PIN already used by: ${duplicate.username}`);
+                          } else {
+                            setPinError('');
+                          }
+                        }
+                      }}
+                      className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-mono ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'} ${pinError ? 'border-red-500/50 focus:border-red-500' : ''}`}
                       placeholder="4-6 digits"
                     />
+                    {pinError && (
+                      <p className="text-red-500 text-xs ml-1 font-semibold animate-pulse">{pinError}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm text-gray-400 ml-1">{t.phone}</label>
@@ -2892,10 +2929,27 @@ export default function Dashboard() {
                       <input 
                         type="email"
                         value={formData.email}
-                        onChange={e => setFormData({...formData, email: e.target.value})}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setFormData({...formData, email: val});
+                          const trimmed = val.trim().toLowerCase();
+                          if (!trimmed) {
+                            setEmailError('');
+                          } else {
+                            const duplicate = users.find(u => u.email?.trim().toLowerCase() === trimmed && (!editingUser || u.id !== editingUser.id));
+                            if (duplicate) {
+                              setEmailError(lang === 'ar' ? `⚠️ البريد الإلكتروني مستخدم بالفعل من قبل الموظف: ${duplicate.username}` : `⚠️ Email already used by: ${duplicate.username}`);
+                            } else {
+                              setEmailError('');
+                            }
+                          }
+                        }}
+                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'} ${emailError ? 'border-red-500/50 focus:border-red-500' : ''}`}
                         placeholder="username@outlook.com / company.com"
                       />
+                      {emailError && (
+                        <p className="text-red-500 text-xs ml-1 font-semibold animate-pulse">{emailError}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
@@ -3085,7 +3139,12 @@ export default function Dashboard() {
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 px-6 py-4 bg-blue-600 rounded-2xl font-bold hover:bg-blue-500 transition-all text-white"
+                    disabled={!!pinError || !!emailError}
+                    className={`flex-1 px-6 py-4 rounded-2xl font-bold transition-all text-white ${
+                      (pinError || emailError)
+                        ? 'bg-gray-600/50 text-gray-400 opacity-50 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-500'
+                    }`}
                   >
                     {editingUser ? t.save : t.createBtn}
                   </button>
