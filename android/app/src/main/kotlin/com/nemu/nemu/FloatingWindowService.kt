@@ -661,7 +661,9 @@ class FloatingWindowService : Service() {
             val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
             calendar.add(Calendar.HOUR_OF_DAY, 3) // Egypt Time is UTC + 3
             
-            val sdf = SimpleDateFormat("h:mm", Locale.US)
+            val sdf = SimpleDateFormat("h:mm", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
             val timeStr = sdf.format(calendar.time)
             
             bubbleTextView?.text = timeStr
