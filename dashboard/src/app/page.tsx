@@ -1321,6 +1321,7 @@ export default function Dashboard() {
 
   const filteredUsers = users.filter(user => 
     user.username?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    user.email?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     user.pin?.includes(searchQuery)
   ).sort((a, b) => {
     // 1. Manager check: managers always first
