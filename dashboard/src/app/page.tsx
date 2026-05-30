@@ -24,6 +24,8 @@ import {
   MapPin,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Menu,
   Bot,
   Upload,
@@ -54,6 +56,7 @@ export default function Dashboard() {
 
   // Notifications state
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [expandedNotifications, setExpandedNotifications] = useState<Record<string, boolean>>({});
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationFormData, setNotificationFormData] = useState({ title: '', content: '' });
 
@@ -1874,28 +1877,61 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {notifications.map((notif) => (
-                  <div key={notif.id} className={`p-6 rounded-3xl border flex justify-between items-start gap-4 transition-all hover:scale-[1.01] ${theme === 'dark' ? 'bg-[#111] border-white/5 hover:border-white/10' : 'bg-white border-gray-200 hover:shadow-lg'}`}>
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-600/10 text-blue-500 rounded-lg flex items-center justify-center">
-                          <Bell className="w-4 h-4" />
-                        </div>
-                        <h4 className="text-lg font-bold">{notif.title}</h4>
-                      </div>
-                      <p className="text-gray-400 text-sm md:text-base whitespace-pre-wrap">{notif.content}</p>
-                      <span className="text-xs text-gray-500 block">
-                        {new Date(notif.created_at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}
-                      </span>
-                    </div>
-                    <button 
-                      onClick={() => handleDeleteNotification(notif.id)}
-                      className="p-3 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                {notifications.map((notif) => {
+                  const isExpanded = expandedNotifications[notif.id] || false;
+                  const isLong = notif.content && notif.content.length > 160;
+                  return (
+                    <motion.div 
+                      layout
+                      key={notif.id} 
+                      className={`p-6 rounded-3xl border flex justify-between items-start gap-4 transition-all ${theme === 'dark' ? 'bg-[#111] border-white/5 hover:border-white/10' : 'bg-white border-gray-200 hover:shadow-lg'}`}
                     >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-600/10 text-blue-500 rounded-lg flex items-center justify-center">
+                            <Bell className="w-4 h-4" />
+                          </div>
+                          <h4 className="text-lg font-bold">{notif.title}</h4>
+                        </div>
+                        <motion.p 
+                          layout
+                          className="text-gray-400 text-sm md:text-base whitespace-pre-wrap leading-relaxed"
+                        >
+                          {isLong && !isExpanded
+                            ? notif.content.slice(0, 160) + '...'
+                            : notif.content}
+                        </motion.p>
+                        {isLong && (
+                          <button
+                            onClick={() => setExpandedNotifications(prev => ({ ...prev, [notif.id]: !prev[notif.id] }))}
+                            className="text-xs font-bold text-blue-500 hover:text-blue-400 flex items-center gap-1 mt-1 transition-all px-2.5 py-1 rounded-lg bg-blue-500/5 hover:bg-blue-500/10 self-start"
+                          >
+                            {isExpanded ? (
+                              <>
+                                {lang === 'ar' ? 'عرض أقل' : 'Show Less'}
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              </>
+                            ) : (
+                              <>
+                                {lang === 'ar' ? 'عرض المزيد' : 'Show More'}
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </>
+                            )}
+                          </button>
+                        )}
+                        <span className="text-xs text-gray-500 block pt-1">
+                          {new Date(notif.created_at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteNotification(notif.id)}
+                        className="p-3 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all self-start"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </div>
