@@ -749,7 +749,8 @@ export default function Dashboard() {
         email: '', password: '', verification_code: '',
         rah_human_id: '', rah_api_key: '',
         rah_hours_offset: '', rah_earnings_offset: '', rah_rate_override: '',
-        rah_egp_rate: '', rah_exchange_rate: ''
+        rah_egp_rate: '', rah_exchange_rate: '',
+        rah_usd_payout_unit: '', rah_egp_payout_unit: ''
       });
       setIsModalOpen(true);
     } else {
