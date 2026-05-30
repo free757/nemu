@@ -3906,7 +3906,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
               </div>
 
               {/* EGP Accounting & Net Profit Calculator */}
-              {egpRate > 0 && (
+              {totalEarnings > 0 && (
                 <div className={`p-5 rounded-3xl border mb-6 bg-gradient-to-br from-emerald-500/10 to-blue-500/10 ${theme === 'dark' ? 'border-emerald-500/20' : 'border-emerald-200'}`}>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs text-emerald-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
