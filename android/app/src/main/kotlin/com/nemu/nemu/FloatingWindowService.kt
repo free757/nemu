@@ -21,6 +21,10 @@ import android.view.*
 import android.widget.*
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
+import java.util.Calendar
+import java.util.TimeZone
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class FloatingWindowService : Service() {
 
@@ -40,6 +44,7 @@ class FloatingWindowService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var bubbleView: FrameLayout? = null
+    private var bubbleTextView: TextView? = null
     private var panelView: FrameLayout? = null
     private var containerHolder: FrameLayout? = null
  
@@ -48,6 +53,14 @@ class FloatingWindowService : Service() {
         override fun run() {
             checkNativeVpnStatus()
             vpnCheckHandler.postDelayed(this, 3000) // check every 3 seconds
+        }
+    }
+
+    private val clockHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val clockRunnable = object : Runnable {
+        override fun run() {
+            updateClockTime()
+            clockHandler.postDelayed(this, 5000) // update every 5 seconds for ultimate accuracy
         }
     }
 
@@ -73,6 +86,7 @@ class FloatingWindowService : Service() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForegroundWithNotification()
         vpnCheckHandler.post(vpnCheckRunnable)
+        clockHandler.post(clockRunnable)
     }
 
     private fun startForegroundWithNotification() {
@@ -155,14 +169,17 @@ class FloatingWindowService : Service() {
         }
         bubbleView?.background = shape
 
-        // Main text "N" inside bubble
+        // Main text clock instead of "N" inside bubble
         val textView = TextView(this).apply {
-            text = "N"
+            text = "--:--"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
         }
+        bubbleTextView = textView
+        updateClockTime() // set correct Cairo time immediately
+
         val textParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -639,10 +656,25 @@ class FloatingWindowService : Service() {
         }
     }
 
+    private fun updateClockTime() {
+        try {
+            val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+            calendar.add(Calendar.HOUR_OF_DAY, 3) // Egypt Time is UTC + 3
+            
+            val sdf = SimpleDateFormat("h:mm", Locale.US)
+            val timeStr = sdf.format(calendar.time)
+            
+            bubbleTextView?.text = timeStr
+        } catch (e: Exception) {
+            bubbleTextView?.text = "N"
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         vpnCheckHandler.removeCallbacks(vpnCheckRunnable)
+        clockHandler.removeCallbacks(clockRunnable)
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         panelView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
     }
