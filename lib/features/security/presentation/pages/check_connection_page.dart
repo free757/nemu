@@ -21,7 +21,7 @@ import 'package:nemu/core/utils/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nemu/core/services/rentahuman_sync_service.dart';
 
-final ValueNotifier<bool> showOverlayNotifier = ValueNotifier<bool>(true);
+final ValueNotifier<bool> showOverlayNotifier = ValueNotifier<bool>(false);
 
 class CheckConnectionPage extends StatelessWidget {
   const CheckConnectionPage({super.key});
@@ -56,7 +56,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
   StreamSubscription<List<Map<String, dynamic>>>? _notificationsSubscription;
   List<Map<String, dynamic>> _notifications = [];
   int _lastSeenCount = 0;
-  bool _showOverlay = true;
+  bool _showOverlay = false;
 
   @override
   void initState() {
@@ -68,7 +68,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
 
   Future<void> _loadOverlayPreference() async {
     final prefs = await SharedPreferences.getInstance();
-    final showOverlayPref = prefs.getBool('show_floating_overlay') ?? true;
+    final showOverlayPref = prefs.getBool('show_floating_overlay') ?? false;
     showOverlayNotifier.value = showOverlayPref;
     if (mounted) {
       setState(() {
