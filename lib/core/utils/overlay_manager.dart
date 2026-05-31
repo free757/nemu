@@ -73,4 +73,21 @@ class OverlayManager {
       return false;
     }
   }
+
+  static Future<bool> isExternalCameraConnected() async {
+    try {
+      final bool? connected = await _channel.invokeMethod('isExternalCameraConnected');
+      return connected ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<void> openSettings() async {
+    try {
+      await _channel.invokeMethod('openSettings');
+    } catch (e) {
+      // Ignore
+    }
+  }
 }

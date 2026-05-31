@@ -94,6 +94,33 @@ class MainActivity : FlutterActivity() {
                         result.success(false)
                     }
                 }
+                "isExternalCameraConnected" -> {
+                    val usbManager = getSystemService(Context.USB_SERVICE) as android.hardware.usb.UsbManager
+                    val deviceList = usbManager.deviceList
+                    var cameraFound = false
+                    
+                    for (device in deviceList.values) {
+                        if (device.deviceClass == 14 || device.deviceClass == 239) {
+                            cameraFound = true
+                            break
+                        }
+                        for (i in 0 until device.interfaceCount) {
+                            val usbInterface = device.getInterface(i)
+                            if (usbInterface.interfaceClass == 14) {
+                                cameraFound = true
+                                break
+                            }
+                        }
+                    }
+                    result.success(cameraFound)
+                }
+                "openSettings" -> {
+                    val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }
