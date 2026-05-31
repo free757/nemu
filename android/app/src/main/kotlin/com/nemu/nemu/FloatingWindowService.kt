@@ -21,6 +21,10 @@ import android.view.*
 import android.widget.*
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.AbsoluteSizeSpan
+import android.text.style.ForegroundColorSpan
 import java.util.Calendar
 import java.util.TimeZone
 import java.text.SimpleDateFormat
@@ -173,9 +177,10 @@ class FloatingWindowService : Service() {
         val textView = TextView(this).apply {
             text = "--:--"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
+            setLineSpacing(0f, 0.82f) // beautiful snug spacing for 2-line layout
         }
         bubbleTextView = textView
         updateClockTime() // set correct Cairo time immediately
@@ -661,12 +666,44 @@ class FloatingWindowService : Service() {
             val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
             calendar.add(Calendar.HOUR_OF_DAY, 3) // Egypt Time is UTC + 3
             
-            val sdf = SimpleDateFormat("h:mm", Locale.US).apply {
+            val timeSdf = SimpleDateFormat("h:mm", Locale.US).apply {
                 timeZone = TimeZone.getTimeZone("UTC")
             }
-            val timeStr = sdf.format(calendar.time)
+            val amPmSdf = SimpleDateFormat("a", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
             
-            bubbleTextView?.text = timeStr
+            val timeStr = timeSdf.format(calendar.time)
+            val amPmStr = amPmSdf.format(calendar.time)
+            
+            val fullText = "$timeStr\n$amPmStr"
+            val spannable = SpannableString(fullText)
+            
+            // Set time size to 14sp with bold spacing
+            spannable.setSpan(
+                AbsoluteSizeSpan(14, true),
+                0,
+                timeStr.length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            
+            // Set AM/PM size to 8sp and color to cool light gray
+            val amPmStart = timeStr.length + 1
+            val amPmEnd = fullText.length
+            spannable.setSpan(
+                AbsoluteSizeSpan(8, true),
+                amPmStart,
+                amPmEnd,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            spannable.setSpan(
+                ForegroundColorSpan(Color.parseColor("#9CA3AF")),
+                amPmStart,
+                amPmEnd,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            
+            bubbleTextView?.text = spannable
         } catch (e: Exception) {
             bubbleTextView?.text = "N"
         }
