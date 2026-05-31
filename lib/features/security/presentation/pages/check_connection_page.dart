@@ -403,6 +403,8 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                               const SizedBox(height: 12),
                               _buildOverlayToggleCard(),
                               const SizedBox(height: 12),
+                              _buildCredentialsCard(context, user),
+                              const SizedBox(height: 12),
                               _buildShareAppCard(context),
                               const SizedBox(height: 20),
                               _buildProxyCard(context, user),
@@ -562,6 +564,345 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCredentialsCard(BuildContext context, user) {
+    return Card(
+      color: Colors.white.withOpacity(0.05),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _showCredentialsBottomSheet(context, user),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.amberAccent.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.security, color: Colors.amberAccent, size: 24),
+                  ),
+                  const SizedBox(width: 15),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "بيانات الحساب ورمز التحقق",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "عرض ونسخ البريد، كلمة المرور، والرمز السري",
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.4)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCredentialsBottomSheet(BuildContext context, user) {
+    String emailVal = user.email ?? '';
+    String passwordVal = user.password ?? '';
+    String codeVal = user.verificationCode ?? user.pin;
+    bool isPasswordVisible = false;
+    bool isLoading = true;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF16161A),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            if (isLoading) {
+              isLoading = false;
+              Supabase.instance.client
+                  .from('app_users')
+                  .select()
+                  .eq('id', user.id)
+                  .single()
+                  .then((response) {
+                final freshUser = UserModel.fromJson(response);
+                if (context.mounted) {
+                  context.read<AuthCubit>().updateUserInfo(freshUser);
+                  setState(() {
+                    emailVal = freshUser.email ?? '';
+                    passwordVal = freshUser.password ?? '';
+                    codeVal = freshUser.verificationCode ?? freshUser.pin;
+                  });
+                }
+              }).catchError((_) {});
+            }
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16161A),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Center(
+                    child: Icon(Icons.vpn_key, size: 36, color: Colors.amberAccent),
+                  ),
+                  const SizedBox(height: 10),
+                  const Center(
+                    child: Text(
+                      "بيانات الاعتماد ورمز التحقق",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Center(
+                    child: Text(
+                      "استخدم هذه البيانات لتسجيل الدخول في منصات العمل",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    "البريد الإلكتروني",
+                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.email_outlined, color: Colors.amberAccent, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SelectableText(
+                            emailVal,
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: emailVal));
+                            HapticFeedback.lightImpact();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("تم نسخ البريد الإلكتروني! 📋"),
+                                backgroundColor: Colors.amber,
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.copy, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "كلمة المرور",
+                    style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.lock_outline, color: Colors.amberAccent, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SelectableText(
+                            isPasswordVisible ? passwordVal : '••••••••••••',
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              isPasswordVisible = !isPasswordVisible;
+                            });
+                            HapticFeedback.lightImpact();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: passwordVal));
+                            HapticFeedback.lightImpact();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("تم نسخ كلمة المرور! 🔑"),
+                                backgroundColor: Colors.amber,
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.copy, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.amberAccent.withOpacity(0.1),
+                          Colors.orangeAccent.withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.amberAccent.withOpacity(0.15)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.timer_outlined, color: Colors.amberAccent, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              "رمز التحقق النشط (LIVE PIN)",
+                              style: TextStyle(
+                                color: Colors.amberAccent.withOpacity(0.8),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              codeVal,
+                              style: const TextStyle(
+                                color: Colors.amberAccent,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 3,
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: codeVal));
+                                HapticFeedback.mediumImpact();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("تم نسخ رمز التحقق بنجاح! ⏱️"),
+                                    backgroundColor: Colors.amber,
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.amberAccent.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.copy, color: Colors.amberAccent, size: 18),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "هذا الرمز يتطابق تلقائياً مع توقيت القاهرة لتأمين عملية تسجيل الدخول الخاصة بك.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("إغلاق النافذة", style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amberAccent,
+                      foregroundColor: const Color(0xFF16161A),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
