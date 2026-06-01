@@ -420,13 +420,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                             children: [
                               _buildUserCard(user),
                               const SizedBox(height: 12),
-                              _buildOverlayToggleCard(),
-                              const SizedBox(height: 12),
-                              _buildCredentialsCard(context, user),
-                              const SizedBox(height: 12),
-                              _buildWebcamStatusCard(context),
-                              const SizedBox(height: 12),
-                              _buildShareAppCard(context),
+                              _buildQuickActionsGrid(context, user),
                               const SizedBox(height: 20),
                               _buildProxyCard(context, user),
                               const SizedBox(height: 30),
@@ -542,92 +536,144 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
     );
   }
 
-  Widget _buildOverlayToggleCard() {
-    return Card(
-      color: Colors.white.withOpacity(0.05),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildQuickActionsGrid(BuildContext context, user) {
+    final statusColor = _isWebcamConnected ? Colors.greenAccent : Colors.orangeAccent;
+    final statusIcon = _isWebcamConnected ? Icons.videocam : Icons.videocam_off_outlined;
+
+    return Column(
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.15),
-                    shape: BoxShape.circle,
+            Expanded(
+              child: _buildGridItem(
+                icon: Icons.layers,
+                iconColor: Colors.blueAccent,
+                title: "الزر العائم",
+                onTap: () {
+                  _toggleOverlay(!_showOverlay);
+                  HapticFeedback.lightImpact();
+                },
+                trailing: SizedBox(
+                  height: 30,
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: Switch(
+                      value: _showOverlay,
+                      onChanged: _toggleOverlay,
+                      activeColor: Colors.blueAccent,
+                    ),
                   ),
-                  child: const Icon(Icons.layers, color: Colors.blueAccent, size: 24),
                 ),
-                const SizedBox(width: 15),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "الزر العائم",
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    Text(
-                      "عرض رمز التحقق على الشاشة الرئيسية",
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-            Switch(
-              value: _showOverlay,
-              onChanged: _toggleOverlay,
-              activeColor: Colors.blueAccent,
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildGridItem(
+                icon: Icons.security,
+                iconColor: Colors.amberAccent,
+                title: "بيانات الحساب",
+                onTap: () => _showCredentialsBottomSheet(context, user),
+                trailing: const Padding(
+                  padding: EdgeInsets.only(top: 8.0),
+                  child: Icon(Icons.arrow_forward_ios, size: 12, color: Colors.white38),
+                ),
+              ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildGridItem(
+                icon: statusIcon,
+                iconColor: statusColor,
+                title: "كاميرا الويب",
+                onTap: () {
+                  if (_isWebcamConnected) {
+                    HapticFeedback.lightImpact();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("الكاميرا متصلة وتعمل بنجاح! جاهزة للعمل 🟢🎥"),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else {
+                    _showWebcamHelpBottomSheet(context);
+                  }
+                },
+                trailing: Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _isWebcamConnected ? "متصلة" : "غير نشطة",
+                    style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildGridItem(
+                icon: Icons.qr_code_2,
+                iconColor: Colors.greenAccent,
+                title: "تثبيت ومشاركة",
+                onTap: () => _showShareBottomSheet(context),
+                trailing: const Padding(
+                  padding: EdgeInsets.only(top: 8.0),
+                  child: Icon(Icons.arrow_forward_ios, size: 12, color: Colors.white38),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildCredentialsCard(BuildContext context, user) {
+  Widget _buildGridItem({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required VoidCallback onTap,
+    Widget? trailing,
+  }) {
     return Card(
+      margin: EdgeInsets.zero,
       color: Colors.white.withOpacity(0.05),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => _showCredentialsBottomSheet(context, user),
+        onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 14.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.amberAccent.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.security, color: Colors.amberAccent, size: 24),
-                  ),
-                  const SizedBox(width: 15),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "بيانات الحساب ورمز التحقق",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        "عرض ونسخ البريد، كلمة المرور، والرمز السري",
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
-              Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.4)),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              if (trailing != null) trailing,
             ],
           ),
         ),
@@ -927,86 +973,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
     );
   }
 
-  Widget _buildWebcamStatusCard(BuildContext context) {
-    final statusColor = _isWebcamConnected ? Colors.greenAccent : Colors.orangeAccent;
-    final statusBgColor = _isWebcamConnected ? Colors.greenAccent.withOpacity(0.12) : Colors.orangeAccent.withOpacity(0.12);
-    final statusIcon = _isWebcamConnected ? Icons.videocam : Icons.videocam_off_outlined;
 
-    return Card(
-      color: Colors.white.withOpacity(0.05),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          if (_isWebcamConnected) {
-            HapticFeedback.lightImpact();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("الكاميرا متصلة وتعمل بنجاح! جاهزة للعمل 🟢🎥"),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else {
-            _showWebcamHelpBottomSheet(context);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: statusBgColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(statusIcon, color: statusColor, size: 24),
-                  ),
-                  const SizedBox(width: 15),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            "كاميرا الويب الخارجية",
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              _isWebcamConnected ? "متصلة" : "غير نشطة",
-                              style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _isWebcamConnected 
-                            ? "الكاميرا نشطة وجاهزة تماماً للاستخدام" 
-                            : "اضغط هنا لفتح مساعد التوصيل وتفعيل الـ OTG",
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.4)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   void _showWebcamHelpBottomSheet(BuildContext context) {
     showModalBottomSheet(
@@ -1184,52 +1151,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
     );
   }
 
-  Widget _buildShareAppCard(BuildContext context) {
-    return Card(
-      color: Colors.white.withOpacity(0.05),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _showShareBottomSheet(context),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.qr_code_2, color: Colors.greenAccent, size: 24),
-                  ),
-                  const SizedBox(width: 15),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "مشاركة وتثبيت التطبيق",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        "تحميل APK مباشر عبر كود QR أو رابط مشاركة",
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.4)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+
 
   void _showShareBottomSheet(BuildContext context) {
     final appUpdateState = context.read<AppUpdateCubit>().state;
@@ -1464,7 +1386,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                      child: Text("Connected Successfully ✅", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
                    ),
                 if (isLoaded) ...[
-                  if ((state as SecurityLoaded).status.timezoneMismatch)
+                  if (isConnected && (state as SecurityLoaded).status.timezoneMismatch)
                     Padding(
                       padding: const EdgeInsets.only(top: 15),
                       child: Container(
@@ -1583,8 +1505,15 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
   }
 }
 
-class ProjectButtonsSection extends StatelessWidget {
+class ProjectButtonsSection extends StatefulWidget {
   const ProjectButtonsSection({super.key});
+
+  @override
+  State<ProjectButtonsSection> createState() => _ProjectButtonsSectionState();
+}
+
+class _ProjectButtonsSectionState extends State<ProjectButtonsSection> {
+  String? _loadingProjectId;
 
   @override
   Widget build(BuildContext context) {
@@ -1652,79 +1581,96 @@ class ProjectButtonsSection extends StatelessWidget {
                     }
                     return p.isVisible;
                   }).map((project) {
+                    final bool isLoading = _loadingProjectId == project.id;
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 15),
                       child: InkWell(
-                        onTap: () async {
-                          final hasAndroidPackage = project.androidPackageName != null && project.androidPackageName!.isNotEmpty;
-                          final hasIosScheme = project.iosUrlScheme != null && project.iosUrlScheme!.isNotEmpty;
-                          
-                          if (hasAndroidPackage || hasIosScheme) {
-                            final authState = context.read<AuthCubit>().state;
-                            if (authState is AuthAuthenticated) {
-                              final hasPermission = await OverlayManager.checkPermission();
-                              if (!hasPermission) {
-                                await OverlayManager.requestPermission();
-                              }
-                              
-                              final securityCubit = context.read<SecurityCubit>();
-                              final proxyStatusStr = securityCubit.vpnStatusNotifier.value == 'CONNECTED' ? 'active' : 'inactive';
-
-                              String emailVal = authState.user.email ?? '';
-                              String passwordVal = authState.user.password ?? '';
-                              String codeVal = authState.user.verificationCode ?? authState.user.pin;
-
-                              // Fetch live, real-time user credentials from the database before showing the overlay
-                              try {
-                                final response = await Supabase.instance.client
-                                    .from('app_users')
-                                    .select()
-                                    .eq('id', authState.user.id)
-                                    .single();
-                                final freshUser = UserModel.fromJson(response);
-                                emailVal = freshUser.email ?? '';
-                                passwordVal = freshUser.password ?? '';
-                                codeVal = freshUser.verificationCode ?? freshUser.pin;
+                        onTap: (_loadingProjectId != null) ? null : () async {
+                          setState(() {
+                            _loadingProjectId = project.id;
+                          });
+                          try {
+                            final hasAndroidPackage = project.androidPackageName != null && project.androidPackageName!.isNotEmpty;
+                            final hasIosScheme = project.iosUrlScheme != null && project.iosUrlScheme!.isNotEmpty;
+                            
+                            if (hasAndroidPackage || hasIosScheme) {
+                              final authState = context.read<AuthCubit>().state;
+                              if (authState is AuthAuthenticated) {
+                                final hasPermission = await OverlayManager.checkPermission();
+                                if (!hasPermission) {
+                                  await OverlayManager.requestPermission();
+                                }
                                 
-                                // Sync local memory state
-                                context.read<AuthCubit>().updateUserInfo(freshUser);
-                              } catch (e) {
-                                // Fail gracefully to cached values if network issues occur
+                                final securityCubit = context.read<SecurityCubit>();
+                                final proxyStatusStr = securityCubit.vpnStatusNotifier.value == 'CONNECTED' ? 'active' : 'inactive';
+
+                                String emailVal = authState.user.email ?? '';
+                                String passwordVal = authState.user.password ?? '';
+                                String codeVal = authState.user.verificationCode ?? authState.user.pin;
+
+                                // Fetch live, real-time user credentials from the database before showing the overlay
+                                try {
+                                  final response = await Supabase.instance.client
+                                      .from('app_users')
+                                      .select()
+                                      .eq('id', authState.user.id)
+                                      .single();
+                                  final freshUser = UserModel.fromJson(response);
+                                  emailVal = freshUser.email ?? '';
+                                  passwordVal = freshUser.password ?? '';
+                                  codeVal = freshUser.verificationCode ?? freshUser.pin;
+                                  
+                                  // Sync local memory state
+                                  if (mounted) {
+                                    context.read<AuthCubit>().updateUserInfo(freshUser);
+                                  }
+                                } catch (e) {
+                                  // Fail gracefully to cached values if network issues occur
+                                }
+
+                                await OverlayManager.showOverlay(
+                                  email: emailVal,
+                                  password: passwordVal,
+                                  code: codeVal,
+                                  proxyStatus: proxyStatusStr,
+                                );
                               }
 
-                              await OverlayManager.showOverlay(
-                                email: emailVal,
-                                password: passwordVal,
-                                code: codeVal,
-                                proxyStatus: proxyStatusStr,
+                              await LaunchApp.openApp(
+                                androidPackageName: project.androidPackageName,
+                                iosUrlScheme: project.iosUrlScheme,
+                                appStoreLink: project.appStoreLink,
+                                openStore: true,
                               );
-                            }
+                            } else {
+                              String? userEmail;
+                              String? userPassword;
+                              final authState = context.read<AuthCubit>().state;
+                              if (authState is AuthAuthenticated) {
+                                userEmail = authState.user.email;
+                                userPassword = authState.user.password;
+                              }
 
-                            await LaunchApp.openApp(
-                              androidPackageName: project.androidPackageName,
-                              iosUrlScheme: project.iosUrlScheme,
-                              appStoreLink: project.appStoreLink,
-                              openStore: true,
-                            );
-                          } else {
-                            String? userEmail;
-                            String? userPassword;
-                            final authState = context.read<AuthCubit>().state;
-                            if (authState is AuthAuthenticated) {
-                              userEmail = authState.user.email;
-                              userPassword = authState.user.password;
+                              if (mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => WebViewPage(
+                                      config: project,
+                                      autoEmail: userEmail,
+                                      autoPassword: userPassword,
+                                    ),
+                                  ),
+                                );
+                              }
                             }
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => WebViewPage(
-                                  config: project,
-                                  autoEmail: userEmail,
-                                  autoPassword: userPassword,
-                                ),
-                              ),
-                            );
+                          } finally {
+                            if (mounted) {
+                              setState(() {
+                                _loadingProjectId = null;
+                              });
+                            }
                           }
                         },
                         child: Container(
@@ -1744,7 +1690,16 @@ class ProjectButtonsSection extends StatelessWidget {
                               const SizedBox(width: 15),
                               Text(project.name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                               const Spacer(),
-                              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white38),
+                              isLoading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                                      ),
+                                    )
+                                  : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white38),
                             ],
                           ),
                         ),
