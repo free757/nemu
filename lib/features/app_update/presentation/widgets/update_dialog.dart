@@ -214,7 +214,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                 if (!widget.updateInfo.forceUpdate)
                                   TextButton.icon(
                                     style: TextButton.styleFrom(
-                                      foregroundColor: Colors.white50,
+                                      foregroundColor: Colors.white60,
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     ),
                                     onPressed: () => Navigator.pop(context),
