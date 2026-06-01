@@ -5,6 +5,7 @@ import 'features/security/presentation/pages/check_connection_page.dart';
 import 'features/auth/presentation/pages/pin_login_page.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +18,12 @@ void main() async {
 
   // Initialize Dependency Injection
   await di.init();
+
+  // Load overlay preference before launching App UI to avoid race condition state mismatch
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    showOverlayNotifier.value = prefs.getBool('show_floating_overlay') ?? false;
+  } catch (_) {}
 
   runApp(const NemuApp());
 }

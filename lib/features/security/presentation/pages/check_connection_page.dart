@@ -59,7 +59,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
   StreamSubscription<List<Map<String, dynamic>>>? _notificationsSubscription;
   List<Map<String, dynamic>> _notifications = [];
   int _lastSeenCount = 0;
-  bool _showOverlay = false;
+  bool _showOverlay = showOverlayNotifier.value;
   bool _isWebcamConnected = false;
   Timer? _webcamCheckTimer;
 
