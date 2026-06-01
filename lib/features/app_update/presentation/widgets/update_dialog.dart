@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/overlay_manager.dart';
 import '../../domain/entities/app_update_info.dart';
 
-class UpdateDialog extends StatelessWidget {
+class UpdateDialog extends StatefulWidget {
   final AppUpdateInfo updateInfo;
   final String currentVersion;
 
@@ -14,12 +14,19 @@ class UpdateDialog extends StatelessWidget {
     required this.currentVersion,
   });
 
+  @override
+  State<UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<UpdateDialog> {
+  bool _isDownloading = false;
+
   Future<void> _launchDownload() async {
     if (Platform.isAndroid) {
-      final success = await OverlayManager.downloadAndInstallApk(updateInfo.downloadUrl);
+      final success = await OverlayManager.downloadAndInstallApk(widget.updateInfo.downloadUrl);
       if (!success) {
-        // Fallback to launching in browser if direct background download failed (e.g. permission or system DownloadManager disabled)
-        final Uri url = Uri.parse(updateInfo.downloadUrl);
+        // Fallback to launching in browser if direct background download failed
+        final Uri url = Uri.parse(widget.updateInfo.downloadUrl);
         try {
           if (await canLaunchUrl(url)) {
             await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -27,7 +34,7 @@ class UpdateDialog extends StatelessWidget {
         } catch (_) {}
       }
     } else {
-      final Uri url = Uri.parse(updateInfo.downloadUrl);
+      final Uri url = Uri.parse(widget.updateInfo.downloadUrl);
       try {
         if (await canLaunchUrl(url)) {
           await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -80,21 +87,27 @@ class UpdateDialog extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.blueAccent.withOpacity(0.1),
+                        color: _isDownloading
+                            ? Colors.greenAccent.withOpacity(0.1)
+                            : Colors.blueAccent.withOpacity(0.1),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                        border: Border.all(
+                          color: _isDownloading
+                              ? Colors.greenAccent.withOpacity(0.3)
+                              : Colors.blueAccent.withOpacity(0.3),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.system_update_alt,
-                        color: Colors.blueAccent,
+                      child: Icon(
+                        _isDownloading ? Icons.cloud_download : Icons.system_update_alt,
+                        color: _isDownloading ? Colors.greenAccent : Colors.blueAccent,
                         size: 40,
                       ),
                     ),
                     const SizedBox(height: 20),
                     // Title
-                    const Text(
-                      "تحديث جديد متاح! 🎉",
-                      style: TextStyle(
+                    Text(
+                      _isDownloading ? "جاري التحميل... 📥" : "تحديث جديد متاح! 🎉",
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -104,7 +117,9 @@ class UpdateDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "نسخة جديدة من التطبيق متوفرة للتحميل الآن.",
+                      _isDownloading
+                          ? "يتم الآن تحميل حزمة التثبيت الخاصة بالتطبيق."
+                          : "نسخة جديدة من التطبيق متوفرة للتحميل الآن.",
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
                         fontSize: 14,
@@ -123,15 +138,15 @@ class UpdateDialog extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildVersionColumn("الإصدار الحالي", currentVersion, Colors.white60),
+                          _buildVersionColumn("الإصدار الحالي", widget.currentVersion, Colors.white60),
                           Container(width: 1, height: 30, color: Colors.white12),
-                          _buildVersionColumn("الإصدار الجديد", updateInfo.latestVersion, Colors.greenAccent),
+                          _buildVersionColumn("الإصدار الجديد", widget.updateInfo.latestVersion, Colors.greenAccent),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
                     // Changelog Section
-                    if (updateInfo.changelog.isNotEmpty) ...[
+                    if (!_isDownloading && widget.updateInfo.changelog.isNotEmpty) ...[
                       Align(
                         alignment: Alignment.centerRight,
                         child: Text(
@@ -155,7 +170,7 @@ class UpdateDialog extends StatelessWidget {
                         child: SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
                           child: Text(
-                            updateInfo.changelog,
+                            widget.updateInfo.changelog,
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.8),
                               fontSize: 13,
@@ -167,62 +182,115 @@ class UpdateDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
                     ],
-                    // Action Buttons
-                    Row(
-                      children: [
-                        if (!updateInfo.forceUpdate)
-                          Expanded(
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                              ),
-                              onPressed: () => Navigator.pop(context),
-                              child: Text(
-                                "لاحقاً",
-                                style: TextStyle(color: Colors.white.withOpacity(0.8)),
-                              ),
-                            ),
-                          ),
-                        if (!updateInfo.forceUpdate) const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueAccent,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              elevation: 2,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            onPressed: () {
-                              _launchDownload();
-                              if (!updateInfo.forceUpdate) {
-                                Navigator.pop(context);
-                              }
-                            },
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                    // Action / Downloading Area with Smooth Animation
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _isDownloading
+                          ? Column(
+                              key: const ValueKey('loading_state'),
                               children: [
-                                Icon(Icons.download, size: 18),
-                                SizedBox(width: 8),
+                                const SizedBox(height: 10),
+                                const SizedBox(
+                                  width: 45,
+                                  height: 45,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+                                    strokeWidth: 3.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  "جاري بدء تنزيل التحديث...",
+                                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 6),
                                 Text(
-                                  "تحديث الآن",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
+                                  "يرجى سحب لوحة الإشعارات لمشاهدة تقدم التحميل.",
+                                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                if (!widget.updateInfo.forceUpdate)
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white50,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    ),
+                                    onPressed: () => Navigator.pop(context),
+                                    icon: const Icon(Icons.open_in_new, size: 14),
+                                    label: const Text(
+                                      "المتابعة في الخلفية",
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : Row(
+                              key: const ValueKey('buttons_state'),
+                              children: [
+                                if (!widget.updateInfo.forceUpdate)
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(15),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                      ),
+                                      onPressed: () => Navigator.pop(context),
+                                      child: Text(
+                                        "لاحقاً",
+                                        style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                                      ),
+                                    ),
+                                  ),
+                                if (!widget.updateInfo.forceUpdate) const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blueAccent,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      elevation: 2,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                    onPressed: () async {
+                                      setState(() {
+                                        _isDownloading = true;
+                                      });
+                                      await _launchDownload();
+                                      // If optional update, close after a delay to give them feedback
+                                      if (!widget.updateInfo.forceUpdate) {
+                                        Future.delayed(const Duration(milliseconds: 2500), () {
+                                          if (mounted) {
+                                            Navigator.pop(context);
+                                          }
+                                        });
+                                      }
+                                    },
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.download, size: 18),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          "تحديث الآن",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
