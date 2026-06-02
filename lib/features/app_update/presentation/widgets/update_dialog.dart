@@ -20,6 +20,44 @@ class UpdateDialog extends StatefulWidget {
 
 class _UpdateDialogState extends State<UpdateDialog> {
   bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+  String _downloadStatusText = "جاري بدء تنزيل التحديث...";
+  int _bytesDownloaded = 0;
+  int _bytesTotal = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    OverlayManager.addProgressListener(_onDownloadProgress);
+  }
+
+  @override
+  void dispose() {
+    OverlayManager.removeProgressListener(_onDownloadProgress);
+    super.dispose();
+  }
+
+  void _onDownloadProgress(double progress, int bytesDownloaded, int bytesTotal, String status) {
+    if (mounted) {
+      setState(() {
+        _downloadProgress = progress;
+        _bytesDownloaded = bytesDownloaded;
+        _bytesTotal = bytesTotal;
+        
+        if (status == 'successful') {
+          _downloadStatusText = "اكتمل التنزيل! جاري التثبيت... 🚀";
+        } else if (status == 'failed') {
+          _downloadStatusText = "فشل التنزيل. يرجى المحاولة لاحقاً.";
+        } else if (status == 'paused') {
+          _downloadStatusText = "تم إيقاف التنزيل مؤقتاً.";
+        } else if (status == 'pending') {
+          _downloadStatusText = "في انتظار بدء التنزيل...";
+        } else {
+          _downloadStatusText = "جاري تحميل التحديث... ${(progress * 100).toStringAsFixed(0)}%";
+        }
+      });
+    }
+  }
 
   Future<void> _launchDownload() async {
     if (Platform.isAndroid) {
@@ -190,24 +228,49 @@ class _UpdateDialogState extends State<UpdateDialog> {
                               key: const ValueKey('loading_state'),
                               children: [
                                 const SizedBox(height: 10),
-                                const SizedBox(
-                                  width: 45,
-                                  height: 45,
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.greenAccent),
-                                    strokeWidth: 3.5,
-                                  ),
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 80,
+                                      height: 80,
+                                      child: CircularProgressIndicator(
+                                        value: _downloadProgress > 0.0 ? _downloadProgress : null,
+                                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+                                        backgroundColor: Colors.white.withOpacity(0.05),
+                                        strokeWidth: 5.0,
+                                      ),
+                                    ),
+                                    Text(
+                                      _downloadProgress > 0.0
+                                          ? "${(_downloadProgress * 100).toStringAsFixed(0)}%"
+                                          : "...",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 20),
-                                const Text(
-                                  "جاري بدء تنزيل التحديث...",
-                                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                Text(
+                                  _downloadStatusText,
+                                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 6),
+                                if (_bytesTotal > 0) ...[
+                                  Text(
+                                    "${(_bytesDownloaded / (1024 * 1024)).toStringAsFixed(1)} MB / ${(_bytesTotal / (1024 * 1024)).toStringAsFixed(1)} MB",
+                                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 10),
+                                ],
                                 Text(
-                                  "يرجى سحب لوحة الإشعارات لمشاهدة تقدم التحميل.",
-                                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                  "يرجى سحب لوحة الإشعارات لمشاهدة تفاصيل التنزيل.",
+                                  style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 16),
@@ -264,14 +327,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                         _isDownloading = true;
                                       });
                                       await _launchDownload();
-                                      // If optional update, close after a delay to give them feedback
-                                      if (!widget.updateInfo.forceUpdate) {
-                                        Future.delayed(const Duration(milliseconds: 2500), () {
-                                          if (mounted) {
-                                            Navigator.pop(context);
-                                          }
-                                        });
-                                      }
                                     },
                                     child: const Row(
                                       mainAxisAlignment: MainAxisAlignment.center,

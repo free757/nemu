@@ -3,6 +3,49 @@ import 'package:flutter/services.dart';
 class OverlayManager {
   static const MethodChannel _channel = MethodChannel('com.nemu.nemu/overlay');
 
+  static final List<Function(double progress, int bytesDownloaded, int bytesTotal, String status)> _progressListeners = [];
+
+  static void addProgressListener(Function(double progress, int bytesDownloaded, int bytesTotal, String status) listener) {
+    _progressListeners.add(listener);
+  }
+
+  static void removeProgressListener(Function(double progress, int bytesDownloaded, int bytesTotal, String status) listener) {
+    _progressListeners.remove(listener);
+  }
+
+  static void initialize() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onDownloadProgress') {
+        final map = call.arguments as Map;
+        final int progressInt = map['progress'] ?? 0;
+        final int bytesDownloaded = map['bytesDownloaded'] ?? 0;
+        final int bytesTotal = map['bytesTotal'] ?? 0;
+        final int statusInt = map['status'] ?? 0;
+        
+        String status = 'downloading';
+        if (statusInt == 8) { // DownloadManager.STATUS_SUCCESSFUL
+          status = 'successful';
+        } else if (statusInt == 16) { // DownloadManager.STATUS_FAILED
+          status = 'failed';
+        } else if (statusInt == 1) { // DownloadManager.STATUS_PENDING
+          status = 'pending';
+        } else if (statusInt == 2) { // DownloadManager.STATUS_RUNNING
+          status = 'running';
+        } else if (statusInt == 4) { // DownloadManager.STATUS_PAUSED
+          status = 'paused';
+        }
+
+        final double progress = progressInt / 100.0;
+        
+        for (final listener in List.from(_progressListeners)) {
+          try {
+            listener(progress, bytesDownloaded, bytesTotal, status);
+          } catch (_) {}
+        }
+      }
+    });
+  }
+
   static Future<bool> checkPermission() async {
     try {
       final bool granted = await _channel.invokeMethod('checkOverlayPermission');

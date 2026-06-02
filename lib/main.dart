@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/utils/overlay_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'injection_container.dart' as di;
 import 'features/security/presentation/pages/check_connection_page.dart';
@@ -9,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  OverlayManager.initialize();
   
   // Initialize Supabase
   await Supabase.initialize(

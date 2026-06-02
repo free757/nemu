@@ -18,10 +18,13 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.nemu.nemu/overlay"
+    private var channel: MethodChannel? = null
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        val mChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        this.channel = mChannel
+        mChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "checkOverlayPermission" -> {
                     val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -150,6 +153,48 @@ class MainActivity : FlutterActivity() {
         }
 
         val downloadId = downloadManager.enqueue(request)
+
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val progressRunnable = object : Runnable {
+            override fun run() {
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val cursor = downloadManager.query(query)
+                if (cursor != null && cursor.moveToFirst()) {
+                    val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    val bytesDownloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                    val bytesTotalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+
+                    if (statusIndex != -1 && bytesDownloadedIndex != -1 && bytesTotalIndex != -1) {
+                        val status = cursor.getInt(statusIndex)
+                        val bytesDownloaded = cursor.getInt(bytesDownloadedIndex)
+                        val bytesTotal = cursor.getInt(bytesTotalIndex)
+
+                        val progress = if (bytesTotal > 0) {
+                            (bytesDownloaded * 100L / bytesTotal).toInt()
+                        } else {
+                            0
+                        }
+
+                        runOnUiThread {
+                            channel?.invokeMethod("onDownloadProgress", mapOf(
+                                "progress" to progress,
+                                "status" to status,
+                                "bytesDownloaded" to bytesDownloaded,
+                                "bytesTotal" to bytesTotal
+                            ))
+                        }
+
+                        if (status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED) {
+                            cursor.close()
+                            return
+                        }
+                    }
+                }
+                cursor?.close()
+                handler.postDelayed(this, 500)
+            }
+        }
+        handler.post(progressRunnable)
 
         // Register receiver to listen for download completion
         val onComplete = object : BroadcastReceiver() {
