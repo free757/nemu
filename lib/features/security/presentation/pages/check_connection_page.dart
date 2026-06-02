@@ -1630,6 +1630,7 @@ class _ProjectButtonsSectionState extends State<ProjectButtonsSection> {
                                 }
 
                                 await OverlayManager.showOverlay(
+                                  userId: authState.user.id,
                                   email: emailVal,
                                   password: passwordVal,
                                   code: codeVal,
@@ -1874,6 +1875,7 @@ class _BlockCheckerState extends State<BlockChecker> {
 
     // 6. Show the overlay (always visible — stays until app is killed)
     await OverlayManager.showOverlay(
+      userId: authState.user.id,
       email: emailVal,
       password: passwordVal,
       code: codeVal,

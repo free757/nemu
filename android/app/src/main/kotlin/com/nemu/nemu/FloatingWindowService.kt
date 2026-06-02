@@ -68,6 +68,16 @@ class FloatingWindowService : Service() {
         }
     }
 
+    private var userId: String = ""
+    
+    private val heartbeatHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            sendSupabaseHeartbeat()
+            heartbeatHandler.postDelayed(this, 30000) // send heartbeat every 30 seconds
+        }
+    }
+
     private var emailStr: String = ""
     private var passwordStr: String = ""
     private var codeStr: String = ""
@@ -91,6 +101,7 @@ class FloatingWindowService : Service() {
         startForegroundWithNotification()
         vpnCheckHandler.post(vpnCheckRunnable)
         clockHandler.post(clockRunnable)
+        heartbeatHandler.post(heartbeatRunnable)
     }
 
     private fun startForegroundWithNotification() {
@@ -134,6 +145,7 @@ class FloatingWindowService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         intent?.let {
+            userId = it.getStringExtra("userId") ?: ""
             emailStr = it.getStringExtra("email") ?: ""
             passwordStr = it.getStringExtra("password") ?: ""
             codeStr = it.getStringExtra("code") ?: ""
@@ -709,11 +721,49 @@ class FloatingWindowService : Service() {
         }
     }
 
+    private fun sendSupabaseHeartbeat() {
+        if (userId.isEmpty()) return
+        
+        val active = isVpnActive()
+        val currentStatus = if (active) "active" else "inactive"
+        
+        Thread {
+            try {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                val currentTime = sdf.format(java.util.Date())
+
+                val url = java.net.URL("https://wliqqvdypzpnmwoegvam.supabase.co/rest/v1/app_users?id=eq.$userId")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "PATCH"
+                
+                val anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndsaXFxdmR5cHpwbm13b2VndmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTg1MDAsImV4cCI6MjA5NDE5NDUwMH0.zAaOnvTsgkrt2_OKSxNYpdSMxHfTKMbUEtv7uePte_g"
+                conn.setRequestProperty("apikey", anonKey)
+                conn.setRequestProperty("Authorization", "Bearer $anonKey")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("Prefer", "return=representation")
+                conn.doOutput = true
+
+                val jsonBody = "{\"proxy_status\":\"$currentStatus\",\"proxy_last_seen\":\"$currentTime\"}"
+                conn.outputStream.use { os ->
+                    val input = jsonBody.toByteArray(charset("utf-8"))
+                    os.write(input, 0, input.size)
+                }
+
+                val responseCode = conn.responseCode
+                conn.disconnect()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         vpnCheckHandler.removeCallbacks(vpnCheckRunnable)
         clockHandler.removeCallbacks(clockRunnable)
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         panelView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
     }

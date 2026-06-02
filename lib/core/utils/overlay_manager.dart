@@ -21,6 +21,7 @@ class OverlayManager {
   }
 
   static Future<bool> showOverlay({
+    required String userId,
     required String email,
     required String password,
     required String code,
@@ -31,6 +32,7 @@ class OverlayManager {
   }) async {
     try {
       final bool success = await _channel.invokeMethod('showOverlay', {
+        'userId': userId,
         'email': email,
         'password': password,
         'code': code,

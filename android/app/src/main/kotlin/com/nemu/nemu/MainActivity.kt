@@ -44,6 +44,7 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "showOverlay" -> {
+                    val userId = call.argument<String>("userId") ?: ""
                     val email = call.argument<String>("email") ?: ""
                     val password = call.argument<String>("password") ?: ""
                     val code = call.argument<String>("code") ?: ""
@@ -53,6 +54,7 @@ class MainActivity : FlutterActivity() {
                     val showMiscBtn = call.argument<Boolean>("show_misc") ?: true
 
                     val intent = Intent(this, FloatingWindowService::class.java).apply {
+                        putExtra("userId", userId)
                         putExtra("email", email)
                         putExtra("password", password)
                         putExtra("code", code)
