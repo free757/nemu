@@ -3892,7 +3892,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
 
                   <div className={`p-4 rounded-3xl border ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'المستحق حالياً' : 'Currently Due'}</span>
+                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{lang === 'ar' ? 'مكتسب غير مقيد' : 'Earned, not credited'}</span>
                       <Clock className="w-4 h-4 text-amber-500" />
                     </div>
                     <div className="text-2xl font-black mb-1 text-amber-400">${((profile.currentlyDue || 0) / 100).toFixed(2)}</div>
