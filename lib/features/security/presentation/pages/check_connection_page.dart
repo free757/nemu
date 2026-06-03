@@ -109,26 +109,8 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
   }
 
   Future<void> _syncRentAHuman() async {
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthAuthenticated) {
-      final hasApiKey = authState.user.rahApiKey != null && authState.user.rahApiKey!.isNotEmpty;
-      final isProxyConnected = vpnStatusNotifier.value == 'CONNECTED';
-
-      print('[RentAHumanSyncTrigger] ℹ️ Checking sync conditions: Has API Key: $hasApiKey, Proxy Connected: $isProxyConnected');
-
-      if (hasApiKey && isProxyConnected) {
-        try {
-          await RentAHumanSyncService().syncRentAHumanData(
-            userId: authState.user.id,
-            apiKey: authState.user.rahApiKey!,
-          );
-        } catch (_) {}
-      } else {
-        print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: API Key configured = $hasApiKey, Proxy connection status = ${vpnStatusNotifier.value}');
-      }
-    } else {
-      print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: User is not authenticated.');
-    }
+    // Disabled by user request
+    return;
   }
 
   void _subscribeToNotifications() {
@@ -1934,26 +1916,8 @@ class _BlockCheckerState extends State<BlockChecker> {
   }
 
   Future<void> _syncRentAHuman() async {
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthAuthenticated) {
-      final hasApiKey = authState.user.rahApiKey != null && authState.user.rahApiKey!.isNotEmpty;
-      final isProxyConnected = vpnStatusNotifier.value == 'CONNECTED';
-
-      print('[RentAHumanSyncTrigger] ℹ️ Checking sync conditions: Has API Key: $hasApiKey, Proxy Connected: $isProxyConnected');
-
-      if (hasApiKey && isProxyConnected) {
-        try {
-          await RentAHumanSyncService().syncRentAHumanData(
-            userId: authState.user.id,
-            apiKey: authState.user.rahApiKey!,
-          );
-        } catch (_) {}
-      } else {
-        print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: API Key configured = $hasApiKey, Proxy connection status = ${vpnStatusNotifier.value}');
-      }
-    } else {
-      print('[RentAHumanSyncTrigger] ⚠️ Sync skipped: User is not authenticated.');
-    }
+    // Disabled by user request
+    return;
   }
 
   Future<void> _checkBlockStatus() async {

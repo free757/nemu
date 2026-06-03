@@ -91,6 +91,14 @@ class FloatingWindowService : Service() {
 
     private lateinit var panelParams: WindowManager.LayoutParams
 
+    private var cachedPrayerTimes: Map<String, String>? = null
+    private var cachedPrayerTimesDay: Int = -1
+    private var lastTriggeredPrayer: String = ""
+    private var lastTriggeredPrayerDay: Int = -1
+    private var prayerPopupView: TextView? = null
+    private val hidePrayerPopupHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val hidePrayerPopupRunnable = Runnable { hidePrayerPopup() }
+
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -716,6 +724,26 @@ class FloatingWindowService : Service() {
             )
             
             bubbleTextView?.text = spannable
+
+            // --- Egypt Prayer times check ---
+            val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
+            if (cachedPrayerTimes == null || cachedPrayerTimesDay != currentDay) {
+                cachedPrayerTimes = PrayerTimeCalculator.getPrayerTimes(calendar)
+                cachedPrayerTimesDay = currentDay
+            }
+            
+            val hour = calendar.get(Calendar.HOUR_OF_DAY)
+            val minute = calendar.get(Calendar.MINUTE)
+            val currentTimeStr = String.format(Locale.US, "%02d:%02d", hour, minute)
+            
+            cachedPrayerTimes?.let { times ->
+                for ((prayerName, prayerTime) in times) {
+                    if (currentTimeStr == prayerTime) {
+                        checkAndTriggerPrayerNotification(prayerName)
+                        break
+                    }
+                }
+            }
         } catch (e: Exception) {
             bubbleTextView?.text = "N"
         }
@@ -758,13 +786,215 @@ class FloatingWindowService : Service() {
         }.start()
     }
 
-    override fun onDestroy() {
+        override fun onDestroy() {
         super.onDestroy()
         instance = null
         vpnCheckHandler.removeCallbacks(vpnCheckRunnable)
         clockHandler.removeCallbacks(clockRunnable)
         heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        hidePrayerPopupHandler.removeCallbacks(hidePrayerPopupRunnable)
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         panelView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
+        prayerPopupView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
+    }
+
+    private fun getArabicPrayerName(englishName: String): String {
+        return when (englishName) {
+            "Fajr" -> "الفجر"
+            "Dhuhr" -> "الظهر"
+            "Asr" -> "العصر"
+            "Maghrib" -> "المغرب"
+            "Isha" -> "العشاء"
+            else -> englishName
+        }
+    }
+
+    private fun checkAndTriggerPrayerNotification(prayerName: String) {
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        calendar.add(Calendar.HOUR_OF_DAY, 3)
+        val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
+        
+        if (lastTriggeredPrayer != prayerName || lastTriggeredPrayerDay != currentDay) {
+            lastTriggeredPrayer = prayerName
+            lastTriggeredPrayerDay = currentDay
+            showPrayerPopup(prayerName)
+        }
+    }
+
+    private fun showPrayerPopup(prayerName: String) {
+        if (prayerPopupView != null) {
+            hidePrayerPopup()
+        }
+
+        val context = this
+        val textView = TextView(context).apply {
+            val arabicName = getArabicPrayerName(prayerName)
+            text = "🕌 حان الآن موعد أذان $arabicName"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            
+            // Set padding
+            val padH = dpToPx(12f)
+            val padV = dpToPx(8f)
+            setPadding(padH, padV, padH, padV)
+            
+            // Rounded background with neon border
+            val shape = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(12f).toFloat()
+                setColor(Color.parseColor("#1E1E24")) // Dark premium background
+                setStroke(dpToPx(1.5f), Color.parseColor("#3B82F6")) // Subtle neon blue border
+            }
+            background = shape
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                elevation = dpToPx(6f).toFloat()
+            }
+        }
+        prayerPopupView = textView
+
+        // Layout params
+        val bubbleParams = bubbleView?.layoutParams as? WindowManager.LayoutParams ?: return
+        val bubbleSize = dpToPx(60f)
+        val screenWidth = resources.displayMetrics.widthPixels
+        val isLeft = bubbleParams.x + (bubbleSize / 2) < screenWidth / 2
+
+        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+
+        val popupParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            layoutType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            y = bubbleParams.y + dpToPx(10f) // align vertically near center of bubble
+            if (isLeft) {
+                x = bubbleParams.x + bubbleSize + dpToPx(8f)
+            } else {
+                // Since wrap content width is dynamic, we estimate width around 180dp
+                x = bubbleParams.x - dpToPx(180f)
+            }
+        }
+
+        try {
+            windowManager.addView(textView, popupParams)
+            
+            // Animate fade in
+            textView.alpha = 0f
+            textView.animate().alpha(1f).setDuration(400).start()
+
+            // Auto hide after 10 seconds
+            hidePrayerPopupHandler.removeCallbacks(hidePrayerPopupRunnable)
+            hidePrayerPopupHandler.postDelayed(hidePrayerPopupRunnable, 10000)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun hidePrayerPopup() {
+        val view = prayerPopupView ?: return
+        prayerPopupView = null
+        try {
+            view.animate().alpha(0f).setDuration(300).withEndAction {
+                try {
+                    windowManager.removeView(view)
+                } catch (e: Exception) {}
+            }.start()
+        } catch (e: Exception) {
+            try {
+                windowManager.removeView(view)
+            } catch (ex: Exception) {}
+        }
     }
 }
+
+object PrayerTimeCalculator {
+    private const val LATITUDE = 30.0444
+    private const val LONGITUDE = 31.2357
+    private const val TIMEZONE = 3.0 // UTC+3 Egypt Time
+    private const val FAJR_ANGLE = 19.5
+    private const val ISHA_ANGLE = 17.5
+    
+    private fun d2r(d: Double): Double = d * Math.PI / 180.0
+    private fun r2d(r: Double): Double = r * 180.0 / Math.PI
+    
+    private fun fixAngle(a: Double): Double {
+        var angle = a % 360.0
+        if (angle < 0) angle += 360.0
+        return angle
+    }
+    
+    private fun fixHour(h: Double): Double {
+        var hour = h % 24.0
+        if (hour < 0) hour += 24.0
+        return hour
+    }
+    
+    fun getPrayerTimes(calendar: Calendar): Map<String, String> {
+        val dayOfYear = calendar.get(Calendar.DAY_OF_YEAR)
+        val n = dayOfYear.toDouble()
+        val g = fixAngle(357.529 + 0.98560028 * n)
+        val q = fixAngle(280.459 + 0.98564736 * n)
+        val L = fixAngle(q + 1.915 * Math.sin(d2r(g)) + 0.020 * Math.sin(d2r(2.0 * g)))
+        
+        val e = 23.439 - 0.00000036 * n
+        val declination = r2d(Math.asin(Math.sin(d2r(e)) * Math.sin(d2r(L))))
+        
+        var ra = r2d(Math.atan2(Math.cos(d2r(e)) * Math.sin(d2r(L)), Math.cos(d2r(L)))) / 15.0
+        if (ra < 0) ra += 24.0
+        
+        val qHours = q / 15.0
+        val equationOfTime = (qHours - ra) * 60.0
+        
+        val dhuhrLocal = 12.0 + TIMEZONE - (LONGITUDE / 15.0) - (equationOfTime / 60.0)
+        
+        fun hourAngle(angle: Double, declination: Double): Double {
+            val num = Math.sin(d2r(angle)) - Math.sin(d2r(LATITUDE)) * Math.sin(d2r(declination))
+            val den = Math.cos(d2r(LATITUDE)) * Math.cos(d2r(declination))
+            val cosH = num / den
+            if (cosH > 1.0) return 0.0
+            if (cosH < -1.0) return 0.0
+            return r2d(Math.acos(cosH)) / 15.0
+        }
+        
+        val fajrHA = hourAngle(-FAJR_ANGLE, declination)
+        val sunsetHA = hourAngle(-0.833, declination)
+        val ishaHA = hourAngle(-ISHA_ANGLE, declination)
+        
+        val fajrTime = fixHour(dhuhrLocal - fajrHA)
+        val dhuhrTime = fixHour(dhuhrLocal)
+        
+        val gAsr = Math.tan(d2r(Math.abs(LATITUDE - declination)))
+        val asrAngle = r2d(Math.atan(1.0 / (1.0 + gAsr)))
+        val asrHA = hourAngle(asrAngle, declination)
+        val asrTime = fixHour(dhuhrLocal + asrHA)
+        
+        val maghribTime = fixHour(dhuhrLocal + sunsetHA)
+        val ishaTime = fixHour(dhuhrLocal + ishaHA)
+        
+        return mapOf(
+            "Fajr" to formatTime(fajrTime),
+            "Dhuhr" to formatTime(dhuhrTime),
+            "Asr" to formatTime(asrTime),
+            "Maghrib" to formatTime(maghribTime),
+            "Isha" to formatTime(ishaTime)
+        )
+    }
+    
+    private fun formatTime(decimalHour: Double): String {
+        val totalMinutes = Math.round(decimalHour * 60.0).toInt()
+        val hour = (totalMinutes / 60) % 24
+        val minute = totalMinutes % 60
+        return String.format(Locale.US, "%02d:%02d", hour, minute)
+    }
+}
+
