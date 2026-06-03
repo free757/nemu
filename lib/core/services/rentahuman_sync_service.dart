@@ -81,6 +81,7 @@ class RentAHumanSyncService {
         print('[RentAHumanSync] 📤 Syncing metrics to Supabase (app_users table)...');
         final Map<String, dynamic> updateData = {
           'rah_balance': balance,
+          'rah_last_synced': DateTime.now().toUtc().toIso8601String(),
         };
         if (currentlyDue != null) {
           updateData['rah_currently_due'] = currentlyDue;

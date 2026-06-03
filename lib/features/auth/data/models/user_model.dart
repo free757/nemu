@@ -20,6 +20,7 @@ class UserModel extends UserEntity {
     super.rahBalance,
     super.rahCurrentlyDue,
     super.rahEarnings,
+    super.rahLastSynced,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -42,6 +43,7 @@ class UserModel extends UserEntity {
       rahBalance: json['rah_balance'] != null ? (json['rah_balance'] as num).toDouble() : null,
       rahCurrentlyDue: json['rah_currently_due'] != null ? (json['rah_currently_due'] as num).toDouble() : null,
       rahEarnings: json['rah_earnings'] as List<dynamic>?,
+      rahLastSynced: json['rah_last_synced'],
     );
   }
 
@@ -65,6 +67,7 @@ class UserModel extends UserEntity {
       'rah_balance': rahBalance,
       'rah_currently_due': rahCurrentlyDue,
       'rah_earnings': rahEarnings,
+      'rah_last_synced': rahLastSynced,
     };
   }
 }

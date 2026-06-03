@@ -3735,6 +3735,27 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
     }
   };
 
+  const formatSyncTime = (dateStr?: string) => {
+    if (!dateStr) return lang === 'ar' ? 'غير متوفر' : 'N/A';
+    try {
+      const date = new Date(dateStr);
+      const diffMs = new Date().getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return lang === 'ar' ? 'الآن' : 'Just now';
+      if (diffMins < 60) return lang === 'ar' ? `منذ ${diffMins} د` : `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return lang === 'ar' ? `منذ ${diffHours} س` : `${diffHours}h ago`;
+      return date.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const handleOpenDetails = (e: React.MouseEvent) => {
     e.stopPropagation();
     setDetailsOpen(true);
@@ -3795,6 +3816,11 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
           </div>
         </div>
 
+        <div className="flex items-center justify-between text-[10px] text-gray-500 font-bold px-1 pt-0.5 border-t border-white/5">
+          <span>🔄 {lang === 'ar' ? 'آخر مزامنة:' : 'Last synced:'}</span>
+          <span>{formatSyncTime(user.rah_last_synced)}</span>
+        </div>
+
         {/* Details Dialog / Portal Rendering inside component */}
         {mounted && typeof window !== 'undefined' && createPortal(
           <AnimatePresence>
@@ -3824,7 +3850,10 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
                     </div>
                     <div>
                       <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{profile.name}</h3>
-                      <p className="text-xs text-gray-500 font-medium">RentAHuman integration stats</p>
+                      <p className="text-xs text-gray-500 font-medium">{lang === 'ar' ? 'إحصائيات تكامل RentAHuman' : 'RentAHuman integration stats'}</p>
+                      <p className="text-[10px] text-gray-400 font-bold mt-0.5">
+                        🔄 {lang === 'ar' ? 'آخر تحديث:' : 'Last synced:'} {formatSyncTime(user.rah_last_synced)}
+                      </p>
                     </div>
                   </div>
                   <button 
@@ -3985,6 +4014,9 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
             </span>
           </div>
         )}
+        <span className="text-[9px] text-gray-500 font-bold mt-1">
+          🔄 {lang === 'ar' ? 'تحديث:' : 'Sync:'} {formatSyncTime(user.rah_last_synced)}
+        </span>
       </div>
 
       {/* Details Dialog / Portal Rendering inside desktop view */}
