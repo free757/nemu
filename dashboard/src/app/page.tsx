@@ -3566,7 +3566,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
             amount: tx.amount, // already in cents in the database!
             type: tx.type || (tx.direction === 'received' ? 'figure_ongoing_payout' : 'transfer'),
             description: tx.description || '',
-            createdAt: tx.created_at || tx.timestamp || '',
+            createdAt: tx.created_at || tx.createdAt || tx.timestamp || '',
             balanceAfter: tx.balance_after || tx.balanceAfter || 0
           })),
           totalBookings: 0,
