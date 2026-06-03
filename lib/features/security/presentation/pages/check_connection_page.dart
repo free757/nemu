@@ -425,6 +425,17 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                               _buildProxyCard(context, user),
                               const SizedBox(height: 30),
                               const ProjectButtonsSection(),
+                              const SizedBox(height: 32),
+                              Text(
+                                "إصدار التطبيق: ${AppConstants.appVersion}",
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.35),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
                             ],
                           ),
                         ),

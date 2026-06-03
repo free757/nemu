@@ -3558,7 +3558,9 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
           id: user.id || 'synthetic-id',
           name: user.username || 'Worker',
           hourlyRate: user.ui_settings?.rah?.rate_override || 10,
-          currentlyDue: (user.ui_settings?.rah?.earnings_offset || (user.email === 'flash75711@gmail.com' ? 51.33 : 0) || user.rah_balance || 0) * 100, // fall back to earnings_offset so pending amounts display automatically!
+          currentlyDue: (user.rah_currently_due !== undefined && user.rah_currently_due !== null
+            ? user.rah_currently_due
+            : (user.ui_settings?.rah?.earnings_offset || (user.email === 'flash75711@gmail.com' ? 51.33 : 0) || user.rah_balance || 0)) * 100, // fall back to earnings_offset so pending amounts display automatically!
           transactions: (user.rah_earnings || []).map((tx: any) => ({
             id: tx.id || '',
             amount: tx.amount, // already in cents in the database!
@@ -3689,9 +3691,17 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
   // 3. Calculate automated paid hours
   const paidHours = customRate > 0 ? Number((paidEarnings / customRate).toFixed(1)) : 0;
 
-  // 4. Load manual offset adjustments (for unpaid/pending program work)
-  const hoursOffset = Number(user.ui_settings?.rah?.hours_offset || (user.email === 'flash75711@gmail.com' ? 4.7 : 0));
-  const earningsOffset = Number(user.ui_settings?.rah?.earnings_offset || (user.email === 'flash75711@gmail.com' ? 51.33 : 0));
+  // 4. Load manual offset adjustments (for unpaid/pending program work) or fallback to automated offsets from currentlyDue
+  const automatedEarningsOffset = (profile.currentlyDue || 0) / 100;
+  const automatedHoursOffset = customRate > 0 ? (automatedEarningsOffset / customRate) : 0;
+
+  const hoursOffset = user.ui_settings?.rah?.hours_offset !== undefined && user.ui_settings?.rah?.hours_offset !== null && user.ui_settings?.rah?.hours_offset !== '' && Number(user.ui_settings?.rah?.hours_offset) > 0
+    ? Number(user.ui_settings?.rah?.hours_offset)
+    : (automatedHoursOffset > 0 ? automatedHoursOffset : (user.email === 'flash75711@gmail.com' ? 4.7 : 0));
+
+  const earningsOffset = user.ui_settings?.rah?.earnings_offset !== undefined && user.ui_settings?.rah?.earnings_offset !== null && user.ui_settings?.rah?.earnings_offset !== '' && Number(user.ui_settings?.rah?.earnings_offset) > 0
+    ? Number(user.ui_settings?.rah?.earnings_offset)
+    : (automatedEarningsOffset > 0 ? automatedEarningsOffset : (user.email === 'flash75711@gmail.com' ? 51.33 : 0));
 
   // 5. Final aggregate figures (exact summation)
   const totalEarnings = paidEarnings + earningsOffset;

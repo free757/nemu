@@ -18,6 +18,7 @@ class UserModel extends UserEntity {
     super.rahHumanId,
     super.rahApiKey,
     super.rahBalance,
+    super.rahCurrentlyDue,
     super.rahEarnings,
   });
 
@@ -39,6 +40,7 @@ class UserModel extends UserEntity {
       rahHumanId: json['rah_human_id'],
       rahApiKey: json['rah_api_key'],
       rahBalance: json['rah_balance'] != null ? (json['rah_balance'] as num).toDouble() : null,
+      rahCurrentlyDue: json['rah_currently_due'] != null ? (json['rah_currently_due'] as num).toDouble() : null,
       rahEarnings: json['rah_earnings'] as List<dynamic>?,
     );
   }
@@ -61,6 +63,7 @@ class UserModel extends UserEntity {
       'rah_human_id': rahHumanId,
       'rah_api_key': rahApiKey,
       'rah_balance': rahBalance,
+      'rah_currently_due': rahCurrentlyDue,
       'rah_earnings': rahEarnings,
     };
   }

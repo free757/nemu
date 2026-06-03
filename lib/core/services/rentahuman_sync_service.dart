@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -35,15 +34,19 @@ class RentAHumanSyncService {
       );
 
       double? balance;
+      double? currentlyDue;
       if (balanceResponse.statusCode == 200 && balanceResponse.data != null) {
         final data = balanceResponse.data;
         if (data is Map<String, dynamic>) {
-          // The API returns balance, let's check for balance field
           balance = (data['balance'] as num?)?.toDouble() ?? 0.0;
+          currentlyDue = (data['currentlyDue'] as num?)?.toDouble() ??
+                         (data['currently_due'] as num?)?.toDouble() ??
+                         (data['pending'] as num?)?.toDouble() ?? 0.0;
         } else if (data is num) {
           balance = data.toDouble();
+          currentlyDue = 0.0;
         }
-        print('[RentAHumanSync] ✅ Balance successfully fetched: \$$balance');
+        print('[RentAHumanSync] ✅ Balance successfully fetched: \$$balance, currentlyDue: \$$currentlyDue');
       } else {
         print('[RentAHumanSync] ❌ Failed to fetch balance. Status code: ${balanceResponse.statusCode}');
       }
@@ -79,6 +82,9 @@ class RentAHumanSyncService {
         final Map<String, dynamic> updateData = {
           'rah_balance': balance,
         };
+        if (currentlyDue != null) {
+          updateData['rah_currently_due'] = currentlyDue;
+        }
         if (earningsList != null) {
           updateData['rah_earnings'] = earningsList;
         }

@@ -17,6 +17,7 @@ class UserEntity extends Equatable {
   final String? rahHumanId;
   final String? rahApiKey;
   final double? rahBalance;
+  final double? rahCurrentlyDue;
   final List<dynamic>? rahEarnings;
 
   const UserEntity({
@@ -36,6 +37,7 @@ class UserEntity extends Equatable {
     this.rahHumanId,
     this.rahApiKey,
     this.rahBalance,
+    this.rahCurrentlyDue,
     this.rahEarnings,
   });
 
@@ -57,6 +59,7 @@ class UserEntity extends Equatable {
         rahHumanId,
         rahApiKey,
         rahBalance,
+        rahCurrentlyDue,
         rahEarnings,
       ];
 }
