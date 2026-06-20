@@ -1044,7 +1044,7 @@ export default function Dashboard() {
           ) : (
             <div className="grid grid-cols-1 gap-6">
               {employees.map(employee => {
-                const linkedAccounts = users.filter(u => u.owner_id === employee.id);
+                const linkedAccounts = [employee, ...users.filter(u => u.owner_id === employee.id)];
                 let totalUsdDue = 0;
                 linkedAccounts.forEach(acc => {
                   totalUsdDue += Number(acc.rah_currently_due) || 0;
@@ -1141,11 +1141,11 @@ export default function Dashboard() {
                     {/* Linked Rent Accounts */}
                     <div className="space-y-3 pl-2 sm:pl-12">
                       <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                        {lang === 'ar' ? 'حسابات رينت المرتبطة' : 'Linked Rent Accounts'}
+                        {lang === 'ar' ? 'حسابات رينت' : 'Rent Accounts'}
                       </h4>
                       {linkedAccounts.length === 0 ? (
                         <p className="text-xs text-gray-500 italic">
-                          {lang === 'ar' ? 'لا توجد حسابات مرتبطة بهذا الموظف.' : 'No accounts linked to this employee yet.'}
+                          {lang === 'ar' ? 'لا توجد حسابات.' : 'No accounts found.'}
                         </p>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
