@@ -2417,15 +2417,27 @@ export default function Dashboard() {
     // 1. Manager check: managers always first
     if (a.is_manager && !b.is_manager) return -1;
     if (!a.is_manager && b.is_manager) return 1;
+    if (a.is_manager && b.is_manager) {
+      return (a.username || '').localeCompare(b.username || '');
+    }
 
-    // 2. Online check: online users first
-    const aOnline = isProxyOnline(a);
-    const bOnline = isProxyOnline(b);
-    if (aOnline && !bOnline) return -1;
-    if (!aOnline && bOnline) return 1;
+    // Neither is a manager. Group them by owner.
+    const aOwnerId = a.owner_id || a.id;
+    const bOwnerId = b.owner_id || b.id;
 
-    // 3. Fallback: alphabetical sorting by username
-    return (a.username || '').localeCompare(b.username || '');
+    if (aOwnerId === bOwnerId) {
+      // Same owner group: owner goes first, then linked accounts sorted alphabetically
+      if (!a.owner_id && b.owner_id) return -1;
+      if (a.owner_id && !b.owner_id) return 1;
+      return (a.username || '').localeCompare(b.username || '');
+    }
+
+    // Different owner groups: sort the owner groups alphabetically by the owner's username.
+    const aOwner = users.find(u => u.id === aOwnerId);
+    const bOwner = users.find(u => u.id === bOwnerId);
+    const aOwnerName = (aOwner ? aOwner.username : a.username) || '';
+    const bOwnerName = (bOwner ? bOwner.username : b.username) || '';
+    return aOwnerName.localeCompare(bOwnerName);
   });
 
   // ── Auth Guard (placed after all hooks) ──────────────────────────────────
@@ -2757,8 +2769,11 @@ export default function Dashboard() {
                             <div className="w-4 h-4" />
                           )}
                         </td>
-                        <td className="px-6 py-5">
+                        <td className={`py-5 pr-6 ${user.owner_id ? 'pl-14' : 'pl-6'}`}>
                           <div className="flex items-center gap-3">
+                            {user.owner_id && (
+                              <span className={`text-xl font-bold select-none mr-1 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'}`}>↳</span>
+                            )}
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg text-white">
                               {user.username?.charAt(0).toUpperCase()}
                             </div>
@@ -2980,7 +2995,10 @@ export default function Dashboard() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className={`p-6 rounded-3xl border shadow-sm space-y-6 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
-                    style={{ borderLeft: !user.is_manager ? `6px solid ${getOwnerHexColor(user.owner_id || user.id)}` : undefined }}
+                    style={{ 
+                      borderLeft: !user.is_manager ? `6px solid ${getOwnerHexColor(user.owner_id || user.id)}` : undefined,
+                      marginLeft: user.owner_id ? '1.5rem' : undefined
+                    }}
                   >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -3001,6 +3019,9 @@ export default function Dashboard() {
                           className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${theme === 'dark' ? 'bg-[#222] border-white/10' : 'bg-white border-gray-300'}`}
                         />
                       ) : null}
+                      {user.owner_id && (
+                        <span className={`text-xl font-bold select-none mr-1 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'}`}>↳</span>
+                      )}
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-xl text-white">
                         {user.username?.charAt(0).toUpperCase()}
                       </div>
