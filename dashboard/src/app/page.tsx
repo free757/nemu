@@ -2734,7 +2734,7 @@ export default function Dashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         className={`transition-all group ${theme === 'dark' ? 'hover:bg-white/[0.02] divide-white/5' : 'hover:bg-gray-50 divide-gray-100'}`}
-                        style={{ borderLeft: user.owner_id ? `4px solid ${getOwnerHexColor(user.owner_id)}` : undefined }}
+                        style={{ borderLeft: !user.is_manager ? `4px solid ${getOwnerHexColor(user.owner_id || user.id)}` : undefined }}
                       >
                         <td className="pl-6 py-5 w-12 text-center">
                           {!user.is_manager ? (
@@ -2980,7 +2980,7 @@ export default function Dashboard() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     className={`p-6 rounded-3xl border shadow-sm space-y-6 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
-                    style={{ borderLeft: user.owner_id ? `6px solid ${getOwnerHexColor(user.owner_id)}` : undefined }}
+                    style={{ borderLeft: !user.is_manager ? `6px solid ${getOwnerHexColor(user.owner_id || user.id)}` : undefined }}
                   >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
