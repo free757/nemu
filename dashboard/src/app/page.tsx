@@ -32,6 +32,7 @@ import {
   Mic,
   MicOff,
   Ban,
+  CheckCircle,
   Bell,
   Clock,
   Layers,
@@ -41,12 +42,18 @@ import {
   TrendingUp,
   Calendar,
   ArrowUpRight,
-  ArrowDownLeft
+  ArrowDownLeft,
+  Wallet,
+  Coins,
+  Save,
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Dashboard() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [remoteConfigs, setRemoteConfigs] = useState<any[]>([]);
@@ -93,15 +100,48 @@ export default function Dashboard() {
   const [confirmAction, setConfirmAction] = useState<{id: string, name: string} | null>(null);
   const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
   const [blockTargetUser, setBlockTargetUser] = useState<any>(null);
+  const [isForceLogoutConfirmOpen, setIsForceLogoutConfirmOpen] = useState(false);
+  const [forceLogoutTargetUser, setForceLogoutTargetUser] = useState<any>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<Record<string, boolean>>({});
   const [editingUser, setEditingUser] = useState<any>(null);
+  
+  // Financial & Accounts States
+  const [financialTransactions, setFinancialTransactions] = useState<any[]>([]);
+  const [exchangeRate, setExchangeRate] = useState<number>(50.0);
+  const [manualExchangeRate, setManualExchangeRate] = useState<string>('');
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
+  const [payoutTargetUser, setPayoutTargetUser] = useState<any>(null);
+  const [payoutFormData, setPayoutFormData] = useState({ amountEgp: '', transferMobile: '', description: '' });
+  const [isTxModalOpen, setIsTxModalOpen] = useState(false);
+  const [txFormData, setTxFormData] = useState({ amountUsd: '', amountEgp: '', type: 'deposit', description: '' });
+  const [editedDues, setEditedDues] = useState<Record<string, string>>({});
+  const [expandedPayouts, setExpandedPayouts] = useState<Record<string, boolean>>({});
+  const [isWalletLedgerExpanded, setIsWalletLedgerExpanded] = useState(false);
   const [editingConfig, setEditingConfig] = useState<any>(null);
   const [visualProjects, setVisualProjects] = useState<any[]>([]);
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+  };
 
   useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    setMounted(true);
+    fetchExchangeRate();
+    fetchTransactions();
     const saved = localStorage.getItem('isSidebarCollapsed');
     if (saved !== null) {
       setIsSidebarCollapsed(saved === 'true');
@@ -279,7 +319,10 @@ export default function Dashboard() {
     rah_egp_rate: '',
     rah_exchange_rate: '',
     rah_usd_payout_unit: '',
-    rah_egp_payout_unit: ''
+    rah_egp_payout_unit: '',
+    owner_id: '',
+    payoneer_email: '',
+    payout_status: 'waiting'
   });
 
   const [quickPaste, setQuickPaste] = useState('');
@@ -457,8 +500,817 @@ export default function Dashboard() {
   const fetchUsers = async () => {
     setLoading(true);
     const { data, error } = await supabase.from('app_users').select('*').order('created_at', { ascending: false });
-    if (!error) setUsers(data);
+    if (!error) {
+      setUsers(data);
+      // Clean up selectedUserIds to remove any users that are no longer in the list
+      setSelectedUserIds(prev => {
+        if (!data) return {};
+        const activeIds = new Set(data.map(u => u.id));
+        const clean: Record<string, boolean> = {};
+        for (const id in prev) {
+          if (activeIds.has(id) && prev[id]) {
+            clean[id] = true;
+          }
+        }
+        return clean;
+      });
+    }
     setLoading(false);
+  };
+
+  const fetchTransactions = async () => {
+    const { data, error } = await supabase
+      .from('financial_transactions')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) {
+      setFinancialTransactions(data);
+    }
+  };
+
+  const fetchExchangeRate = async () => {
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data = await res.json();
+      if (data && data.rates && data.rates.EGP) {
+        setExchangeRate(data.rates.EGP);
+      }
+    } catch (e) {
+      console.error('Failed to fetch exchange rate:', e);
+    }
+  };
+
+  const handleSaveDue = async (accountId: string, val: string) => {
+    const numVal = parseFloat(val) || 0;
+    const { error } = await supabase
+      .from('app_users')
+      .update({ rah_currently_due: numVal })
+      .eq('id', accountId);
+    if (!error) {
+      showToast(lang === 'ar' ? 'تم حفظ القيمة بنجاح' : 'Due next payout updated successfully', 'success');
+      fetchUsers();
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const handleUpdatePayoutStatus = async (accountId: string, status: string) => {
+    const { error } = await supabase
+      .from('app_users')
+      .update({ payout_status: status })
+      .eq('id', accountId);
+    if (!error) {
+      showToast(lang === 'ar' ? 'تم تحديث حالة الدفع بنجاح' : 'Payout status updated successfully', 'success');
+      fetchUsers();
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const handleCreateTransaction = async (payload: {
+    amount_usd?: number;
+    amount_egp?: number;
+    type: 'deposit' | 'payout' | 'expense' | 'profit_withdraw';
+    target_user_id?: string;
+    transfer_mobile?: string;
+    description?: string;
+  }) => {
+    const { error } = await supabase
+      .from('financial_transactions')
+      .insert([payload]);
+    if (!error) {
+      showToast(lang === 'ar' ? 'تم تسجيل المعاملة بنجاح' : 'Transaction created successfully', 'success');
+      fetchTransactions();
+      fetchUsers();
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const getOwnerHexColor = (ownerId: string) => {
+    if (!ownerId) return 'transparent';
+    const colors = [
+      '#a855f7', // purple
+      '#14b8a6', // teal
+      '#ec4899', // pink
+      '#6366f1', // indigo
+      '#f43f5e', // rose
+      '#06b6d4', // cyan
+      '#f59e0b', // amber
+      '#10b981'  // emerald
+    ];
+    let hash = 0;
+    for (let i = 0; i < ownerId.length; i++) {
+      hash = ownerId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  const getOwnerClasses = (ownerId: string) => {
+    if (!ownerId) return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+    const colorMap = [
+      'bg-purple-500/10 text-purple-400 border-purple-500/20',
+      'bg-teal-500/10 text-teal-400 border-teal-500/20',
+      'bg-pink-500/10 text-pink-400 border-pink-500/20',
+      'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      'bg-rose-500/10 text-rose-400 border-rose-500/20',
+      'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+      'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    ];
+    let hash = 0;
+    for (let i = 0; i < ownerId.length; i++) {
+      hash = ownerId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colorMap.length;
+    return colorMap[index];
+  };
+
+  const handlePayoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payoutTargetUser) return;
+    const amountEgp = parseFloat(payoutFormData.amountEgp) || 0;
+    const rate = parseFloat(manualExchangeRate) || exchangeRate || 50.0;
+    const amountUsd = amountEgp / rate;
+
+    const payload = {
+      amount_usd: amountUsd,
+      amount_egp: amountEgp,
+      type: 'payout' as const,
+      target_user_id: payoutTargetUser.id,
+      transfer_mobile: payoutFormData.transferMobile || undefined,
+      description: payoutFormData.description || `Salary payout for ${payoutTargetUser.username}`,
+    };
+
+    await handleCreateTransaction(payload);
+
+    // Reset linked accounts dues to 0
+    const { error } = await supabase
+      .from('app_users')
+      .update({ rah_currently_due: 0 })
+      .eq('owner_id', payoutTargetUser.id);
+    
+    if (!error) {
+      showToast(lang === 'ar' ? 'تم تصفير مستحقات الحسابات بنجاح' : 'Linked accounts dues reset to 0', 'success');
+      fetchUsers();
+    } else {
+      console.error('Error resetting dues:', error);
+    }
+
+    setIsPayoutModalOpen(false);
+    setPayoutFormData({ amountEgp: '', transferMobile: '', description: '' });
+    setPayoutTargetUser(null);
+  };
+
+  const handleTxSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountUsd = parseFloat(txFormData.amountUsd) || 0;
+    const amountEgp = parseFloat(txFormData.amountEgp) || 0;
+    const rate = parseFloat(manualExchangeRate) || exchangeRate || 50.0;
+
+    const payload = {
+      amount_usd: amountUsd || (amountEgp ? amountEgp / rate : 0),
+      amount_egp: amountEgp || (amountUsd ? amountUsd * rate : 0),
+      type: txFormData.type as 'deposit' | 'expense' | 'profit_withdraw',
+      description: txFormData.description || '',
+    };
+
+    await handleCreateTransaction(payload);
+    setIsTxModalOpen(false);
+    setTxFormData({ amountUsd: '', amountEgp: '', type: 'deposit', description: '' });
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm(lang === 'ar' ? 'هل أنت متأكد من حذف هذه المعاملة؟ هذا الإجراء لا يمكن التراجع عنه.' : 'Are you sure you want to delete this transaction? This action cannot be undone.')) {
+      return;
+    }
+    const { error } = await supabase
+      .from('financial_transactions')
+      .delete()
+      .eq('id', id);
+    if (!error) {
+      showToast(lang === 'ar' ? 'تم حذف المعاملة بنجاح' : 'Transaction deleted successfully', 'success');
+      fetchTransactions();
+      fetchUsers();
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const renderAccountsTab = () => {
+    const currentRate = parseFloat(manualExchangeRate) || exchangeRate || 50.0;
+
+    // Calculate totals
+    let totalDepositsUsd = 0;
+    let totalExpensesUsd = 0;
+    let totalPayoutsUsd = 0;
+    let totalDistributionsUsd = 0;
+
+    financialTransactions.forEach(tx => {
+      const usdAmount = Number(tx.amount_usd) || 0;
+      if (tx.type === 'deposit') {
+        totalDepositsUsd += usdAmount;
+      } else if (tx.type === 'expense') {
+        totalExpensesUsd += usdAmount;
+      } else if (tx.type === 'payout') {
+        totalPayoutsUsd += usdAmount;
+      } else if (tx.type === 'profit_withdraw') {
+        totalDistributionsUsd += usdAmount;
+      }
+    });
+
+    const netUsdWallet = totalDepositsUsd - totalExpensesUsd - totalPayoutsUsd - totalDistributionsUsd;
+    const netEgpWallet = netUsdWallet * currentRate;
+
+    // Split splits
+    const partner1ShareUsd = netUsdWallet * 0.4;
+    const partner1ShareEgp = netEgpWallet * 0.4;
+    const partner2ShareUsd = netUsdWallet * 0.6;
+    const partner2ShareEgp = netEgpWallet * 0.6;
+
+    // Group users by owner
+    const employees = users.filter(u => !u.is_manager && !u.owner_id);
+
+    return (
+      <div className="space-y-6 pb-24 animate-fadeIn">
+        {/* Exchange Rate Banner */}
+        <div className={`p-6 rounded-[2rem] border flex flex-col md:flex-row items-center justify-between gap-6 transition-all ${
+          theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200 hover:shadow-lg'
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wider">{lang === 'ar' ? 'سعر صرف الدولار الحالي' : 'EGP / USD Exchange Rate'}</h3>
+              <p className={`text-xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mt-0.5`}>
+                1 USD = {currentRate.toFixed(2)} EGP
+                {!manualExchangeRate && (
+                  <span className="text-xs text-green-500 font-medium ml-2 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
+                    {lang === 'ar' ? 'سعر حي' : 'LIVE API'}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <label className="text-xs font-bold text-gray-400 whitespace-nowrap">{lang === 'ar' ? 'تعديل السعر يدويًا:' : 'Override Rate:'}</label>
+            <div className="relative flex items-center w-full md:w-48">
+              <input
+                type="number"
+                step="any"
+                placeholder={exchangeRate.toFixed(2)}
+                value={manualExchangeRate}
+                onChange={(e) => setManualExchangeRate(e.target.value)}
+                className={`w-full border rounded-2xl px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-all font-bold ${
+                  theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                }`}
+              />
+              {manualExchangeRate && (
+                <button
+                  onClick={() => setManualExchangeRate('')}
+                  className="absolute right-3 text-[10px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full font-bold uppercase"
+                >
+                  {lang === 'ar' ? 'افتراضي' : 'CLEAR'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Withdrawal Cycle & Suspension Risks Info Banner */}
+        <div className={`p-6 rounded-[2rem] border relative overflow-hidden bg-gradient-to-r ${
+          theme === 'dark'
+            ? 'from-amber-500/10 via-red-500/5 to-transparent border-amber-500/20'
+            : 'from-amber-50 via-red-50/30 to-white border-amber-200'
+        }`}>
+          <div className="flex gap-4 items-start">
+            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h4 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {lang === 'ar' ? 'ℹ️ دورة السحب ومخاطر بايونير' : 'ℹ️ Withdrawal Cycle & Payoneer Risk Info'}
+              </h4>
+              <div className={`text-xs space-y-1.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p>
+                  {lang === 'ar'
+                    ? '⚠️ تظهر أزرار السحب في رينت يوم الخميس صباحاً (تقريباً 7:00 ص بتوقيت مصر). عند طلب السحب، تتجدول الدفعة لتصل بايونير خلال يومين.'
+                    : '⚠️ Rent withdrawal buttons appear on Thursday mornings (~7:00 AM Egypt time). Once requested, payouts are scheduled to reach Payoneer within 2 days.'}
+                </p>
+                <p>
+                  {lang === 'ar'
+                    ? '⚠️ تنبيه هام: عند ربط عدة حسابات رينت بحساب بايونير واحد، قد يتم تعليق دفعات بعض الحسابات بينما تمر دفعات الحسابات الأخرى بسلام.'
+                    : '⚠️ Important: When linking multiple Rent accounts to a single Payoneer, some withdrawals may get suspended/held while others clear successfully.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Central Wallet & Profit Split Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1: Central Wallet */}
+          <div className={`p-6 rounded-[2rem] border relative overflow-hidden flex flex-col justify-between h-[230px] transition-all bg-gradient-to-br ${
+            theme === 'dark' 
+              ? 'from-blue-600/10 via-blue-900/5 to-transparent border-blue-500/20' 
+              : 'from-blue-50 to-white border-blue-200 hover:shadow-xl'
+          }`}>
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-blue-500 uppercase tracking-widest block">
+                    {lang === 'ar' ? 'المحفظة المركزية' : 'Central Wallet'}
+                  </span>
+                  <button
+                    onClick={() => setIsWalletLedgerExpanded(!isWalletLedgerExpanded)}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                      isWalletLedgerExpanded
+                        ? 'bg-blue-600/20 text-blue-400 border-blue-500/30'
+                        : theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400 hover:text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Clock className="w-3 h-3" />
+                    <span>{lang === 'ar' ? 'سجل المحفظة' : 'Wallet Ledger'}</span>
+                  </button>
+                </div>
+                <h3 className={`text-3xl font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  ${netUsdWallet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </h3>
+                <p className="text-sm font-semibold text-gray-500">
+                  ≈ {netEgpWallet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center">
+                <Wallet className="w-6 h-6" />
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-4 pt-4 border-t border-white/5">
+              <button
+                onClick={() => {
+                  setTxFormData({ amountUsd: '', amountEgp: '', type: 'deposit', description: '' });
+                  setIsTxModalOpen(true);
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/10"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>{lang === 'ar' ? 'إيداع' : 'Deposit'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setTxFormData({ amountUsd: '', amountEgp: '', type: 'expense', description: '' });
+                  setIsTxModalOpen(true);
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-red-600/10"
+              >
+                <ArrowDownLeft className="w-3.5 h-3.5" />
+                <span>{lang === 'ar' ? 'مصروف' : 'Expense'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setTxFormData({ amountUsd: '', amountEgp: '', type: 'profit_withdraw', description: '' });
+                  setIsTxModalOpen(true);
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-amber-600/10"
+              >
+                <Coins className="w-3.5 h-3.5" />
+                <span>{lang === 'ar' ? 'سحب أرباح' : 'Withdraw'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Partner 1 Split (40%) */}
+          <div className={`p-6 rounded-[2rem] border flex flex-col justify-between h-[230px] transition-all bg-gradient-to-br ${
+            theme === 'dark' 
+              ? 'from-purple-600/10 via-purple-900/5 to-transparent border-purple-500/20' 
+              : 'from-purple-50 to-white border-purple-200 hover:shadow-xl'
+          }`}>
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-purple-500 uppercase tracking-widest block">
+                {lang === 'ar' ? 'شريك 1 (40%)' : 'Partner 1 (40%)'}
+              </span>
+              <h3 className={`text-3xl font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                ${partner1ShareUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+              <p className="text-sm font-semibold text-gray-500">
+                ≈ {partner1ShareEgp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
+              </p>
+            </div>
+            
+            <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+              <div className="flex justify-between text-xs text-gray-500 font-bold">
+                <span>{lang === 'ar' ? 'الحصة من المحفظة' : 'Current Share'}</span>
+                <span>40%</span>
+              </div>
+              <div className="w-full bg-gray-700/30 rounded-full h-2 overflow-hidden">
+                <div className="bg-purple-500 h-full rounded-full" style={{ width: '40%' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Partner 2 Split (60%) */}
+          <div className={`p-6 rounded-[2rem] border flex flex-col justify-between h-[230px] transition-all bg-gradient-to-br ${
+            theme === 'dark' 
+              ? 'from-emerald-600/10 via-emerald-900/5 to-transparent border-emerald-500/20' 
+              : 'from-emerald-50 to-white border-emerald-200 hover:shadow-xl'
+          }`}>
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-emerald-500 uppercase tracking-widest block">
+                {lang === 'ar' ? 'شريك 2 (60%)' : 'Partner 2 (60%)'}
+              </span>
+              <h3 className={`text-3xl font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                ${partner2ShareUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+              <p className="text-sm font-semibold text-gray-500">
+                ≈ {partner2ShareEgp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
+              </p>
+            </div>
+            
+            <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
+              <div className="flex justify-between text-xs text-gray-500 font-bold">
+                <span>{lang === 'ar' ? 'الحصة من المحفظة' : 'Current Share'}</span>
+                <span>60%</span>
+              </div>
+              <div className="w-full bg-gray-700/30 rounded-full h-2 overflow-hidden">
+                <div className="bg-emerald-500 h-full rounded-full" style={{ width: '60%' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Expandable Wallet Ledger Section */}
+        {isWalletLedgerExpanded && (
+          <div className={`p-6 rounded-[2rem] border mt-6 animate-fadeIn ${
+            theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {lang === 'ar' ? 'سجل عمليات المحفظة (الإيداعات، المصروفات، سحوبات الشركاء)' : 'Wallet Transaction Ledger (Deposits, Expenses, Withdrawals)'}
+              </h3>
+              <button 
+                onClick={() => setIsWalletLedgerExpanded(false)}
+                className="text-xs text-gray-500 hover:text-gray-400 font-bold"
+              >
+                {lang === 'ar' ? 'إغلاق' : 'Close'}
+              </button>
+            </div>
+            
+            {(() => {
+              const walletTx = financialTransactions.filter(tx => tx.type !== 'payout');
+              if (walletTx.length === 0) {
+                return (
+                  <p className="text-sm text-gray-500 text-center py-6">
+                    {lang === 'ar' ? 'لا توجد عمليات مسجلة بعد في المحفظة.' : 'No wallet transactions recorded yet.'}
+                  </p>
+                );
+              }
+              return (
+                <div className="overflow-x-auto rounded-2xl border border-white/5">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className={`border-b ${theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-gray-50 border-gray-100 text-gray-500'} text-xs font-bold uppercase`}>
+                        <th className="px-6 py-3">{lang === 'ar' ? 'التاريخ' : 'DATE'}</th>
+                        <th className="px-6 py-3">{lang === 'ar' ? 'النوع' : 'TYPE'}</th>
+                        <th className="px-6 py-3">{lang === 'ar' ? 'المبلغ بالدولار' : 'USD'}</th>
+                        <th className="px-6 py-3">{lang === 'ar' ? 'المبلغ بالجنيه' : 'EGP'}</th>
+                        <th className="px-6 py-3">{lang === 'ar' ? 'البيان' : 'DESC'}</th>
+                        <th className="px-6 py-3 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {walletTx.map(tx => (
+                        <tr key={tx.id} className={theme === 'dark' ? 'hover:bg-white/[0.01]' : 'hover:bg-gray-50'}>
+                          <td className="px-6 py-3 whitespace-nowrap text-xs text-gray-500">
+                            {new Date(tx.created_at).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            {tx.type === 'deposit' && (
+                              <span className="px-2.5 py-0.5 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-bold">
+                                DEPOSIT
+                              </span>
+                            )}
+                            {tx.type === 'expense' && (
+                              <span className="px-2.5 py-0.5 text-xs bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-bold">
+                                EXPENSE
+                              </span>
+                            )}
+                            {tx.type === 'profit_withdraw' && (
+                              <span className="px-2.5 py-0.5 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full font-bold">
+                                WITHDRAW
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 font-semibold font-mono text-xs">
+                            ${Number(tx.amount_usd).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-6 py-3 font-semibold font-mono text-xs text-gray-400">
+                            {Number(tx.amount_egp).toLocaleString()} EGP
+                          </td>
+                          <td className="px-6 py-3 text-xs text-gray-400 max-w-xs truncate" title={tx.description}>
+                            {tx.description || '-'}
+                          </td>
+                          <td className="px-6 py-3 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => handleDeleteTransaction(tx.id)}
+                              className="p-1.5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                              title={lang === 'ar' ? 'حذف' : 'Delete'}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Grouped Employee Dues List */}
+        <div className="space-y-4">
+          <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            {lang === 'ar' ? 'مستحقات ورواتب الموظفين' : 'Employee Salaries & Work Hours'}
+          </h2>
+          
+          {employees.length === 0 ? (
+            <div className={`p-12 text-center rounded-[2rem] border ${theme === 'dark' ? 'bg-[#111] border-white/5 text-gray-500' : 'bg-white border-gray-200 text-gray-400'}`}>
+              {lang === 'ar' ? 'لا يوجد موظفون مضافون حالياً.' : 'No primary employees found.'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {employees.map(employee => {
+                const linkedAccounts = users.filter(u => u.owner_id === employee.id);
+                let totalUsdDue = 0;
+                linkedAccounts.forEach(acc => {
+                  totalUsdDue += Number(acc.rah_currently_due) || 0;
+                });
+                const totalHours = totalUsdDue / 10;
+                const salaryDueEgp = totalHours * 100;
+                
+                const historicPaidEgp = financialTransactions
+                  .filter(tx => tx.type === 'payout' && tx.target_user_id === employee.id)
+                  .reduce((sum, tx) => sum + (Number(tx.amount_egp) || 0), 0);
+
+                const employeeColor = getOwnerHexColor(employee.id);
+
+                return (
+                  <div 
+                    key={employee.id}
+                    className={`rounded-[2rem] border p-6 transition-all ${
+                      theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200 hover:shadow-md'
+                    }`}
+                    style={{ borderLeft: `6px solid ${employeeColor}` }}
+                  >
+                    {/* Employee Header */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-lg animate-pulse"
+                            style={{ backgroundColor: employeeColor }}
+                          >
+                            {employee.username?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                              {employee.username}
+                            </h3>
+                            <p className="text-gray-500 text-xs">
+                              📞 {employee.phone_number || (lang === 'ar' ? 'بدون رقم هاتف' : 'No phone number')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stats Overview */}
+                      <div className="flex flex-wrap items-center gap-4">
+                        <div className="text-center px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
+                          <span className="text-[10px] text-gray-500 font-bold block uppercase">{lang === 'ar' ? 'الساعات' : 'HOURS'}</span>
+                          <span className={`text-sm font-extrabold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>{totalHours.toFixed(1)} hrs</span>
+                        </div>
+                        <div className="text-center px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
+                          <span className="text-[10px] text-gray-500 font-bold block uppercase">{lang === 'ar' ? 'الراتب المستحق' : 'SALARY DUE'}</span>
+                          <span className={`text-sm font-extrabold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{salaryDueEgp.toLocaleString()} EGP</span>
+                        </div>
+                        <div className="text-center px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
+                          <span className="text-[10px] text-gray-500 font-bold block uppercase">{lang === 'ar' ? 'إجمالي المدفوع' : 'TOTAL PAID'}</span>
+                          <span className={`text-sm font-extrabold ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`}>{historicPaidEgp.toLocaleString()} EGP</span>
+                        </div>
+                        
+                        <button
+                          onClick={() => setExpandedPayouts(prev => ({ ...prev, [employee.id]: !prev[employee.id] }))}
+                          className={`px-4 py-3 rounded-2xl font-bold text-xs border transition-all flex items-center gap-1.5 ${
+                            expandedPayouts[employee.id]
+                              ? 'bg-blue-600/10 text-blue-500 border-blue-500/20'
+                              : theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400 hover:text-white' : 'bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          <Clock className="w-4 h-4" />
+                          <span>{lang === 'ar' ? 'سجل المدفوعات' : 'History'}</span>
+                          {expandedPayouts[employee.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setPayoutTargetUser(employee);
+                            setPayoutFormData({
+                              amountEgp: salaryDueEgp.toString(),
+                              transferMobile: employee.phone_number || '',
+                              description: `Salary payout for ${employee.username} (${totalHours.toFixed(1)} hrs worked)`,
+                            });
+                            setIsPayoutModalOpen(true);
+                          }}
+                          disabled={salaryDueEgp <= 0}
+                          className={`px-5 py-3 rounded-2xl font-bold text-xs transition-all flex items-center gap-2 ${
+                            salaryDueEgp > 0
+                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20'
+                              : 'bg-gray-600/20 text-gray-500 cursor-not-allowed opacity-50'
+                          }`}
+                        >
+                          <Coins className="w-4 h-4" />
+                          <span>{lang === 'ar' ? 'صرف المرتب' : 'Payout Salary'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Linked Rent Accounts */}
+                    <div className="space-y-3 pl-2 sm:pl-12">
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                        {lang === 'ar' ? 'حسابات رينت المرتبطة' : 'Linked Rent Accounts'}
+                      </h4>
+                      {linkedAccounts.length === 0 ? (
+                        <p className="text-xs text-gray-500 italic">
+                          {lang === 'ar' ? 'لا توجد حسابات مرتبطة بهذا الموظف.' : 'No accounts linked to this employee yet.'}
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {linkedAccounts.map(acc => {
+                            const isOnline = isProxyOnline(acc);
+                            const accHours = (Number(acc.rah_currently_due) || 0) / 10;
+                            const accSalary = accHours * 100;
+                            return (
+                              <div 
+                                key={acc.id}
+                                className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
+                                  theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'
+                                }`}
+                              >
+                                <div className="space-y-2 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-sm font-bold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>
+                                      {acc.username}
+                                    </span>
+                                    <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-500'}`} />
+                                    {acc.payoneer_email && (
+                                      <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full font-medium font-mono">
+                                        {lang === 'ar' ? 'بايونير' : 'Payoneer'}: {acc.payoneer_email}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                    <p className="text-[11px] text-gray-500 whitespace-nowrap">
+                                      {accHours.toFixed(1)} hrs • {accSalary} EGP
+                                    </p>
+                                    <select
+                                      value={acc.payout_status || 'waiting'}
+                                      onChange={e => handleUpdatePayoutStatus(acc.id, e.target.value)}
+                                      className={`text-[10px] font-bold border rounded-lg px-2 py-1 outline-none transition-all cursor-pointer ${
+                                        acc.payout_status === 'cleared'
+                                          ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                                          : acc.payout_status === 'requested'
+                                          ? 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400'
+                                          : acc.payout_status === 'ready'
+                                          ? 'bg-red-500/15 border-red-500/30 text-red-400'
+                                          : acc.payout_status === 'suspended'
+                                          ? 'bg-orange-500/15 border-orange-500/30 text-orange-400'
+                                          : 'bg-gray-500/15 border-gray-500/30 text-gray-400'
+                                      }`}
+                                    >
+                                      <option value="waiting" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                        ⚪ {lang === 'ar' ? 'لم تبدأ الدورة' : 'Cycle Waiting'}
+                                      </option>
+                                      <option value="ready" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                        🔴 {lang === 'ar' ? 'جاهز للطلب' : 'Ready to Request'}
+                                      </option>
+                                      <option value="requested" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                        🟡 {lang === 'ar' ? 'قيد الانتظار' : 'Requested / Pending'}
+                                      </option>
+                                      <option value="cleared" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                        🟢 {lang === 'ar' ? 'تم الوصول' : 'Cleared / Received'}
+                                      </option>
+                                      <option value="suspended" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                        ⚠️ {lang === 'ar' ? 'معلقة / مشكلة' : 'Suspended / Issue'}
+                                      </option>
+                                    </select>
+                                  </div>
+                                </div>
+                                
+                                {/* Edit Due Field */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-500 text-xs font-bold">$</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={editedDues[acc.id] !== undefined ? editedDues[acc.id] : (acc.rah_currently_due || 0).toString()}
+                                    onChange={e => setEditedDues({ ...editedDues, [acc.id]: e.target.value })}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveDue(acc.id, editedDues[acc.id] || (acc.rah_currently_due || 0).toString());
+                                        const updated = { ...editedDues };
+                                        delete updated[acc.id];
+                                        setEditedDues(updated);
+                                      }
+                                    }}
+                                    className={`w-20 border rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 font-bold transition-all text-center ${
+                                      theme === 'dark' ? 'bg-black/35 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'
+                                    }`}
+                                  />
+                                  {editedDues[acc.id] !== undefined && editedDues[acc.id] !== (acc.rah_currently_due || 0).toString() && (
+                                    <button
+                                      onClick={() => {
+                                        handleSaveDue(acc.id, editedDues[acc.id]);
+                                        const updated = { ...editedDues };
+                                        delete updated[acc.id];
+                                        setEditedDues(updated);
+                                      }}
+                                      className="p-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg hover:bg-emerald-500 hover:text-white transition-all"
+                                      title="Save"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Expandable Payouts Section */}
+                    {expandedPayouts[employee.id] && (
+                      <div className="mt-6 pt-6 border-t border-dashed border-white/10 space-y-3 animate-fadeIn">
+                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                          {lang === 'ar' ? 'سجل مدفوعات الموظف' : 'Employee Payout Records'}
+                        </h4>
+                        {(() => {
+                          const payouts = financialTransactions.filter(tx => tx.type === 'payout' && tx.target_user_id === employee.id);
+                          if (payouts.length === 0) {
+                            return (
+                              <p className="text-xs text-gray-500 italic">
+                                {lang === 'ar' ? 'لا توجد مدفوعات مسجلة بعد.' : 'No payouts recorded yet.'}
+                              </p>
+                            );
+                          }
+                          return (
+                            <div className="overflow-x-auto rounded-2xl border border-white/5">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className={`border-b ${theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-gray-50 border-gray-100 text-gray-500'} font-bold`}>
+                                    <th className="px-4 py-2.5">{lang === 'ar' ? 'التاريخ' : 'DATE'}</th>
+                                    <th className="px-4 py-2.5">{lang === 'ar' ? 'المبلغ بالجنيه' : 'AMOUNT (EGP)'}</th>
+                                    <th className="px-4 py-2.5">{lang === 'ar' ? 'رقم التحويل' : 'MOBILE'}</th>
+                                    <th className="px-4 py-2.5">{lang === 'ar' ? 'البيان' : 'DESC'}</th>
+                                    <th className="px-4 py-2.5"></th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                  {payouts.map(tx => (
+                                    <tr key={tx.id} className={theme === 'dark' ? 'hover:bg-white/[0.01]' : 'hover:bg-gray-50'}>
+                                      <td className="px-4 py-2 text-gray-500 whitespace-nowrap">{new Date(tx.created_at).toLocaleDateString()}</td>
+                                      <td className="px-4 py-2 font-bold font-mono text-emerald-500">{Number(tx.amount_egp).toLocaleString()} EGP</td>
+                                      <td className="px-4 py-2 font-mono text-gray-400">{tx.transfer_mobile || '-'}</td>
+                                      <td className="px-4 py-2 text-gray-400 truncate max-w-[120px]" title={tx.description}>{tx.description || '-'}</td>
+                                      <td className="px-4 py-2 text-right">
+                                        <button
+                                          onClick={() => handleDeleteTransaction(tx.id)}
+                                          className="text-red-500/50 hover:text-red-500 p-1.5 rounded-lg transition-all hover:bg-red-500/10"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const fetchConfigs = async () => {
@@ -659,8 +1511,42 @@ export default function Dashboard() {
       )
       .subscribe();
 
+    // Realtime channel for financial_transactions updates
+    const txChannel = supabase
+      .channel('financial_transactions_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'financial_transactions' },
+        () => {
+          fetchTransactions();
+        }
+      )
+      .subscribe();
+
+    // Realtime channel for remote_configs updates
+    const configChannel = supabase
+      .channel('remote_configs_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'remote_configs' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setRemoteConfigs((prev) => [payload.new as any, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setRemoteConfigs((prev) =>
+              prev.map((config) => (config.id === payload.new.id ? { ...config, ...payload.new } : config))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setRemoteConfigs((prev) => prev.filter((config) => config.id === payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(configChannel);
+      supabase.removeChannel(txChannel);
     };
   }, []);
 
@@ -678,6 +1564,90 @@ export default function Dashboard() {
         activeTab === 'users' ? fetchUsers() : fetchConfigs();
         setIsConfirmOpen(false);
       }
+    }
+  };
+
+  const handleForceLogout = (user: any) => {
+    setForceLogoutTargetUser(user);
+    setIsForceLogoutConfirmOpen(true);
+  };
+
+  const confirmForceLogout = async () => {
+    if (!forceLogoutTargetUser) return;
+
+    const currentSettings = forceLogoutTargetUser.ui_settings || {};
+    const newSettings = {
+      ...currentSettings,
+      force_logout: true
+    };
+    
+    // Update local state optimistically
+    setUsers((prev: any[]) => prev.map((u: any) => u.id === forceLogoutTargetUser.id ? { ...u, ui_settings: newSettings } : u));
+    setIsForceLogoutConfirmOpen(false);
+    
+    const { error } = await supabase
+      .from('app_users')
+      .update({ ui_settings: newSettings })
+      .eq('id', forceLogoutTargetUser.id);
+
+    if (error) {
+      showToast(error.message, 'error');
+      fetchUsers();
+    } else {
+      showToast(
+        lang === 'ar'
+          ? 'تم إرسال أمر تسجيل الخروج بنجاح.'
+          : 'Force logout command sent successfully.',
+        'success'
+      );
+    }
+    setForceLogoutTargetUser(null);
+  };
+
+  const handleTriggerRentAHumanSync = async () => {
+    let syncConfig = remoteConfigs.find(c => c.config_key === 'rentahuman_sync_trigger');
+    
+    if (!syncConfig) {
+      const { data, error } = await supabase
+        .from('remote_configs')
+        .select('*')
+        .eq('config_key', 'rentahuman_sync_trigger')
+        .maybeSingle();
+      if (data) {
+        syncConfig = data;
+      } else {
+        const { data: newConfig } = await supabase
+          .from('remote_configs')
+          .insert([{ config_key: 'rentahuman_sync_trigger', config_value: { status: 'requested' }, is_enabled: true }])
+          .select()
+          .single();
+        if (newConfig) {
+          showToast(
+            lang === 'ar' ? 'تم إنشاء حقل المزامنة وبدء الطلب...' : 'Sync field created and request sent...',
+            'info'
+          );
+          fetchConfigs();
+          return;
+        }
+        showToast(lang === 'ar' ? 'تعذر العثور على إعداد المزامنة' : 'Could not find sync configuration', 'error');
+        return;
+      }
+    }
+
+    const newConfigValue = { ...syncConfig.config_value, status: 'requested' };
+    const { error } = await supabase
+      .from('remote_configs')
+      .update({ config_value: newConfigValue })
+      .eq('id', syncConfig.id);
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast(
+        lang === 'ar' ? 'تم إرسال طلب المزامنة إلى الماك.' : 'Sync request sent to Mac.',
+        'info'
+      );
+      fetchConfigs();
     }
   };
 
@@ -701,6 +1671,96 @@ export default function Dashboard() {
       setBlockTargetUser(null);
     } else {
       alert(error.message);
+    }
+  };
+
+  const batchToggleBlock = async (blockStatus: boolean) => {
+    const selectedIds = Object.keys(selectedUserIds).filter(id => selectedUserIds[id]);
+    if (selectedIds.length === 0) return;
+    
+    const message = blockStatus
+      ? (lang === 'ar' 
+         ? `هل أنت متأكد من حظر ${selectedIds.length} مستخدم؟ سيتم طردهم من هواتفهم فوراً.` 
+         : `Are you sure you want to block ${selectedIds.length} users? They will be logged out of their phones instantly.`)
+      : (lang === 'ar' 
+         ? `هل أنت متأكد من إلغاء حظر ${selectedIds.length} مستخدم؟` 
+         : `Are you sure you want to unblock ${selectedIds.length} users?`);
+         
+    if (!confirm(message)) return;
+    
+    setLoading(true);
+    const { error } = await supabase
+      .from('app_users')
+      .update({ is_blocked: blockStatus })
+      .in('id', selectedIds);
+      
+    if (!error) {
+      showToast(
+        lang === 'ar'
+          ? `تمت العملية بنجاح لـ ${selectedIds.length} مستخدم.`
+          : `Action completed successfully for ${selectedIds.length} users.`,
+        'success'
+      );
+      setSelectedUserIds({});
+      fetchUsers();
+    } else {
+      alert(error.message);
+    }
+    setLoading(false);
+  };
+
+  const batchForceLogout = async () => {
+    const selectedIds = Object.keys(selectedUserIds).filter(id => selectedUserIds[id]);
+    if (selectedIds.length === 0) return;
+    
+    const confirmed = confirm(
+      lang === 'ar'
+        ? `هل أنت متأكد من تسجيل الخروج الإجباري لـ ${selectedIds.length} مستخدم؟`
+        : `Are you sure you want to force logout ${selectedIds.length} users?`
+    );
+    if (!confirmed) return;
+    
+    setLoading(true);
+    try {
+      const selectedUsers = users.filter(u => selectedIds.includes(u.id));
+      
+      // Update local state optimistically
+      setUsers((prev: any[]) => prev.map((u: any) => {
+        if (selectedIds.includes(u.id)) {
+          const currentSettings = u.ui_settings || {};
+          return {
+            ...u,
+            ui_settings: { ...currentSettings, force_logout: true }
+          };
+        }
+        return u;
+      }));
+      
+      const promises = selectedUsers.map(user => {
+        const currentSettings = user.ui_settings || {};
+        const newSettings = {
+          ...currentSettings,
+          force_logout: true
+        };
+        return supabase
+          .from('app_users')
+          .update({ ui_settings: newSettings })
+          .eq('id', user.id);
+      });
+      
+      await Promise.all(promises);
+      showToast(
+        lang === 'ar'
+          ? `تم إرسال أمر تسجيل الخروج لـ ${selectedIds.length} مستخدم بنجاح.`
+          : `Force logout command sent to ${selectedIds.length} users successfully.`,
+        'success'
+      );
+      setSelectedUserIds({});
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    } finally {
+      setLoading(false);
+      fetchUsers();
     }
   };
 
@@ -731,7 +1791,10 @@ export default function Dashboard() {
       rah_egp_rate: user.ui_settings?.rah?.egp_rate?.toString() || '',
       rah_exchange_rate: user.ui_settings?.rah?.exchange_rate?.toString() || '',
       rah_usd_payout_unit: user.ui_settings?.rah?.usd_payout_unit?.toString() || '',
-      rah_egp_payout_unit: user.ui_settings?.rah?.egp_payout_unit?.toString() || ''
+      rah_egp_payout_unit: user.ui_settings?.rah?.egp_payout_unit?.toString() || '',
+      owner_id: user.owner_id || '',
+      payoneer_email: user.payoneer_email || '',
+      payout_status: user.payout_status || 'waiting'
     });
     setIsModalOpen(true);
   };
@@ -777,7 +1840,10 @@ export default function Dashboard() {
         rah_human_id: '', rah_api_key: '',
         rah_hours_offset: '', rah_earnings_offset: '', rah_rate_override: '',
         rah_egp_rate: '', rah_exchange_rate: '',
-        rah_usd_payout_unit: '', rah_egp_payout_unit: ''
+        rah_usd_payout_unit: '', rah_egp_payout_unit: '',
+        owner_id: '',
+        payoneer_email: '',
+        payout_status: 'waiting'
       });
       setIsModalOpen(true);
     } else {
@@ -912,7 +1978,10 @@ export default function Dashboard() {
       verification_code: formData.verification_code?.trim() || null,
       rah_human_id: formData.rah_human_id?.trim() || null,
       rah_api_key: formData.rah_api_key?.trim() || null,
-      ui_settings
+      ui_settings,
+      owner_id: formData.owner_id || null,
+      payoneer_email: formData.payoneer_email?.trim() || null,
+      payout_status: formData.payout_status || 'waiting'
     };
 
     // Double check duplicate validation just in case
@@ -1443,6 +2512,13 @@ export default function Dashboard() {
                   {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.users}</motion.span>}
                 </button>
                 <button 
+                  onClick={() => { setActiveTab('accounts'); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'accounts' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <DollarSign className="w-5 h-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{lang === 'ar' ? 'الحسابات والمالية' : 'Financial Accounts'}</motion.span>}
+                </button>
+                <button 
                   onClick={() => { setActiveTab('config'); setIsMobileMenuOpen(false); }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'config' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
                 >
@@ -1508,15 +2584,18 @@ export default function Dashboard() {
         <header className={`sticky top-0 z-30 px-4 md:px-8 py-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 ${theme === 'dark' ? 'bg-[#0a0a0a] border-white/5' : 'bg-[#f8f9fa] border-gray-200'}`}>
           <div>
             <h1 className="text-2xl font-bold mb-1">
-              {activeTab === 'users' ? t.title : activeTab === 'config' ? t.configTitle : activeTab === 'notifications' ? t.notificationsTitle : activeTab === 'misc' ? t.miscTitle : t.toolsTitle}
+              {activeTab === 'users' ? t.title : activeTab === 'accounts' ? (lang === 'ar' ? 'الحسابات والمحفظة المالية' : 'Financial Accounts & Wallet') : activeTab === 'config' ? t.configTitle : activeTab === 'notifications' ? t.notificationsTitle : activeTab === 'misc' ? t.miscTitle : t.toolsTitle}
             </h1>
             <p className="text-gray-500 text-xs md:text-sm">
-              {activeTab === 'users' ? t.subtitle : activeTab === 'config' ? t.subtitle : activeTab === 'notifications' ? t.notificationsSubtitle : activeTab === 'misc' ? t.miscSubtitle : t.toolsSubtitle}
+              {activeTab === 'users' ? t.subtitle : activeTab === 'accounts' ? (lang === 'ar' ? 'تتبع رواتب الموظفين، ساعات العمل، المصروفات، وأرباح الشركاء.' : 'Track employee salaries, hours, expenses, and partner profits.') : activeTab === 'config' ? t.subtitle : activeTab === 'notifications' ? t.notificationsSubtitle : activeTab === 'misc' ? t.miscSubtitle : t.toolsSubtitle}
             </p>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
             <DashboardLiveClock lang={lang} theme={theme} />
+            {activeTab === 'users' && (
+              <PayoutHeaderWidget lang={lang} theme={theme} />
+            )}
             {activeTab === 'users' && (() => {
               const nm = users.filter(u => !u.is_manager);
               const on = nm.filter(u => isProxyOnline(u)).length;
@@ -1542,19 +2621,57 @@ export default function Dashboard() {
             })()}
             {activeTab !== 'tools' && (
               <>
+                {activeTab === 'users' && (
+                  <div className="relative w-48 sm:w-64">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
+                    <input 
+                      type="text" 
+                      placeholder={t.search}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className={`w-full border rounded-xl py-2.5 pl-10 pr-3 focus:border-blue-500 outline-none transition-all text-xs font-medium ${theme === 'dark' ? 'bg-[#111] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-950'}`}
+                    />
+                  </div>
+                )}
+                {activeTab === 'users' && (() => {
+                  const syncConfig = remoteConfigs.find(c => c.config_key === 'rentahuman_sync_trigger');
+                  const syncStatus = syncConfig?.config_value?.status || 'idle';
+                  const isSyncing = syncStatus === 'requested' || syncStatus === 'running';
+                  
+                  return (
+                    <button
+                      onClick={handleTriggerRentAHumanSync}
+                      disabled={isSyncing}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm border shrink-0 ${
+                        isSyncing 
+                          ? (theme === 'dark' ? 'bg-purple-600/25 text-purple-400 border-purple-500/20 cursor-not-allowed' : 'bg-purple-50 text-purple-500 border-purple-100 cursor-not-allowed')
+                          : (theme === 'dark' ? 'bg-purple-600/10 text-purple-400 border-purple-500/20 hover:bg-purple-600/20 shadow-[0_0_12px_rgba(139,92,246,0.1)]' : 'bg-purple-50 text-purple-600 border-purple-100 hover:bg-purple-100/80')
+                      }`}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span>
+                        {isSyncing 
+                          ? (lang === 'ar' ? 'جاري المزامنة...' : 'Syncing...')
+                          : (lang === 'ar' ? 'مزامنة RentAHuman' : 'Sync RentAHuman')}
+                      </span>
+                    </button>
+                  );
+                })()}
                 <button 
-                  onClick={activeTab === 'users' ? fetchUsers : activeTab === 'config' ? fetchConfigs : activeTab === 'misc' ? fetchMiscItems : fetchNotifications}
+                  onClick={activeTab === 'users' || activeTab === 'accounts' ? async () => { await fetchUsers(); await fetchTransactions(); } : activeTab === 'config' ? fetchConfigs : activeTab === 'misc' ? fetchMiscItems : fetchNotifications}
                   className={`p-2.5 border rounded-xl transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
-                <button 
-                  onClick={activeTab === 'notifications' ? () => setIsNotificationModalOpen(true) : activeTab === 'misc' ? () => { setEditingMisc(null); setMiscFormData({ title: '', content: '', display_order: 0 }); setIsMiscModalOpen(true); } : handleOpenAdd}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20 text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>{activeTab === 'users' ? t.addNew : activeTab === 'config' ? t.addConfig : activeTab === 'misc' ? t.addMisc : t.addNotification}</span>
-                </button>
+                {activeTab !== 'accounts' && (
+                  <button 
+                    onClick={activeTab === 'notifications' ? () => setIsNotificationModalOpen(true) : activeTab === 'misc' ? () => { setEditingMisc(null); setMiscFormData({ title: '', content: '', display_order: 0 }); setIsMiscModalOpen(true); } : handleOpenAdd}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20 text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{activeTab === 'users' ? t.addNew : activeTab === 'config' ? t.addConfig : activeTab === 'misc' ? t.addMisc : t.addNotification}</span>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1563,24 +2680,42 @@ export default function Dashboard() {
         <div className="p-4 md:p-8">
         {activeTab === 'users' ? (
           <div className="space-y-6">
+            
 
-            {/* Search Bar */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-              <input 
-                type="text" 
-                placeholder={t.search}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full border rounded-2xl py-4 pl-12 pr-4 focus:border-blue-500 outline-none transition-all ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200 text-gray-900'}`}
-              />
-            </div>
+
+
 
             {/* Desktop Table View */}
             <div className={`hidden md:block rounded-3xl border shadow-sm overflow-hidden ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
               <table className="w-full text-left">
                 <thead>
                   <tr className={`border-b ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                    <th className="pl-6 py-5 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={
+                          (() => {
+                            const nonManagers = filteredUsers.filter(u => !u.is_manager);
+                            return nonManagers.length > 0 && nonManagers.every(u => selectedUserIds[u.id]);
+                          })()
+                        }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          const newSelected = { ...selectedUserIds };
+                          filteredUsers.forEach(u => {
+                            if (!u.is_manager) {
+                              if (checked) {
+                                newSelected[u.id] = true;
+                              } else {
+                                delete newSelected[u.id];
+                              }
+                            }
+                          });
+                          setSelectedUserIds(newSelected);
+                        }}
+                        className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${theme === 'dark' ? 'bg-[#222] border-white/10' : 'bg-white border-gray-300'}`}
+                      />
+                    </th>
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.profile}</th>
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.pin}</th>
                     <th className="px-6 py-5 text-gray-400 font-medium">{t.proxy}</th>
@@ -1593,11 +2728,35 @@ export default function Dashboard() {
                     {filteredUsers.map((user) => (
                       <motion.tr 
                         key={user.id}
+                        layout="position"
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         className={`transition-all group ${theme === 'dark' ? 'hover:bg-white/[0.02] divide-white/5' : 'hover:bg-gray-50 divide-gray-100'}`}
+                        style={{ borderLeft: user.owner_id ? `4px solid ${getOwnerHexColor(user.owner_id)}` : undefined }}
                       >
+                        <td className="pl-6 py-5 w-12 text-center">
+                          {!user.is_manager ? (
+                            <input
+                              type="checkbox"
+                              checked={!!selectedUserIds[user.id]}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                const newSelected = { ...selectedUserIds };
+                                if (checked) {
+                                  newSelected[user.id] = true;
+                                } else {
+                                  delete newSelected[user.id];
+                                }
+                                setSelectedUserIds(newSelected);
+                              }}
+                              className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${theme === 'dark' ? 'bg-[#222] border-white/10' : 'bg-white border-gray-300'}`}
+                            />
+                          ) : (
+                            <div className="w-4 h-4" />
+                          )}
+                        </td>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg text-white">
@@ -1620,6 +2779,46 @@ export default function Dashboard() {
                                   <span className="px-2 py-0.5 text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
                                     🔑 Auto-Login
                                   </span>
+                                )}
+                                {(() => {
+                                  const owner = user.owner_id ? users.find(u => u.id === user.owner_id) : null;
+                                  if (!owner) return null;
+                                  return (
+                                    <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold uppercase tracking-wider flex items-center gap-1 ${getOwnerClasses(user.owner_id)}`}>
+                                      👤 {lang === 'ar' ? `صاحب الحساب: ${owner.username}` : `Owner: ${owner.username}`}
+                                    </span>
+                                  );
+                                })()}
+                                {!user.is_manager && (
+                                  <>
+                                    {user.payoneer_email && (
+                                      <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold font-mono">
+                                        📧 Payoneer: {user.payoneer_email}
+                                      </span>
+                                    )}
+                                    <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold uppercase tracking-wider ${
+                                      user.payout_status === 'cleared'
+                                        ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                        : user.payout_status === 'requested'
+                                        ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                        : user.payout_status === 'ready'
+                                        ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                        : user.payout_status === 'suspended'
+                                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                        : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                                    }`}>
+                                      {user.payout_status === 'cleared' && '🟢 '}
+                                      {user.payout_status === 'requested' && '🟡 '}
+                                      {user.payout_status === 'ready' && '🔴 '}
+                                      {user.payout_status === 'suspended' && '⚠️ '}
+                                      {user.payout_status === 'waiting' && '⚪ '}
+                                      {user.payout_status === 'cleared' && (lang === 'ar' ? 'تم الوصول' : 'Cleared')}
+                                      {user.payout_status === 'requested' && (lang === 'ar' ? 'قيد الانتظار' : 'Requested')}
+                                      {user.payout_status === 'ready' && (lang === 'ar' ? 'جاهز للطلب' : 'Ready')}
+                                      {user.payout_status === 'suspended' && (lang === 'ar' ? 'معلقة' : 'Suspended')}
+                                      {(user.payout_status === 'waiting' || !user.payout_status) && (lang === 'ar' ? 'لم تبدأ الدورة' : 'Waiting')}
+                                    </span>
+                                  </>
                                 )}
                               </div>
                               <p className="text-gray-500 text-sm">{user.phone_number}</p>
@@ -1681,32 +2880,51 @@ export default function Dashboard() {
                         </td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex justify-end gap-2">
-                            <button 
-                              onClick={() => handleOpenUserSettings(user)}
-                              className="p-2 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all"
-                              title="User Button Settings"
-                            >
-                              <SlidersHorizontal className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleToggleBlock(user)}
-                              className={`p-2 rounded-lg transition-all ${user.is_blocked ? 'text-red-500 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-400 hover:bg-red-500/5'}`}
-                              title={user.is_blocked ? 'Unblock User' : 'Block User'}
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleOpenEdit(user)}
-                              className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteClick(user.id, user.username)}
-                              className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {user.is_manager ? (
+                              <button 
+                                onClick={() => handleOpenEdit(user)}
+                                className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
+                                title={lang === 'ar' ? 'تعديل البيانات' : 'Edit Profile'}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <>
+                                <button 
+                                  onClick={() => handleOpenUserSettings(user)}
+                                  className="p-2 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all"
+                                  title="User Button Settings"
+                                >
+                                  <SlidersHorizontal className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleToggleBlock(user)}
+                                  className={`p-2 rounded-lg transition-all ${user.is_blocked ? 'text-red-500 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-400 hover:bg-red-500/5'}`}
+                                  title={user.is_blocked ? 'Unblock User' : 'Block User'}
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleForceLogout(user)}
+                                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                                  title={lang === 'ar' ? 'تسجيل خروج إجباري' : 'Force Logout'}
+                                >
+                                  <LogOut className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleOpenEdit(user)}
+                                  className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteClick(user.id, user.username)}
+                                  className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </motion.tr>
@@ -1716,17 +2934,73 @@ export default function Dashboard() {
               </table>
             </div>
 
+            {/* Mobile Select All Bar */}
+            <div className={`md:hidden flex items-center justify-between p-4 rounded-2xl border mb-2 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}>
+              <label className="flex items-center gap-3 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={
+                    (() => {
+                      const nonManagers = filteredUsers.filter(u => !u.is_manager);
+                      return nonManagers.length > 0 && nonManagers.every(u => selectedUserIds[u.id]);
+                    })()
+                  }
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    const newSelected = { ...selectedUserIds };
+                    filteredUsers.forEach(u => {
+                      if (!u.is_manager) {
+                        if (checked) {
+                          newSelected[u.id] = true;
+                        } else {
+                          delete newSelected[u.id];
+                        }
+                      }
+                    });
+                    setSelectedUserIds(newSelected);
+                  }}
+                  className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${theme === 'dark' ? 'bg-[#222] border-white/10' : 'bg-white border-gray-300'}`}
+                />
+                <span className={`font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{lang === 'ar' ? 'تحديد الكل' : 'Select All'}</span>
+              </label>
+              <span className={`text-xs px-2.5 py-1 rounded-full border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-gray-100 border-gray-200 text-gray-600'}`}>
+                {Object.keys(selectedUserIds).filter(id => selectedUserIds[id]).length} {lang === 'ar' ? 'محدد' : 'selected'}
+              </span>
+            </div>
+
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
-              {filteredUsers.map((user) => (
-                <motion.div 
-                  key={user.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className={`p-6 rounded-3xl border shadow-sm space-y-6 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
-                >
+              <AnimatePresence mode="popLayout">
+                {filteredUsers.map((user) => (
+                  <motion.div 
+                    key={user.id}
+                    layout
+                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className={`p-6 rounded-3xl border shadow-sm space-y-6 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
+                    style={{ borderLeft: user.owner_id ? `6px solid ${getOwnerHexColor(user.owner_id)}` : undefined }}
+                  >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
+                      {!user.is_manager ? (
+                        <input
+                          type="checkbox"
+                          checked={!!selectedUserIds[user.id]}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            const newSelected = { ...selectedUserIds };
+                            if (checked) {
+                              newSelected[user.id] = true;
+                            } else {
+                              delete newSelected[user.id];
+                            }
+                            setSelectedUserIds(newSelected);
+                          }}
+                          className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${theme === 'dark' ? 'bg-[#222] border-white/10' : 'bg-white border-gray-300'}`}
+                        />
+                      ) : null}
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-xl text-white">
                         {user.username?.charAt(0).toUpperCase()}
                       </div>
@@ -1747,6 +3021,46 @@ export default function Dashboard() {
                             <span className="px-2 py-0.5 text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
                               🔑 Auto-Login
                             </span>
+                          )}
+                          {(() => {
+                            const owner = user.owner_id ? users.find(u => u.id === user.owner_id) : null;
+                            if (!owner) return null;
+                            return (
+                              <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold uppercase tracking-wider flex items-center gap-1 ${getOwnerClasses(user.owner_id)}`}>
+                                👤 {lang === 'ar' ? `صاحب الحساب: ${owner.username}` : `Owner: ${owner.username}`}
+                              </span>
+                            );
+                          })()}
+                          {!user.is_manager && (
+                            <>
+                              {user.payoneer_email && (
+                                <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold font-mono">
+                                  📧 Payoneer: {user.payoneer_email}
+                                </span>
+                              )}
+                              <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold uppercase tracking-wider ${
+                                user.payout_status === 'cleared'
+                                  ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                  : user.payout_status === 'requested'
+                                  ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                  : user.payout_status === 'ready'
+                                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                  : user.payout_status === 'suspended'
+                                  ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                  : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                              }`}>
+                                {user.payout_status === 'cleared' && '🟢 '}
+                                {user.payout_status === 'requested' && '🟡 '}
+                                {user.payout_status === 'ready' && '🔴 '}
+                                {user.payout_status === 'suspended' && '⚠️ '}
+                                {user.payout_status === 'waiting' && '⚪ '}
+                                {user.payout_status === 'cleared' && (lang === 'ar' ? 'تم الوصول' : 'Cleared')}
+                                {user.payout_status === 'requested' && (lang === 'ar' ? 'قيد الانتظار' : 'Requested')}
+                                {user.payout_status === 'ready' && (lang === 'ar' ? 'جاهز للطلب' : 'Ready')}
+                                {user.payout_status === 'suspended' && (lang === 'ar' ? 'معلقة' : 'Suspended')}
+                                {(user.payout_status === 'waiting' || !user.payout_status) && (lang === 'ar' ? 'لم تبدأ الدورة' : 'Waiting')}
+                              </span>
+                            </>
                           )}
                         </div>
                         <p className="text-gray-500 text-sm">{user.phone_number}</p>
@@ -1809,31 +3123,49 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleToggleBlock(user)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${user.is_blocked ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                    >
-                      <Ban className="w-4 h-4" />
-                      <span>{user.is_blocked ? (lang === 'ar' ? 'فك حظر' : 'Unblock') : (lang === 'ar' ? 'حظر' : 'Block')}</span>
-                    </button>
+                  {user.is_manager ? (
                     <button 
                       onClick={() => handleOpenEdit(user)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all w-full ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                     >
                       <Edit2 className="w-4 h-4" />
-                      <span>{lang === 'ar' ? 'تعديل' : 'Edit'}</span>
+                      <span>{lang === 'ar' ? 'تعديل البيانات' : 'Edit Profile'}</span>
                     </button>
-                    <button 
-                      onClick={() => handleDeleteClick(user.id, user.username)}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500/20 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>{lang === 'ar' ? 'حذف' : 'Delete'}</span>
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button 
+                        onClick={() => handleToggleBlock(user)}
+                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${user.is_blocked ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      >
+                        <Ban className="w-4 h-4" />
+                        <span>{user.is_blocked ? (lang === 'ar' ? 'فك حظر' : 'Unblock') : (lang === 'ar' ? 'حظر' : 'Block')}</span>
+                      </button>
+                      <button 
+                        onClick={() => handleForceLogout(user)}
+                        className="flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500/20 transition-all"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>{lang === 'ar' ? 'خروج إجباري' : 'Force Logout'}</span>
+                      </button>
+                      <button 
+                        onClick={() => handleOpenEdit(user)}
+                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        <span>{lang === 'ar' ? 'تعديل' : 'Edit'}</span>
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteClick(user.id, user.username)}
+                        className="flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500/20 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>{lang === 'ar' ? 'حذف' : 'Delete'}</span>
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               ))}
+              </AnimatePresence>
             </div>
 
             {filteredUsers.length === 0 && !loading && (
@@ -1841,7 +3173,66 @@ export default function Dashboard() {
                 {t.noUsers}
               </div>
             )}
+
+            {/* Floating Bulk Action Bar */}
+            {mounted && typeof window !== 'undefined' && createPortal(
+              <AnimatePresence>
+                {Object.keys(selectedUserIds).filter(id => selectedUserIds[id]).length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 50 }}
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between gap-4 px-6 py-4 rounded-2xl shadow-2xl border border-white/10 bg-[#16161a]/95 backdrop-blur-md max-w-full w-[90%] md:w-[600px] flex-col sm:flex-row"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center font-bold text-xs text-white">
+                        {Object.keys(selectedUserIds).filter(id => selectedUserIds[id]).length}
+                      </span>
+                      <span className="text-sm font-semibold text-white">
+                        {lang === 'ar' ? 'مستخدمين محددين' : 'users selected'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
+                      <button
+                        onClick={() => batchToggleBlock(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-all"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>{lang === 'ar' ? 'حظر' : 'Block'}</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => batchToggleBlock(false)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>{lang === 'ar' ? 'فك حظر' : 'Unblock'}</span>
+                      </button>
+
+                      <button
+                        onClick={batchForceLogout}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>{lang === 'ar' ? 'خروج إجباري' : 'Force Logout'}</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => setSelectedUserIds({})}
+                        className="px-2.5 py-2 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl text-xs font-medium transition-all"
+                      >
+                        {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>,
+              document.body
+            )}
           </div>
+        ) : activeTab === 'accounts' ? (
+          renderAccountsTab()
         ) : activeTab === 'config' ? (
           <div>
             {remoteConfigs.length === 0 ? (
@@ -2913,6 +4304,47 @@ export default function Dashboard() {
                       <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
+                  {!formData.is_manager && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm text-gray-400 ml-1">
+                          {lang === 'ar' ? 'صاحب الحساب (الموظف)' : 'Account Owner (Employee)'}
+                        </label>
+                        <select
+                          value={formData.owner_id || ''}
+                          onChange={e => setFormData({ ...formData, owner_id: e.target.value })}
+                          className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
+                            theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                          }`}
+                        >
+                          <option value="" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                            {lang === 'ar' ? 'بدون صاحب (هو الموظف الأساسي)' : 'None (This is the primary employee)'}
+                          </option>
+                          {users
+                            .filter(u => !u.is_manager && !u.owner_id && (editingUser ? u.id !== editingUser.id : true))
+                            .map(u => (
+                              <option key={u.id} value={u.id} className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                {u.username}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm text-gray-400 ml-1">
+                          {lang === 'ar' ? 'بريد بايونير (Payoneer Email)' : 'Payoneer Email'}
+                        </label>
+                        <input
+                          type="email"
+                          value={formData.payoneer_email || ''}
+                          onChange={e => setFormData({ ...formData, payoneer_email: e.target.value })}
+                          className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
+                            theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                          }`}
+                          placeholder="email@payoneer.com"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Microsoft Credentials Section */}
@@ -3155,6 +4587,225 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
+      {/* Financial Payout Modal */}
+      <AnimatePresence>
+        {isPayoutModalOpen && payoutTargetUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsPayoutModalOpen(false);
+                setPayoutTargetUser(null);
+              }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={`relative w-full max-w-md rounded-[2.5rem] border p-8 shadow-2xl ${
+                theme === 'dark' ? 'bg-[#111] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'
+              }`}
+            >
+              <h2 className="text-xl font-bold mb-6">
+                {lang === 'ar' ? `تسجيل صرف راتب: ${payoutTargetUser.username}` : `Salary Payout: ${payoutTargetUser.username}`}
+              </h2>
+              <form onSubmit={handlePayoutSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                    {lang === 'ar' ? 'المبلغ بالجنيه المصري (EGP)' : 'Amount (EGP)'}
+                  </label>
+                  <input 
+                    required
+                    type="number"
+                    step="any"
+                    value={payoutFormData.amountEgp}
+                    onChange={e => setPayoutFormData({...payoutFormData, amountEgp: e.target.value})}
+                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-bold font-mono ${
+                      theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                    }`}
+                    placeholder="e.g. 1500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                    {lang === 'ar' ? 'رقم فودافون كاش / المحفظة' : 'Mobile Transfer Number'}
+                  </label>
+                  <input 
+                    type="text"
+                    value={payoutFormData.transferMobile}
+                    onChange={e => setPayoutFormData({...payoutFormData, transferMobile: e.target.value})}
+                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-mono ${
+                      theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-[#fff] border-gray-200 text-gray-900'
+                    }`}
+                    placeholder="e.g. 01012345678"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                    {lang === 'ar' ? 'البيان / الملاحظات' : 'Description'}
+                  </label>
+                  <input 
+                    type="text"
+                    value={payoutFormData.description}
+                    onChange={e => setPayoutFormData({...payoutFormData, description: e.target.value})}
+                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
+                      theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                    }`}
+                    placeholder="e.g. June salary"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setIsPayoutModalOpen(false);
+                      setPayoutTargetUser(null);
+                    }}
+                    className={`flex-1 px-6 py-4 rounded-2xl font-bold transition-all ${
+                      theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    {t.cancel}
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-6 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-bold transition-all text-white shadow-lg shadow-emerald-600/20"
+                  >
+                    {lang === 'ar' ? 'تسجيل الدفع' : 'Record Payout'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Financial Transaction Modal */}
+      <AnimatePresence>
+        {isTxModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsTxModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={`relative w-full max-w-md rounded-[2.5rem] border p-8 shadow-2xl ${
+                theme === 'dark' ? 'bg-[#111] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'
+              }`}
+            >
+              <h2 className="text-xl font-bold mb-6">
+                {txFormData.type === 'deposit' && (lang === 'ar' ? 'إيداع أموال في المحفظة' : 'Deposit Funds')}
+                {txFormData.type === 'expense' && (lang === 'ar' ? 'تسجيل مصروفات' : 'Log Expense')}
+                {txFormData.type === 'profit_withdraw' && (lang === 'ar' ? 'سحب أرباح الشركاء' : 'Withdraw Partner Profits')}
+              </h2>
+              <form onSubmit={handleTxSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                    {lang === 'ar' ? 'العملية' : 'Transaction Type'}
+                  </label>
+                  <select
+                    value={txFormData.type}
+                    onChange={e => setTxFormData({...txFormData, type: e.target.value as any})}
+                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-bold ${
+                      theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                    }`}
+                  >
+                    <option value="deposit" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                      {lang === 'ar' ? 'إيداع (Deposit)' : 'Deposit'}
+                    </option>
+                    <option value="expense" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                      {lang === 'ar' ? 'مصروفات (Expense)' : 'Expense'}
+                    </option>
+                    <option value="profit_withdraw" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                      {lang === 'ar' ? 'سحب أرباح شركاء (Profit Withdraw)' : 'Profit Withdraw'}
+                    </option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                      {lang === 'ar' ? 'المبلغ ($)' : 'Amount (USD)'}
+                    </label>
+                    <input 
+                      type="number"
+                      step="any"
+                      value={txFormData.amountUsd}
+                      onChange={e => setTxFormData({...txFormData, amountUsd: e.target.value})}
+                      className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-bold font-mono ${
+                        theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                      }`}
+                      placeholder="$100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                      {lang === 'ar' ? 'المبلغ (EGP)' : 'Amount (EGP)'}
+                    </label>
+                    <input 
+                      type="number"
+                      step="any"
+                      value={txFormData.amountEgp}
+                      onChange={e => setTxFormData({...txFormData, amountEgp: e.target.value})}
+                      className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all font-bold font-mono ${
+                        theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                      }`}
+                      placeholder="5000"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                    {lang === 'ar' ? 'البيان / التفاصيل' : 'Description'}
+                  </label>
+                  <input 
+                    required
+                    type="text"
+                    value={txFormData.description}
+                    onChange={e => setTxFormData({...txFormData, description: e.target.value})}
+                    className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
+                      theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                    }`}
+                    placeholder="e.g. Rent Payment, Office rent, etc."
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsTxModalOpen(false)}
+                    className={`flex-1 px-6 py-4 rounded-2xl font-bold transition-all ${
+                      theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    {t.cancel}
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bold transition-all text-white shadow-lg shadow-blue-600/20"
+                  >
+                    {lang === 'ar' ? 'تسجيل العملية' : 'Save Transaction'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Per-User Button Settings Modal */}
       <AnimatePresence>
         {isUserSettingsOpen && selectedUserForSettings && (
@@ -3343,6 +4994,77 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
+      {/* Custom Force Logout Confirmation Modal */}
+      <AnimatePresence>
+        {isForceLogoutConfirmOpen && forceLogoutTargetUser && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsForceLogoutConfirmOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={`relative w-full max-w-sm rounded-[2rem] border p-8 shadow-2xl text-center ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/10' : 'bg-white border-gray-200'}`}
+            >
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-red-500/10 text-red-500">
+                <LogOut className="w-8 h-8" />
+              </div>
+              <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {lang === 'ar' ? 'تسجيل خروج إجباري' : 'Force Logout'}
+              </h3>
+              <p className="text-gray-500 text-sm mb-8">
+                {lang === 'ar' 
+                  ? `هل تريد حقاً تسجيل خروج المستخدم "${forceLogoutTargetUser.username}" من التطبيق إجبارياً؟ سيتم فصل البروكسي وإعادته لصفحة تسجيل الدخول.` 
+                  : `Are you sure you want to force logout user "${forceLogoutTargetUser.username}"? This will disconnect their proxy and return them to the login screen.`}
+              </p>
+              
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={confirmForceLogout}
+                  className="w-full py-3 text-white bg-red-600 hover:bg-red-500 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                >
+                  {lang === 'ar' ? 'نعم، سجل خروج' : 'Yes, Log Out'}
+                </button>
+                <button 
+                  onClick={() => setIsForceLogoutConfirmOpen(false)}
+                  className={`w-full py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border text-sm backdrop-blur-md max-w-sm ${
+              toast.type === 'error'
+                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                : toast.type === 'info'
+                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full animate-pulse ${
+              toast.type === 'error' ? 'bg-red-400' : toast.type === 'info' ? 'bg-blue-400' : 'bg-emerald-400'
+            }`} />
+            <span className="font-semibold">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Add/Edit Misc Modal */}
       {isMiscModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
@@ -3506,6 +5228,118 @@ function UserTimezoneDisplay({ timezone, small = false }: { timezone: string; sm
   );
 }
 
+// ─── RentAHuman Payout Header Widget Component ───────────────────────────────
+function PayoutHeaderWidget({ lang, theme }: { lang: 'en' | 'ar'; theme: string }) {
+  const [timeLeftStr, setTimeLeftStr] = useState('');
+  const [fullDetails, setFullDetails] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const getNextPayoutDate = () => {
+    const now = new Date();
+    // Wednesday 9:00 PM Pacific Time is Thursday 4:00 AM UTC
+    const target = new Date(now);
+    target.setUTCHours(4, 0, 0, 0);
+    
+    const currentDay = now.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 4 = Thu
+    const currentHours = now.getUTCHours();
+    
+    let daysToAdd = (4 - currentDay + 7) % 7;
+    
+    if (currentDay === 4) {
+      if (currentHours >= 16) {
+        daysToAdd = 7;
+      } else {
+        daysToAdd = 0;
+      }
+    }
+    
+    target.setUTCDate(target.getUTCDate() + daysToAdd);
+    return target;
+  };
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const target = getNextPayoutDate();
+      const diffMs = target.getTime() - now.getTime();
+      
+      if (diffMs <= 0) {
+        setTimeLeftStr(lang === 'ar' ? 'جاري السحب حالياً...' : 'Processing Payout...');
+        setIsProcessing(true);
+        setFullDetails(
+          lang === 'ar'
+            ? 'سحب الأرباح نشط حالياً! تستمر معالجة السحب لمدة 12 ساعة.'
+            : 'Payout is actively processing! This status remains for 12 hours.'
+        );
+        return;
+      }
+      
+      setIsProcessing(false);
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      
+      const dayLabel = lang === 'ar' ? 'يوم' : 'd';
+      const hourLabel = lang === 'ar' ? 'س' : 'h';
+      const minLabel = lang === 'ar' ? 'د' : 'm';
+      
+      const parts = [];
+      if (days > 0) parts.push(`${days}${dayLabel}`);
+      if (hours > 0 || days > 0) parts.push(`${hours}${hourLabel}`);
+      parts.push(`${minutes}${minLabel}`);
+      
+      setTimeLeftStr(parts.join(' '));
+      
+      const dateOpts: Intl.DateTimeFormatOptions = { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      const formattedDate = target.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', dateOpts);
+      
+      setFullDetails(
+        lang === 'ar'
+          ? `موعد السحب القادم: ${formattedDate} (يغطي أسبوع العمل السابق من الجمعة للجمعة)`
+          : `Next payout: ${formattedDate} (Covers previous Friday-to-Friday week)`
+      );
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 10000); // 10s interval is fine
+    return () => clearInterval(interval);
+  }, [lang]);
+
+  return (
+    <div 
+      title={fullDetails}
+      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 cursor-help transition-all shrink-0 select-none ${
+        isProcessing
+          ? theme === 'dark'
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.05)]'
+            : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100/70'
+          : theme === 'dark'
+            ? 'bg-purple-600/10 border-purple-500/20 text-purple-400 hover:bg-purple-600/20 shadow-[0_0_12px_rgba(139,92,246,0.05)]'
+            : 'bg-purple-50 border-purple-100 text-purple-600 hover:bg-purple-100/70'
+      }`}
+    >
+      <span className="flex h-1.5 w-1.5 relative">
+        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+          isProcessing ? 'bg-emerald-400' : 'bg-purple-400'
+        }`}></span>
+        <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+          isProcessing ? 'bg-emerald-500' : 'bg-purple-500'
+        }`}></span>
+      </span>
+      <Calendar className="w-3.5 h-3.5" />
+      <span>
+        {isProcessing ? timeLeftStr : (lang === 'ar' ? `السحب: ${timeLeftStr}` : `Payout: ${timeLeftStr}`)}
+      </span>
+    </div>
+  );
+}
+
 // ─── RentAHuman Integration Display Component ──────────────────────────────
 
 interface RentAHumanProfile {
@@ -3552,8 +5386,19 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
 
   useEffect(() => {
     if (!user.rah_human_id) {
-      if (user.rah_api_key && user.rah_balance !== undefined && user.rah_balance !== null) {
-        // Construct synthetic profile from Supabase fields synced by the mobile client!
+      if ((user.rah_api_key || user.rah_earnings) && user.rah_balance !== undefined && user.rah_balance !== null) {
+        // Construct synthetic profile from Supabase fields synced by the mobile client/scraper!
+        const transactions = Array.isArray(user.rah_earnings)
+          ? user.rah_earnings.map((tx: any) => ({
+              id: tx.id || '',
+              amount: tx.amount, // already in cents in the database!
+              type: tx.type || (tx.direction === 'received' ? 'figure_ongoing_payout' : 'transfer'),
+              description: tx.description || '',
+              createdAt: tx.created_at || tx.createdAt || tx.timestamp || '',
+              balanceAfter: tx.balance_after || tx.balanceAfter || 0
+            }))
+          : [];
+
         setProfile({
           id: user.id || 'synthetic-id',
           name: user.username || 'Worker',
@@ -3561,14 +5406,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
           currentlyDue: (user.rah_currently_due !== undefined && user.rah_currently_due !== null
             ? user.rah_currently_due
             : (user.ui_settings?.rah?.earnings_offset || (user.email === 'flash75711@gmail.com' ? 51.33 : 0) || user.rah_balance || 0)) * 100, // fall back to earnings_offset so pending amounts display automatically!
-          transactions: (user.rah_earnings || []).map((tx: any) => ({
-            id: tx.id || '',
-            amount: tx.amount, // already in cents in the database!
-            type: tx.type || (tx.direction === 'received' ? 'figure_ongoing_payout' : 'transfer'),
-            description: tx.description || '',
-            createdAt: tx.created_at || tx.createdAt || tx.timestamp || '',
-            balanceAfter: tx.balance_after || tx.balanceAfter || 0
-          })),
+          transactions: transactions,
           totalBookings: 0,
           rating: 5,
           reviewCount: 0,
@@ -3619,7 +5457,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
     };
   }, [user.rah_human_id, user.rah_api_key, user.rah_balance, user.rah_earnings]);
 
-  if (!user.rah_human_id && !user.rah_api_key) {
+  if (!user.rah_human_id && !user.rah_api_key && !user.rah_earnings) {
     return (
       <div className={`text-xs py-2 px-3 rounded-2xl border border-dashed flex items-center justify-center gap-1.5 font-medium ${
         theme === 'dark' ? 'border-white/10 text-gray-500 bg-white/[0.01]' : 'border-gray-200 text-gray-400 bg-gray-50/50'
@@ -3704,8 +5542,18 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
     : (automatedEarningsOffset > 0 ? automatedEarningsOffset : (user.email === 'flash75711@gmail.com' ? 51.33 : 0));
 
   // 5. Final aggregate figures (exact summation)
-  const totalEarnings = paidEarnings + earningsOffset;
-  const totalHours = Number((paidHours + hoursOffset).toFixed(1));
+  let totalEarnings = paidEarnings + earningsOffset;
+  let totalHours = Number((paidHours + hoursOffset).toFixed(1));
+
+  const scrapedStats = (!Array.isArray(user.rah_earnings) && user.rah_earnings && typeof user.rah_earnings === 'object')
+    ? (user.rah_earnings as any)
+    : null;
+
+  if (scrapedStats) {
+    paidEarnings = scrapedStats.paid_to_you || 0;
+    totalEarnings = paidEarnings + (scrapedStats.due_next_payout || 0);
+    totalHours = Number((scrapedStats.usable_hours || scrapedStats.hours_submitted || 0).toFixed(1));
+  }
 
   // 6. EGP Worker Payout and Net Profit calculations
   const exchangeRate = Number(user.ui_settings?.rah?.exchange_rate || 48.5); // Fallback to current EGP exchange rate if not overridden
@@ -3948,9 +5796,33 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
                       );
                     })}
 
-                    {transactions.length === 0 && (
+                    {transactions.length === 0 && scrapedStats && (
+                      <div className="space-y-3 p-1">
+                        <div className={`p-4 rounded-3xl border text-xs space-y-3 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 font-medium">{lang === 'ar' ? 'الساعات المقدمة' : 'Hours Submitted'}</span>
+                            <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{scrapedStats.hours_submitted} hrs</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-white/5 pt-2.5">
+                            <span className="text-gray-400 font-medium">{lang === 'ar' ? 'الساعات المقبولة للعمل' : 'Usable Hours'}</span>
+                            <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{scrapedStats.usable_hours} hrs</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-white/5 pt-2.5">
+                            <span className="text-gray-400 font-medium">{lang === 'ar' ? 'معدل صلاحية الساعات' : 'Usability Rate'}</span>
+                            <span className={`font-bold ${scrapedStats.usability_rate >= 100 ? 'text-emerald-400' : 'text-amber-400'}`}>{scrapedStats.usability_rate}%</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-gray-500 text-center font-medium leading-relaxed">
+                          {lang === 'ar' 
+                            ? 'تم سحب هذه الأرقام مباشرة من صفحة RentAHuman Ongoing.'
+                            : 'These stats were scraped directly from RentAHuman Ongoing page.'}
+                        </p>
+                      </div>
+                    )}
+
+                    {transactions.length === 0 && !scrapedStats && (
                       <div className="py-8 text-center text-xs text-gray-500 border border-dashed border-white/5 rounded-2xl">
-                        No transactions registered yet.
+                        {lang === 'ar' ? 'لا توجد معاملات مسجلة حتى الآن.' : 'No transactions registered yet.'}
                       </div>
                     )}
                   </div>
