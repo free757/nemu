@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import AtlasAdminPanel from '@/features/atlas-accounts/components/AtlasAdminPanel';
 import { sanitizeTranscript } from '@/lib/speechManager';
 import { RealtimePipeline } from '@/lib/realtimePipeline';
 import { resetThrottler, throttleAIRequest, startNewSession, getCurrentSessionId } from '@/lib/pipelineDebounce';
@@ -55,11 +56,13 @@ export default function Dashboard() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string; username: string; is_team_manager: boolean } | null>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [remoteConfigs, setRemoteConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users');
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   // Notifications state
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -84,11 +87,21 @@ export default function Dashboard() {
 
   // ── Auth Guard ────────────────────────────────────────────────────────────
   useEffect(() => {
-    const auth = sessionStorage.getItem('dashboard_auth');
-    if (!auth) {
+    try {
+      const auth = sessionStorage.getItem('dashboard_auth');
+      if (!auth) {
+        router.replace('/login');
+      } else {
+        const parsed = JSON.parse(auth);
+        setCurrentUser(parsed);
+        setIsAuthChecked(true);
+        if (parsed?.is_team_manager) {
+          setActiveTab('users');
+        }
+      }
+    } catch (e) {
+      console.warn('sessionStorage read error in main view', e);
       router.replace('/login');
-    } else {
-      setIsAuthChecked(true);
     }
   }, [router]);
 
@@ -308,6 +321,7 @@ export default function Dashboard() {
     proxy_location: '',
     proxy_timezone: '',
     is_manager: false,
+    is_team_manager: false,
     email: '',
     password: '',
     verification_code: '',
@@ -414,6 +428,7 @@ export default function Dashboard() {
       quickPaste: 'Quick Paste (IP:Port:User:Pass)',
       quickPastePlaceholder: 'Paste proxy string here...',
       isManager: 'Is Manager (Dashboard Access)',
+      isTeamManager: 'Team Manager (Restricted to Team)',
       blockConfirm: 'Are you sure you want to block this user? They will be logged out of their phone instantly.',
       unblockConfirm: 'Are you sure you want to unblock this user?',
       notifTitle: 'Notification Title',
@@ -482,6 +497,7 @@ export default function Dashboard() {
       quickPaste: 'لصق سريع (IP:Port:User:Pass)',
       quickPastePlaceholder: 'الصق سطر البروكسي هنا...',
       isManager: 'مدير (صلاحية دخول لوحة التحكم)',
+      isTeamManager: 'مدير تيم (محدد بموظفيه فقط)',
       blockConfirm: 'هل أنت متأكد من حظر هذا المستخدم؟ سيتم طرده وتسجيل خروجه من الهاتف فوراً.',
       unblockConfirm: 'هل أنت متأكد من إلغاء حظر هذا المستخدم؟',
       notifTitle: 'عنوان الإشعار',
@@ -499,7 +515,20 @@ export default function Dashboard() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('app_users').select('*').order('created_at', { ascending: false });
+    let authUser = null;
+    try {
+      const auth = sessionStorage.getItem('dashboard_auth');
+      authUser = auth ? JSON.parse(auth) : null;
+    } catch (e) {
+      console.warn('sessionStorage fetchUsers error', e);
+    }
+
+    let query = supabase.from('app_users').select('*');
+    if (authUser?.is_team_manager) {
+      query = query.or(`id.eq.${authUser.id},owner_id.eq.${authUser.id}`);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (!error) {
       setUsers(data);
       // Clean up selectedUserIds to remove any users that are no longer in the list
@@ -1070,11 +1099,16 @@ export default function Dashboard() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                       <div>
                         <div className="flex items-center gap-3">
-                          <div 
-                            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-lg animate-pulse"
-                            style={{ backgroundColor: employeeColor }}
-                          >
-                            {employee.username?.charAt(0).toUpperCase()}
+                          <div className="relative">
+                            <div 
+                              className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-lg animate-pulse"
+                              style={{ backgroundColor: employeeColor }}
+                            >
+                              {employee.username?.charAt(0).toUpperCase()}
+                            </div>
+                            {isProxyOnline(employee) && (
+                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-[#111] rounded-full shadow-sm" />
+                            )}
                           </div>
                           <div>
                             <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -1485,11 +1519,23 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    let authUser = null;
+    try {
+      const auth = sessionStorage.getItem('dashboard_auth');
+      authUser = auth ? JSON.parse(auth) : null;
+    } catch (e) {
+      console.warn('sessionStorage mount data fetch error', e);
+    }
+    const isTeamManager = authUser?.is_team_manager || false;
+
     fetchUsers();
-    fetchConfigs();
-    fetchNotifications();
-    fetchMiscItems();
-    fetchOverlayUiSettings();
+
+    if (!isTeamManager) {
+      fetchConfigs();
+      fetchNotifications();
+      fetchMiscItems();
+      fetchOverlayUiSettings();
+    }
 
     // Realtime channel for app_users updates
     const channel = supabase
@@ -1499,11 +1545,17 @@ export default function Dashboard() {
         { event: '*', schema: 'public', table: 'app_users' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setUsers((prev) => [payload.new as any, ...prev]);
+            const newUser = payload.new as any;
+            if (!isTeamManager || newUser.id === authUser?.id || newUser.owner_id === authUser?.id) {
+              setUsers((prev) => [newUser, ...prev]);
+            }
           } else if (payload.eventType === 'UPDATE') {
-            setUsers((prev) =>
-              prev.map((user) => (user.id === payload.new.id ? { ...user, ...payload.new } : user))
-            );
+            const updatedUser = payload.new as any;
+            if (!isTeamManager || updatedUser.id === authUser?.id || updatedUser.owner_id === authUser?.id) {
+              setUsers((prev) =>
+                prev.map((user) => (user.id === updatedUser.id ? { ...user, ...updatedUser } : user))
+              );
+            }
           } else if (payload.eventType === 'DELETE') {
             setUsers((prev) => prev.filter((user) => user.id === payload.old.id));
           }
@@ -1512,41 +1564,47 @@ export default function Dashboard() {
       .subscribe();
 
     // Realtime channel for financial_transactions updates
-    const txChannel = supabase
-      .channel('financial_transactions_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'financial_transactions' },
-        () => {
-          fetchTransactions();
-        }
-      )
-      .subscribe();
+    let txChannel: any = null;
+    if (!isTeamManager) {
+      txChannel = supabase
+        .channel('financial_transactions_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'financial_transactions' },
+          () => {
+            fetchTransactions();
+          }
+        )
+        .subscribe();
+    }
 
     // Realtime channel for remote_configs updates
-    const configChannel = supabase
-      .channel('remote_configs_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'remote_configs' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setRemoteConfigs((prev) => [payload.new as any, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setRemoteConfigs((prev) =>
-              prev.map((config) => (config.id === payload.new.id ? { ...config, ...payload.new } : config))
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setRemoteConfigs((prev) => prev.filter((config) => config.id === payload.old.id));
+    let configChannel: any = null;
+    if (!isTeamManager) {
+      configChannel = supabase
+        .channel('remote_configs_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'remote_configs' },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setRemoteConfigs((prev) => [payload.new as any, ...prev]);
+            } else if (payload.eventType === 'UPDATE') {
+              setRemoteConfigs((prev) =>
+                prev.map((config) => (config.id === payload.new.id ? { ...config, ...payload.new } : config))
+              );
+            } else if (payload.eventType === 'DELETE') {
+              setRemoteConfigs((prev) => prev.filter((config) => config.id === payload.old.id));
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    }
 
     return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(configChannel);
-      supabase.removeChannel(txChannel);
+      if (channel) supabase.removeChannel(channel);
+      if (configChannel) supabase.removeChannel(configChannel);
+      if (txChannel) supabase.removeChannel(txChannel);
     };
   }, []);
 
@@ -1582,12 +1640,15 @@ export default function Dashboard() {
     };
     
     // Update local state optimistically
-    setUsers((prev: any[]) => prev.map((u: any) => u.id === forceLogoutTargetUser.id ? { ...u, ui_settings: newSettings } : u));
+    setUsers((prev: any[]) => prev.map((u: any) => u.id === forceLogoutTargetUser.id ? { ...u, ui_settings: newSettings, last_device_id: null } : u));
     setIsForceLogoutConfirmOpen(false);
     
     const { error } = await supabase
       .from('app_users')
-      .update({ ui_settings: newSettings })
+      .update({ 
+        ui_settings: newSettings,
+        last_device_id: null
+      })
       .eq('id', forceLogoutTargetUser.id);
 
     if (error) {
@@ -1596,8 +1657,8 @@ export default function Dashboard() {
     } else {
       showToast(
         lang === 'ar'
-          ? 'تم إرسال أمر تسجيل الخروج بنجاح.'
-          : 'Force logout command sent successfully.',
+          ? 'تم إرسال أمر تسجيل الخروج وإعادة تعيين ارتباط الجهاز بنجاح.'
+          : 'Force logout and device reset command sent successfully.',
         'success'
       );
     }
@@ -1660,9 +1721,14 @@ export default function Dashboard() {
     if (!blockTargetUser) return;
     const newStatus = !blockTargetUser.is_blocked;
 
+    const payload: any = { is_blocked: newStatus };
+    if (newStatus === true) {
+      payload.last_device_id = null;
+    }
+
     const { error } = await supabase
       .from('app_users')
-      .update({ is_blocked: newStatus })
+      .update(payload)
       .eq('id', blockTargetUser.id);
 
     if (!error) {
@@ -1680,8 +1746,8 @@ export default function Dashboard() {
     
     const message = blockStatus
       ? (lang === 'ar' 
-         ? `هل أنت متأكد من حظر ${selectedIds.length} مستخدم؟ سيتم طردهم من هواتفهم فوراً.` 
-         : `Are you sure you want to block ${selectedIds.length} users? They will be logged out of their phones instantly.`)
+         ? `هل أنت متأكد من حظر ${selectedIds.length} مستخدم؟ سيتم طردهم من هواتفهم وإعادة تعيين ارتباط أجهزتهم فوراً.` 
+         : `Are you sure you want to block ${selectedIds.length} users? They will be logged out and their device associations will be reset instantly.`)
       : (lang === 'ar' 
          ? `هل أنت متأكد من إلغاء حظر ${selectedIds.length} مستخدم؟` 
          : `Are you sure you want to unblock ${selectedIds.length} users?`);
@@ -1689,9 +1755,14 @@ export default function Dashboard() {
     if (!confirm(message)) return;
     
     setLoading(true);
+    const payload: any = { is_blocked: blockStatus };
+    if (blockStatus === true) {
+      payload.last_device_id = null;
+    }
+
     const { error } = await supabase
       .from('app_users')
-      .update({ is_blocked: blockStatus })
+      .update(payload)
       .in('id', selectedIds);
       
     if (!error) {
@@ -1715,8 +1786,8 @@ export default function Dashboard() {
     
     const confirmed = confirm(
       lang === 'ar'
-        ? `هل أنت متأكد من تسجيل الخروج الإجباري لـ ${selectedIds.length} مستخدم؟`
-        : `Are you sure you want to force logout ${selectedIds.length} users?`
+        ? `هل أنت متأكد من تسجيل الخروج الإجباري وإعادة تعيين ارتباط الأجهزة لـ ${selectedIds.length} مستخدم؟`
+        : `Are you sure you want to force logout and reset device associations for ${selectedIds.length} users?`
     );
     if (!confirmed) return;
     
@@ -1730,7 +1801,8 @@ export default function Dashboard() {
           const currentSettings = u.ui_settings || {};
           return {
             ...u,
-            ui_settings: { ...currentSettings, force_logout: true }
+            ui_settings: { ...currentSettings, force_logout: true },
+            last_device_id: null
           };
         }
         return u;
@@ -1744,15 +1816,18 @@ export default function Dashboard() {
         };
         return supabase
           .from('app_users')
-          .update({ ui_settings: newSettings })
+          .update({ 
+            ui_settings: newSettings,
+            last_device_id: null
+          })
           .eq('id', user.id);
       });
       
       await Promise.all(promises);
       showToast(
         lang === 'ar'
-          ? `تم إرسال أمر تسجيل الخروج لـ ${selectedIds.length} مستخدم بنجاح.`
-          : `Force logout command sent to ${selectedIds.length} users successfully.`,
+          ? `تم إرسال أمر تسجيل الخروج وإعادة تعيين ارتباط الأجهزة لـ ${selectedIds.length} مستخدم بنجاح.`
+          : `Force logout and device reset command sent to ${selectedIds.length} users successfully.`,
         'success'
       );
       setSelectedUserIds({});
@@ -1780,6 +1855,7 @@ export default function Dashboard() {
       proxy_location: user.proxy_location || '',
       proxy_timezone: user.proxy_timezone || '',
       is_manager: user.is_manager || false,
+      is_team_manager: user.is_team_manager || false,
       email: user.email || '',
       password: user.password || '',
       verification_code: user.verification_code || '',
@@ -1835,7 +1911,7 @@ export default function Dashboard() {
       setFormData({
         pin: '', username: '', phone_number: '',
         proxy_ip: '', proxy_port: '', proxy_user: '', proxy_pass: '',
-        proxy_location: '', proxy_timezone: '', is_manager: false,
+        proxy_location: '', proxy_timezone: '', is_manager: false, is_team_manager: false,
         email: '', password: '', verification_code: '',
         rah_human_id: '', rah_api_key: '',
         rah_hours_offset: '', rah_earnings_offset: '', rah_rate_override: '',
@@ -1973,13 +2049,17 @@ export default function Dashboard() {
       proxy_location: formData.proxy_location?.trim() || null,
       proxy_timezone: formData.proxy_timezone?.trim() || null,
       phone_number: formData.phone_number?.trim() || null,
+      is_manager: formData.is_manager,
+      is_team_manager: formData.is_team_manager,
       email: formData.email?.trim() || null,
       password: formData.password?.trim() || null,
       verification_code: formData.verification_code?.trim() || null,
       rah_human_id: formData.rah_human_id?.trim() || null,
       rah_api_key: formData.rah_api_key?.trim() || null,
       ui_settings,
-      owner_id: formData.owner_id || null,
+      owner_id: currentUser?.is_team_manager 
+        ? (editingUser?.id === currentUser.id ? null : (editingUser ? formData.owner_id : currentUser.id)) 
+        : (formData.owner_id || null),
       payoneer_email: formData.payoneer_email?.trim() || null,
       payout_status: formData.payout_status || 'waiting'
     };
@@ -2523,41 +2603,52 @@ export default function Dashboard() {
                   <Users className="w-5 h-5 flex-shrink-0" />
                   {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.users}</motion.span>}
                 </button>
-                <button 
-                  onClick={() => { setActiveTab('accounts'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'accounts' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-                >
-                  <DollarSign className="w-5 h-5 flex-shrink-0" />
-                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{lang === 'ar' ? 'الحسابات والمالية' : 'Financial Accounts'}</motion.span>}
-                </button>
-                <button 
-                  onClick={() => { setActiveTab('config'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'config' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-                >
-                  <Settings className="w-5 h-5 flex-shrink-0" />
-                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.config}</motion.span>}
-                </button>
-                <button 
-                  onClick={() => { setActiveTab('tools'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'tools' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-                >
-                  <Bot className="w-5 h-5 flex-shrink-0" />
-                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.tools}</motion.span>}
-                </button>
-                <button 
-                  onClick={() => { setActiveTab('notifications'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'notifications' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-                >
-                  <Bell className="w-5 h-5 flex-shrink-0" />
-                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.notifications}</motion.span>}
-                </button>
-                <button 
-                  onClick={() => { setActiveTab('misc'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'misc' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
-                >
-                  <Layers className="w-5 h-5 flex-shrink-0" />
-                  {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.misc}</motion.span>}
-                </button>
+                {!currentUser?.is_team_manager && (
+                  <>
+                    <button 
+                      onClick={() => { setActiveTab('accounts'); setIsMobileMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'accounts' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                    >
+                      <DollarSign className="w-5 h-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{lang === 'ar' ? 'الحسابات والمالية' : 'Financial Accounts'}</motion.span>}
+                    </button>
+                    <button 
+                      onClick={() => { setActiveTab('config'); setIsMobileMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'config' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                    >
+                      <Settings className="w-5 h-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.config}</motion.span>}
+                    </button>
+                    <button 
+                      onClick={() => { setActiveTab('tools'); setIsMobileMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'tools' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                    >
+                      <Bot className="w-5 h-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.tools}</motion.span>}
+                    </button>
+                    <button 
+                      onClick={() => { setActiveTab('notifications'); setIsMobileMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'notifications' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                    >
+                      <Bell className="w-5 h-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.notifications}</motion.span>}
+                    </button>
+                    <button 
+                      onClick={() => { setActiveTab('misc'); setIsMobileMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'misc' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                    >
+                      <Layers className="w-5 h-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{t.misc}</motion.span>}
+                    </button>
+                    <button 
+                      onClick={() => { setActiveTab('atlas'); setIsMobileMenuOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'atlas' ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' : theme === 'dark' ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+                    >
+                      <Coins className="w-5 h-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-medium whitespace-nowrap">{lang === 'ar' ? 'حسابات أطلس' : 'Atlas Accounts'}</motion.span>}
+                    </button>
+                  </>
+                )}
               </nav>
 
               <div className={`p-4 border-t border-white/5 space-y-4 ${isSidebarCollapsed ? 'items-center flex flex-col px-0' : ''}`}>
@@ -2577,7 +2668,11 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => {
-                    sessionStorage.removeItem('dashboard_auth');
+                    try {
+                      sessionStorage.removeItem('dashboard_auth');
+                    } catch (e) {
+                      console.warn('sessionStorage logout error', e);
+                    }
                     router.replace('/login');
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-400/10 transition-all ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
@@ -2593,26 +2688,30 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto scroll-gpu">
-        <header className={`sticky top-0 z-30 px-4 md:px-8 py-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 ${theme === 'dark' ? 'bg-[#0a0a0a] border-white/5' : 'bg-[#f8f9fa] border-gray-200'}`}>
+        <header className={`sticky top-0 z-30 px-4 md:px-8 py-3 md:py-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 ${theme === 'dark' ? 'bg-[#0a0a0a] border-white/5' : 'bg-[#f8f9fa] border-gray-200'}`}>
           <div>
-            <h1 className="text-2xl font-bold mb-1">
-              {activeTab === 'users' ? t.title : activeTab === 'accounts' ? (lang === 'ar' ? 'الحسابات والمحفظة المالية' : 'Financial Accounts & Wallet') : activeTab === 'config' ? t.configTitle : activeTab === 'notifications' ? t.notificationsTitle : activeTab === 'misc' ? t.miscTitle : t.toolsTitle}
+            <h1 className="text-xl md:text-2xl font-bold mb-0.5">
+              {activeTab === 'users' ? t.title : activeTab === 'accounts' ? (lang === 'ar' ? 'الحسابات والمحفظة المالية' : 'Financial Accounts & Wallet') : activeTab === 'atlas' ? (lang === 'ar' ? 'إدارة حسابات وأرباح أطلس' : 'Atlas Accounts & Payouts') : activeTab === 'config' ? t.configTitle : activeTab === 'notifications' ? t.notificationsTitle : activeTab === 'misc' ? t.miscTitle : t.toolsTitle}
             </h1>
-            <p className="text-gray-500 text-xs md:text-sm">
-              {activeTab === 'users' ? t.subtitle : activeTab === 'accounts' ? (lang === 'ar' ? 'تتبع رواتب الموظفين، ساعات العمل، المصروفات، وأرباح الشركاء.' : 'Track employee salaries, hours, expenses, and partner profits.') : activeTab === 'config' ? t.subtitle : activeTab === 'notifications' ? t.notificationsSubtitle : activeTab === 'misc' ? t.miscSubtitle : t.toolsSubtitle}
+            <p className="text-gray-500 text-xs md:text-sm hidden sm:block">
+              {activeTab === 'users' ? t.subtitle : activeTab === 'accounts' ? (lang === 'ar' ? 'تتبع رواتب الموظفين، ساعات العمل، المصروفات، وأرباح الشركاء.' : 'Track employee salaries, hours, expenses, and partner profits.') : activeTab === 'atlas' ? (lang === 'ar' ? 'إدارة حسابات أطلس للموظفين وتصفير الساعات ودفع المستحقات.' : 'Manage Atlas employee accounts, reset hours, and log payments.') : activeTab === 'config' ? t.subtitle : activeTab === 'notifications' ? t.notificationsSubtitle : activeTab === 'misc' ? t.miscSubtitle : t.toolsSubtitle}
             </p>
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
-            <DashboardLiveClock lang={lang} theme={theme} />
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
+            <div className="hidden lg:block">
+              <DashboardLiveClock lang={lang} theme={theme} />
+            </div>
             {activeTab === 'users' && (
-              <PayoutHeaderWidget lang={lang} theme={theme} />
+              <div className="hidden md:block">
+                <PayoutHeaderWidget lang={lang} theme={theme} />
+              </div>
             )}
             {activeTab === 'users' && (() => {
               const nm = users.filter(u => !u.is_manager);
               const on = nm.filter(u => isProxyOnline(u)).length;
               return (
-                <div className="flex items-center gap-2 mr-2">
+                <div className="hidden md:flex items-center gap-2 mr-2">
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}`}>
                     <Users className="w-3.5 h-3.5 text-gray-400" />
                     <span className="text-gray-400">{lang === 'ar' ? 'الكل' : 'Total'}</span>
@@ -2634,18 +2733,18 @@ export default function Dashboard() {
             {activeTab !== 'tools' && (
               <>
                 {activeTab === 'users' && (
-                  <div className="relative w-48 sm:w-64">
+                  <div className="relative flex-1 sm:flex-none w-full sm:w-48 md:w-64">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                     <input 
                       type="text" 
                       placeholder={t.search}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className={`w-full border rounded-xl py-2.5 pl-10 pr-3 focus:border-blue-500 outline-none transition-all text-xs font-medium ${theme === 'dark' ? 'bg-[#111] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-950'}`}
+                      className={`w-full border rounded-xl py-2 pl-9 pr-3 focus:border-blue-500 outline-none transition-all text-xs font-medium ${theme === 'dark' ? 'bg-[#111] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-950'}`}
                     />
                   </div>
                 )}
-                {activeTab === 'users' && (() => {
+                {/* {activeTab === 'users' && (() => {
                   const syncConfig = remoteConfigs.find(c => c.config_key === 'rentahuman_sync_trigger');
                   const syncStatus = syncConfig?.config_value?.status || 'idle';
                   const isSyncing = syncStatus === 'requested' || syncStatus === 'running';
@@ -2654,34 +2753,41 @@ export default function Dashboard() {
                     <button
                       onClick={handleTriggerRentAHumanSync}
                       disabled={isSyncing}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all text-sm border shrink-0 ${
+                      className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 rounded-xl font-bold transition-all text-xs md:text-sm border shrink-0 ${
                         isSyncing 
                           ? (theme === 'dark' ? 'bg-purple-600/25 text-purple-400 border-purple-500/20 cursor-not-allowed' : 'bg-purple-50 text-purple-500 border-purple-100 cursor-not-allowed')
                           : (theme === 'dark' ? 'bg-purple-600/10 text-purple-400 border-purple-500/20 hover:bg-purple-600/20 shadow-[0_0_12px_rgba(139,92,246,0.1)]' : 'bg-purple-50 text-purple-600 border-purple-100 hover:bg-purple-100/80')
                       }`}
                     >
-                      <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span className="hidden sm:inline">
                         {isSyncing 
                           ? (lang === 'ar' ? 'جاري المزامنة...' : 'Syncing...')
                           : (lang === 'ar' ? 'مزامنة RentAHuman' : 'Sync RentAHuman')}
                       </span>
+                      {isSyncing && (
+                        <span className="sm:hidden">
+                          {lang === 'ar' ? 'جاري...' : 'Sync...'}
+                        </span>
+                      )}
                     </button>
                   );
-                })()}
+                })()} */}
                 <button 
                   onClick={activeTab === 'users' || activeTab === 'accounts' ? async () => { await fetchUsers(); await fetchTransactions(); } : activeTab === 'config' ? fetchConfigs : activeTab === 'misc' ? fetchMiscItems : fetchNotifications}
-                  className={`p-2.5 border rounded-xl transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+                  className={`p-2 border md:p-2.5 rounded-xl transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
                 >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
-                {activeTab !== 'accounts' && (
+                {activeTab !== 'accounts' && activeTab !== 'atlas' && (
                   <button 
                     onClick={activeTab === 'notifications' ? () => setIsNotificationModalOpen(true) : activeTab === 'misc' ? () => { setEditingMisc(null); setMiscFormData({ title: '', content: '', display_order: 0 }); setIsMiscModalOpen(true); } : handleOpenAdd}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20 text-sm"
+                    className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-blue-600 rounded-xl hover:bg-blue-500 transition-all font-bold text-white shadow-lg shadow-blue-600/20 text-xs md:text-sm shrink-0"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>{activeTab === 'users' ? t.addNew : activeTab === 'config' ? t.addConfig : activeTab === 'misc' ? t.addMisc : t.addNotification}</span>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">
+                      {activeTab === 'users' ? t.addNew : activeTab === 'config' ? t.addConfig : activeTab === 'misc' ? t.addMisc : t.addNotification}
+                    </span>
                   </button>
                 )}
               </>
@@ -2774,8 +2880,13 @@ export default function Dashboard() {
                             {user.owner_id && (
                               <span className={`text-xl font-bold select-none mr-1 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'}`}>↳</span>
                             )}
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg text-white">
-                              {user.username?.charAt(0).toUpperCase()}
+                            <div className="relative">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg text-white">
+                                {user.username?.charAt(0).toUpperCase()}
+                              </div>
+                              {isProxyOnline(user) && (
+                                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-[#111] rounded-full shadow-sm" />
+                              )}
                             </div>
                             <div>
                               <div className="flex items-center flex-wrap gap-2">
@@ -2978,214 +3089,269 @@ export default function Dashboard() {
                 />
                 <span className={`font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{lang === 'ar' ? 'تحديد الكل' : 'Select All'}</span>
               </label>
-              <span className={`text-xs px-2.5 py-1 rounded-full border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-gray-100 border-gray-200 text-gray-600'}`}>
-                {Object.keys(selectedUserIds).filter(id => selectedUserIds[id]).length} {lang === 'ar' ? 'محدد' : 'selected'}
-              </span>
+              <div className="flex items-center gap-2.5">
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
+                  theme === 'dark' 
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                }`}>
+                  {lang === 'ar' 
+                    ? `متصل: ${users.filter(u => !u.is_manager && isProxyOnline(u)).length}/${users.filter(u => !u.is_manager).length}` 
+                    : `Online: ${users.filter(u => !u.is_manager && isProxyOnline(u)).length}/${users.filter(u => !u.is_manager).length}`}
+                </span>
+                <span className={`text-xs px-2.5 py-1 rounded-full border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-gray-100 border-gray-200 text-gray-600'}`}>
+                  {Object.keys(selectedUserIds).filter(id => selectedUserIds[id]).length} {lang === 'ar' ? 'محدد' : 'selected'}
+                </span>
+              </div>
             </div>
 
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
               <AnimatePresence mode="popLayout">
-                {filteredUsers.map((user) => (
-                  <motion.div 
-                    key={user.id}
-                    layout
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className={`p-6 rounded-3xl border shadow-sm space-y-6 ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
-                    style={{ 
-                      borderLeft: !user.is_manager ? `6px solid ${getOwnerHexColor(user.owner_id || user.id)}` : undefined,
-                      marginLeft: user.owner_id ? '1.5rem' : undefined
-                    }}
-                  >
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      {!user.is_manager ? (
-                        <input
-                          type="checkbox"
-                          checked={!!selectedUserIds[user.id]}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            const newSelected = { ...selectedUserIds };
-                            if (checked) {
-                              newSelected[user.id] = true;
-                            } else {
-                              delete newSelected[user.id];
-                            }
-                            setSelectedUserIds(newSelected);
-                          }}
-                          className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${theme === 'dark' ? 'bg-[#222] border-white/10' : 'bg-white border-gray-300'}`}
-                        />
-                      ) : null}
-                      {user.owner_id && (
-                        <span className={`text-xl font-bold select-none mr-1 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'}`}>↳</span>
-                      )}
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-xl text-white">
-                        {user.username?.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center flex-wrap gap-2">
-                          <h3 className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</h3>
-                          {user.is_manager && (
-                            <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold uppercase tracking-wider">
-                              Manager
-                            </span>
+                {filteredUsers.map((user) => {
+                  const isExpanded = expandedUserId === user.id;
+                  return (
+                    <motion.div 
+                      key={user.id}
+                      layout
+                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className={`p-6 rounded-3xl border shadow-sm transition-all duration-300 ${isExpanded ? 'space-y-6' : 'space-y-0'} ${theme === 'dark' ? 'bg-[#111] border-white/5' : 'bg-white border-gray-200'}`}
+                      style={{ 
+                        borderLeft: !user.is_manager ? `6px solid ${getOwnerHexColor(user.owner_id || user.id)}` : undefined,
+                        marginLeft: user.owner_id ? '1.5rem' : undefined
+                      }}
+                    >
+                      {/* Card Header (clickable to expand/collapse) */}
+                      <div 
+                        onClick={() => setExpandedUserId(isExpanded ? null : user.id)}
+                        className="flex justify-between items-center cursor-pointer select-none"
+                      >
+                        <div className="flex items-center gap-3 animate-none">
+                          {!user.is_manager ? (
+                            <input
+                              type="checkbox"
+                              checked={!!selectedUserIds[user.id]}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                const newSelected = { ...selectedUserIds };
+                                if (checked) {
+                                  newSelected[user.id] = true;
+                                } else {
+                                  delete newSelected[user.id];
+                                }
+                                setSelectedUserIds(newSelected);
+                              }}
+                              className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${theme === 'dark' ? 'bg-[#222] border-white/10' : 'bg-white border-gray-300'}`}
+                            />
+                          ) : null}
+                          {user.owner_id && (
+                            <span className={`text-xl font-bold select-none mr-1 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'}`}>↳</span>
                           )}
-                          {user.is_blocked && (
-                            <span className="px-2 py-0.5 text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 rounded-full font-bold uppercase tracking-wider">
-                              Blocked
-                            </span>
-                          )}
-                          {user.email && user.password && (
-                            <span className="px-2 py-0.5 text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
-                              🔑 Auto-Login
-                            </span>
-                          )}
-                          {(() => {
-                            const owner = user.owner_id ? users.find(u => u.id === user.owner_id) : null;
-                            if (!owner) return null;
-                            return (
-                              <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold uppercase tracking-wider flex items-center gap-1 ${getOwnerClasses(user.owner_id)}`}>
-                                👤 {lang === 'ar' ? `صاحب الحساب: ${owner.username}` : `Owner: ${owner.username}`}
-                              </span>
-                            );
-                          })()}
-                          {!user.is_manager && (
-                            <>
-                              {user.payoneer_email && (
-                                <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold font-mono">
-                                  📧 Payoneer: {user.payoneer_email}
+                          <div className="relative">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-lg text-white">
+                              {user.username?.charAt(0).toUpperCase()}
+                            </div>
+                            {isProxyOnline(user) && (
+                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-[#111] rounded-full shadow-sm" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center flex-wrap gap-1.5">
+                              <h3 className={`font-bold text-base ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{user.username}</h3>
+                              {user.is_manager && (
+                                <span className="p-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg flex items-center justify-center" title="Manager">
+                                  <ShieldCheck className="w-3.5 h-3.5" />
                                 </span>
                               )}
-                              <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold uppercase tracking-wider ${
-                                user.payout_status === 'cleared'
-                                  ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                                  : user.payout_status === 'requested'
-                                  ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                  : user.payout_status === 'ready'
-                                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                  : user.payout_status === 'suspended'
-                                  ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-                                  : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                              }`}>
-                                {user.payout_status === 'cleared' && '🟢 '}
-                                {user.payout_status === 'requested' && '🟡 '}
-                                {user.payout_status === 'ready' && '🔴 '}
-                                {user.payout_status === 'suspended' && '⚠️ '}
-                                {user.payout_status === 'waiting' && '⚪ '}
-                                {user.payout_status === 'cleared' && (lang === 'ar' ? 'تم الوصول' : 'Cleared')}
-                                {user.payout_status === 'requested' && (lang === 'ar' ? 'قيد الانتظار' : 'Requested')}
-                                {user.payout_status === 'ready' && (lang === 'ar' ? 'جاهز للطلب' : 'Ready')}
-                                {user.payout_status === 'suspended' && (lang === 'ar' ? 'معلقة' : 'Suspended')}
-                                {(user.payout_status === 'waiting' || !user.payout_status) && (lang === 'ar' ? 'لم تبدأ الدورة' : 'Waiting')}
-                              </span>
-                            </>
-                          )}
+                              {user.is_blocked && (
+                                <span className="p-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg flex items-center justify-center" title="Blocked">
+                                  <Ban className="w-3.5 h-3.5" />
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-gray-500 text-xs">{user.phone_number || (lang === 'ar' ? 'بدون رقم هاتف' : 'No phone number')}</p>
+                          </div>
                         </div>
-                        <p className="text-gray-500 text-sm">{user.phone_number}</p>
-                        {user.email && (
-                          <p className="text-xs text-gray-400 mt-1 flex items-center flex-wrap gap-1 font-mono">
-                            <span>📧 {user.email}</span>
-                            {user.verification_code && (
-                              <span className="text-amber-400 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20 font-sans text-[10px]">
-                                OTP: {user.verification_code}
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-1 border rounded-lg font-mono text-xs text-blue-400 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
+                            {user.pin}
+                          </span>
+                          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                      </div>
+
+                      {/* Card Details (Expanded Area) */}
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-6 pt-4 border-t border-dashed border-gray-200 dark:border-white/10"
+                        >
+                          {/* Status Badges Grid */}
+                          <div className="flex flex-wrap gap-2">
+                            {user.email && user.password && (
+                              <span className="px-2 py-0.5 text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-full font-bold flex items-center gap-1" title={lang === 'ar' ? 'تسجيل دخول تلقائي' : 'Auto-Login'}>
+                                🔑 <span className="text-[9px] uppercase tracking-wider">{lang === 'ar' ? 'تلقائي' : 'Auto'}</span>
                               </span>
                             )}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 border rounded-lg font-mono text-sm text-blue-400 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
-                      {user.pin}
-                    </span>
-                  </div>
-
-                  <RentAHumanDisplay user={user} theme={theme} lang={lang} isMobile />
-
-                  {user.is_manager ? (
-                    <div className={`p-5 rounded-2xl border flex flex-col items-center text-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.05)] ${theme === 'dark' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/50 border-amber-200'}`}>
-                      <div className="p-3 bg-amber-500/10 rounded-full text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-                        <ShieldCheck className="w-6 h-6" strokeWidth={2.5} />
-                      </div>
-                      <p className="text-sm font-bold text-amber-500">{lang === 'ar' ? 'مدير النظام (صلاحيات كاملة)' : 'System Administrator'}</p>
-                      <p className="text-xs text-gray-500 max-w-[240px]">
-                        {lang === 'ar' ? 'صلاحيات وصول كاملة لوحة التحكم وخيارات التهيئة.' : 'Full system privileges for dashboard configurations and logs.'}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className={`p-4 rounded-2xl space-y-2 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
-                      <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{t.proxy}</p>
-                      <p className="flex items-center gap-2 text-sm">
-                        <Globe className="w-4 h-4 text-blue-500" />
-                        <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>{user.proxy_ip}:{user.proxy_port}</span>
-                      </p>
-                      <p className="text-gray-500 text-xs flex items-center gap-2">
-                         <MapPin className="w-4 h-4" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {user.proxy_timezone && <UserTimezoneDisplay timezone={user.proxy_timezone} />}
-                        {isProxyOnline(user) ? (
-                          <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-xl w-max font-semibold text-xs border border-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                            <span>ONLINE</span>
+                            {(() => {
+                              const owner = user.owner_id ? users.find(u => u.id === user.owner_id) : null;
+                              if (!owner) return null;
+                              return (
+                                <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold flex items-center gap-1 ${getOwnerClasses(user.owner_id)}`}>
+                                  👤 {owner.username}
+                                </span>
+                              );
+                            })()}
+                            {!user.is_manager && (
+                              <>
+                                {user.payoneer_email && (
+                                  <span className="px-2 py-0.5 text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold font-mono flex items-center gap-1">
+                                    📧 {user.payoneer_email}
+                                  </span>
+                                )}
+                                <span className={`px-2 py-0.5 text-[10px] border rounded-full font-bold uppercase tracking-wider ${
+                                  user.payout_status === 'cleared'
+                                    ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                    : user.payout_status === 'requested'
+                                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                    : user.payout_status === 'ready'
+                                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    : user.payout_status === 'suspended'
+                                    ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                    : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                                }`}>
+                                  {user.payout_status === 'cleared' && '🟢 '}
+                                  {user.payout_status === 'requested' && '🟡 '}
+                                  {user.payout_status === 'ready' && '🔴 '}
+                                  {user.payout_status === 'suspended' && '⚠️ '}
+                                  {user.payout_status === 'waiting' && '⚪ '}
+                                  {user.payout_status === 'cleared' && (lang === 'ar' ? 'تم الوصول' : 'Cleared')}
+                                  {user.payout_status === 'requested' && (lang === 'ar' ? 'قيد الانتظار' : 'Requested')}
+                                  {user.payout_status === 'ready' && (lang === 'ar' ? 'جاهز للطلب' : 'Ready')}
+                                  {user.payout_status === 'suspended' && (lang === 'ar' ? 'معلقة' : 'Suspended')}
+                                  {(user.payout_status === 'waiting' || !user.payout_status) && (lang === 'ar' ? 'لم تبدأ الدورة' : 'Waiting')}
+                                </span>
+                              </>
+                            )}
                           </div>
-                        ) : (
-                          <div 
-                            className="flex items-center gap-1.5 bg-gray-500/10 text-gray-400 px-3 py-1 rounded-xl w-max font-medium text-xs border border-gray-500/10 cursor-help"
-                            title={user.proxy_last_seen ? new Date(user.proxy_last_seen).toLocaleString() : undefined}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-gray-400" />
-                            <span>{lang === 'ar' ? `آخر ظهور: ${formatLastSeen(user.proxy_last_seen, 'ar')}` : `LAST SEEN: ${formatLastSeen(user.proxy_last_seen, 'en').toUpperCase()}`}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
-                  {user.is_manager ? (
-                    <button 
-                      onClick={() => handleOpenEdit(user)}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all w-full ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      <span>{lang === 'ar' ? 'تعديل البيانات' : 'Edit Profile'}</span>
-                    </button>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button 
-                        onClick={() => handleToggleBlock(user)}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${user.is_blocked ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                      >
-                        <Ban className="w-4 h-4" />
-                        <span>{user.is_blocked ? (lang === 'ar' ? 'فك حظر' : 'Unblock') : (lang === 'ar' ? 'حظر' : 'Block')}</span>
-                      </button>
-                      <button 
-                        onClick={() => handleForceLogout(user)}
-                        className="flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500/20 transition-all"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>{lang === 'ar' ? 'خروج إجباري' : 'Force Logout'}</span>
-                      </button>
-                      <button 
-                        onClick={() => handleOpenEdit(user)}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        <span>{lang === 'ar' ? 'تعديل' : 'Edit'}</span>
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteClick(user.id, user.username)}
-                        className="flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500/20 transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>{lang === 'ar' ? 'حذف' : 'Delete'}</span>
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              ))}
+                          {user.email && (
+                            <div className={`p-4 rounded-2xl space-y-1.5 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                              <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{lang === 'ar' ? 'بيانات تسجيل الدخول' : 'Login Credentials'}</p>
+                              <p className="text-xs font-mono text-gray-400 break-all">📧 {user.email}</p>
+                              {user.verification_code && (
+                                <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                                  <span>{lang === 'ar' ? 'رمز التحقق (OTP):' : 'OTP Code:'}</span>
+                                  <span className="text-amber-400 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20 font-sans text-xs">
+                                    {user.verification_code}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <RentAHumanDisplay user={user} theme={theme} lang={lang} isMobile />
+
+                          {user.is_manager ? (
+                            <div className={`p-5 rounded-2xl border flex flex-col items-center text-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.05)] ${theme === 'dark' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/50 border-amber-200'}`}>
+                              <div className="p-3 bg-amber-500/10 rounded-full text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+                                <ShieldCheck className="w-6 h-6" strokeWidth={2.5} />
+                              </div>
+                              <p className="text-sm font-bold text-amber-500">{lang === 'ar' ? 'مدير النظام (صلاحيات كاملة)' : 'System Administrator'}</p>
+                              <p className="text-xs text-gray-500 max-w-[240px]">
+                                {lang === 'ar' ? 'صلاحيات وصول كاملة لوحة التحكم وخيارات التهيئة.' : 'Full system privileges for dashboard configurations and logs.'}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className={`p-4 rounded-2xl space-y-2 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                              <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{t.proxy}</p>
+                              <p className="flex items-center gap-2 text-sm">
+                                <Globe className="w-4 h-4 text-blue-500" />
+                                <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>{user.proxy_ip}:{user.proxy_port}</span>
+                              </p>
+                              <p className="text-gray-500 text-xs flex items-center gap-2">
+                                 <MapPin className="w-4 h-4" /> {user.proxy_location || 'N/A'} • {user.proxy_timezone || 'N/A'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                {user.proxy_timezone && <UserTimezoneDisplay timezone={user.proxy_timezone} />}
+                                {isProxyOnline(user) ? (
+                                  <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-xl w-max font-semibold text-xs border border-emerald-500/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                    <span>ONLINE</span>
+                                  </div>
+                                ) : (
+                                  <div 
+                                    className="flex items-center gap-1.5 bg-gray-500/10 text-gray-400 px-3 py-1 rounded-xl w-max font-medium text-xs border border-gray-500/10 cursor-help"
+                                    title={user.proxy_last_seen ? new Date(user.proxy_last_seen).toLocaleString() : undefined}
+                                  >
+                                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                                    <span>{lang === 'ar' ? `آخر ظهور: ${formatLastSeen(user.proxy_last_seen, 'ar')}` : `LAST SEEN: ${formatLastSeen(user.proxy_last_seen, 'en').toUpperCase()}`}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {user.is_manager ? (
+                            <button 
+                              onClick={() => handleOpenEdit(user)}
+                              className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all w-full ${theme === 'dark' ? 'bg-white/5 text-gray-300 hover:bg-white/10' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                              <span>{lang === 'ar' ? 'تعديل البيانات' : 'Edit Profile'}</span>
+                            </button>
+                          ) : (
+                            <div className="flex gap-2 pt-2">
+                              <button 
+                                onClick={() => handleToggleBlock(user)}
+                                title={user.is_blocked ? (lang === 'ar' ? 'فك حظر' : 'Unblock') : (lang === 'ar' ? 'حظر' : 'Block')}
+                                className={`flex-1 flex items-center justify-center py-3 rounded-xl font-bold transition-all ${
+                                  user.is_blocked 
+                                    ? 'bg-red-500/15 text-red-500 hover:bg-red-500/20' 
+                                    : (theme === 'dark' ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
+                                }`}
+                              >
+                                <Ban className="w-4.5 h-4.5" />
+                              </button>
+                              <button 
+                                onClick={() => handleForceLogout(user)}
+                                title={lang === 'ar' ? 'خروج إجباري' : 'Force Logout'}
+                                className="flex-1 flex items-center justify-center py-3 bg-amber-500/10 text-amber-500 rounded-xl font-bold hover:bg-amber-500/20 transition-all border border-amber-500/10"
+                              >
+                                <LogOut className="w-4.5 h-4.5" />
+                              </button>
+                              <button 
+                                onClick={() => handleOpenEdit(user)}
+                                title={lang === 'ar' ? 'تعديل' : 'Edit'}
+                                className={`flex-1 flex items-center justify-center py-3 rounded-xl font-bold transition-all ${
+                                  theme === 'dark' 
+                                    ? 'bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600/20' 
+                                    : 'bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100/80'
+                                }`}
+                              >
+                                <Edit2 className="w-4.5 h-4.5" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteClick(user.id, user.username)}
+                                title={lang === 'ar' ? 'حذف' : 'Delete'}
+                                className="flex-1 flex items-center justify-center py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500/20 transition-all border border-red-500/10"
+                              >
+                                <Trash2 className="w-4.5 h-4.5" />
+                              </button>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
             </div>
 
@@ -3254,6 +3420,8 @@ export default function Dashboard() {
           </div>
         ) : activeTab === 'accounts' ? (
           renderAccountsTab()
+        ) : activeTab === 'atlas' ? (
+          <AtlasAdminPanel lang={lang} theme={theme} />
         ) : activeTab === 'config' ? (
           <div>
             {remoteConfigs.length === 0 ? (
@@ -3463,6 +3631,18 @@ export default function Dashboard() {
 
             {activeAITool === null ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Atlas Helper Card */}
+                <div 
+                  onClick={() => router.push('/atlas-helper')}
+                  className={`p-6 rounded-3xl border cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 flex flex-col items-center justify-center text-center space-y-4 ${theme === 'dark' ? 'bg-[#111] border-white/10 hover:border-emerald-500/50' : 'bg-white border-gray-200 hover:border-emerald-500'}`}
+                >
+                  <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center">
+                    <Sparkles className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold">Atlas Helper</h3>
+                  <p className="text-sm text-gray-500">Validate and correct Atlas Capture action labels using Gemini 2.5 Pro.</p>
+                </div>
+
                 {/* Live Interview Assistant Card */}
                 <div 
                   onClick={() => setActiveAITool('interview')}
@@ -4313,274 +4493,302 @@ export default function Dashboard() {
                       placeholder="+20123456789"
                     />
                   </div>
-                  <div className={`flex items-center justify-between p-4 rounded-2xl border transition-all h-[56px] self-end ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
-                    <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t.isManager}</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={formData.is_manager} 
-                        onChange={e => setFormData({...formData, is_manager: e.target.checked})} 
-                        className="sr-only peer" 
-                      />
-                      <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                  {!formData.is_manager && (
+                  {!currentUser?.is_team_manager && (
                     <>
-                      <div className="space-y-2">
-                        <label className="text-sm text-gray-400 ml-1">
-                          {lang === 'ar' ? 'صاحب الحساب (الموظف)' : 'Account Owner (Employee)'}
+                      <div className={`flex items-center justify-between p-4 rounded-2xl border transition-all h-[56px] self-end ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t.isManager}</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={formData.is_manager} 
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setFormData({
+                                ...formData, 
+                                is_manager: checked,
+                                is_team_manager: checked ? formData.is_team_manager : false
+                              });
+                            }} 
+                            className="sr-only peer" 
+                          />
+                          <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
-                        <select
-                          value={formData.owner_id || ''}
-                          onChange={e => setFormData({ ...formData, owner_id: e.target.value })}
-                          className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
-                            theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
-                          }`}
-                        >
-                          <option value="" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
-                            {lang === 'ar' ? 'بدون صاحب (هو الموظف الأساسي)' : 'None (This is the primary employee)'}
-                          </option>
-                          {users
-                            .filter(u => !u.is_manager && !u.owner_id && (editingUser ? u.id !== editingUser.id : true))
-                            .map(u => (
-                              <option key={u.id} value={u.id} className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
-                                {u.username}
+                      </div>
+                      {formData.is_manager && (
+                        <div className={`flex items-center justify-between p-4 rounded-2xl border transition-all h-[56px] self-end ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                          <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{t.isTeamManager}</span>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={formData.is_team_manager} 
+                              onChange={e => setFormData({...formData, is_team_manager: e.target.checked})} 
+                              className="sr-only peer" 
+                            />
+                            <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
+                      )}
+                      {!formData.is_manager && (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-sm text-gray-400 ml-1">
+                              {lang === 'ar' ? 'صاحب الحساب (الموظف)' : 'Account Owner (Employee)'}
+                            </label>
+                            <select
+                              value={formData.owner_id || ''}
+                              onChange={e => setFormData({ ...formData, owner_id: e.target.value })}
+                              className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
+                                theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                               }`}
+                            >
+                              <option value="" className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                {lang === 'ar' ? 'بدون صاحب (هو الموظف الأساسي)' : 'None (This is the primary employee)'}
                               </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm text-gray-400 ml-1">
-                          {lang === 'ar' ? 'بريد بايونير (Payoneer Email)' : 'Payoneer Email'}
-                        </label>
-                        <input
-                          type="email"
-                          value={formData.payoneer_email || ''}
-                          onChange={e => setFormData({ ...formData, payoneer_email: e.target.value })}
-                          className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
-                            theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
-                          }`}
-                          placeholder="email@payoneer.com"
-                        />
-                      </div>
+                              {users
+                                .filter(u => (!u.is_manager || u.is_team_manager) && !u.owner_id && (editingUser ? u.id !== editingUser.id : true))
+                                .map(u => (
+                                  <option key={u.id} value={u.id} className={theme === 'dark' ? 'bg-[#111]' : 'bg-white'}>
+                                    {u.username}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm text-gray-400 ml-1">
+                              {lang === 'ar' ? 'بريد بايونير (Payoneer Email)' : 'Payoneer Email'}
+                            </label>
+                            <input
+                              type="email"
+                              value={formData.payoneer_email || ''}
+                              onChange={e => setFormData({ ...formData, payoneer_email: e.target.value })}
+                              className={`w-full border rounded-2xl p-4 outline-none focus:border-blue-500 transition-all ${
+                                theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-gray-50 border-gray-100 text-gray-900'
+                              }`}
+                              placeholder="email@payoneer.com"
+                            />
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
 
-                {/* Microsoft Credentials Section */}
-                <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
-                  <h3 className="text-sm font-bold text-orange-500 flex items-center gap-2 uppercase tracking-widest">
-                    <ShieldCheck className="w-4 h-4" /> {t.microsoftCreds}
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                        {t.microsoftEmail}
-                      </label>
-                      <input 
-                        type="email"
-                        value={formData.email}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setFormData({...formData, email: val});
-                          const trimmed = val.trim().toLowerCase();
-                          if (!trimmed) {
-                            setEmailError('');
-                          } else {
-                            const duplicate = users.find(u => u.email?.trim().toLowerCase() === trimmed && (!editingUser || u.id !== editingUser.id));
-                            if (duplicate) {
-                              setEmailError(lang === 'ar' ? `⚠️ البريد الإلكتروني مستخدم بالفعل من قبل الموظف: ${duplicate.username}` : `⚠️ Email already used by: ${duplicate.username}`);
-                            } else {
-                              setEmailError('');
-                            }
-                          }
-                        }}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'} ${emailError ? 'border-red-500/50 focus:border-red-500' : ''}`}
-                        placeholder="username@outlook.com / company.com"
-                      />
-                      {emailError && (
-                        <p className="text-red-500 text-xs ml-1 font-semibold animate-pulse">{emailError}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                        {t.microsoftPassword}
-                      </label>
-                      <input 
-                        type="text"
-                        value={formData.password}
-                        onChange={e => setFormData({...formData, password: e.target.value})}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                        placeholder="••••••••••••"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                        {t.verificationCode}
-                      </label>
-                      <input 
-                        type="text"
-                        value={formData.verification_code}
-                        onChange={e => setFormData({...formData, verification_code: e.target.value})}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                        placeholder="e.g. 123 456"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* RentAHuman Integration Section */}
-                <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
-                  <h3 className="text-sm font-bold text-purple-500 flex items-center gap-2 uppercase tracking-widest">
-                    <Bot className="w-4 h-4" /> {t.rahTitle}
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                        {t.rahHumanId}
-                      </label>
-                      <input 
-                        type="text"
-                        value={formData.rah_human_id}
-                        onChange={e => setFormData({...formData, rah_human_id: e.target.value})}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                        placeholder="e.g. secretboss001 or Pt4Z1msFXpnKAZvTtPbL"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                        {t.rahApiKey}
-                      </label>
-                      <input 
-                        type="text"
-                        value={formData.rah_api_key}
-                        onChange={e => setFormData({...formData, rah_api_key: e.target.value})}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                        placeholder="rah_live_..."
-                      />
-                    </div>
-                  </div>
-
-
-
-                  <div className="border-t border-dashed border-white/10 pt-4 space-y-4">
-                    <span className="text-xs font-bold text-emerald-400 block uppercase tracking-wider">
-                      {lang === 'ar' ? 'حسابات الدفع والربح بالجنيه المصري (EGP Payout Accounting)' : 'EGP Payout Accounting & Exchange Rate'}
-                    </span>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                          {lang === 'ar' ? 'لكل كم دولار ($)' : 'USD Payout Unit ($)'}
-                        </label>
-                        <input 
-                          type="number"
-                          step="any"
-                          value={formData.rah_usd_payout_unit}
-                          onChange={e => setFormData({...formData, rah_usd_payout_unit: e.target.value})}
-                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                          placeholder="e.g. 100 (Default)"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                          {lang === 'ar' ? 'الجنيه المصري المقابل' : 'EGP Payout Value'}
-                        </label>
-                        <input 
-                          type="number"
-                          step="any"
-                          value={formData.rah_egp_payout_unit}
-                          onChange={e => setFormData({...formData, rah_egp_payout_unit: e.target.value})}
-                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                          placeholder="e.g. 1000 (Default)"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                          {lang === 'ar' ? 'سعر صرف الدولار (EGP/$)' : 'USD to EGP Exchange Rate'}
-                        </label>
-                        <input 
-                          type="number"
-                          step="any"
-                          value={formData.rah_exchange_rate}
-                          onChange={e => setFormData({...formData, rah_exchange_rate: e.target.value})}
-                          className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                          placeholder="e.g. 48.5"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
-                  <h3 className="text-sm font-bold text-blue-500 flex items-center gap-2 uppercase tracking-widest">
-                    <Globe className="w-4 h-4" /> {t.proxyConfig}
-                  </h3>
-                  
-                  {/* Quick Paste Input */}
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
-                      {t.quickPaste}
-                    </label>
-                    <div className="relative">
-                      <input 
-                        value={quickPaste}
-                        onChange={e => handleQuickPasteChange(e.target.value)}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono text-sm ${theme === 'dark' ? 'bg-black/40 border-white/5 text-blue-400 placeholder-gray-600' : 'bg-white border-gray-200 text-blue-600 placeholder-gray-400'}`}
-                        placeholder={t.quickPastePlaceholder}
-                      />
-                      {quickPaste && (
-                        <div className="absolute right-3 top-3 text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                          Auto-parsed!
+                {!currentUser?.is_team_manager && (
+                  <>
+                    {/* Microsoft Credentials Section */}
+                    <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                      <h3 className="text-sm font-bold text-orange-500 flex items-center gap-2 uppercase tracking-widest">
+                        <ShieldCheck className="w-4 h-4" /> {t.microsoftCreds}
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                            {t.microsoftEmail}
+                          </label>
+                          <input 
+                            type="email"
+                            value={formData.email}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setFormData({...formData, email: val});
+                              const trimmed = val.trim().toLowerCase();
+                              if (!trimmed) {
+                                setEmailError('');
+                              } else {
+                                const duplicate = users.find(u => u.email?.trim().toLowerCase() === trimmed && (!editingUser || u.id !== editingUser.id));
+                                if (duplicate) {
+                                  setEmailError(lang === 'ar' ? `⚠️ البريد الإلكتروني مستخدم بالفعل من قبل الموظف: ${duplicate.username}` : `⚠️ Email already used by: ${duplicate.username}`);
+                                } else {
+                                  setEmailError('');
+                                }
+                              }
+                            }}
+                            className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'} ${emailError ? 'border-red-500/50 focus:border-red-500' : ''}`}
+                            placeholder="username@outlook.com / company.com"
+                          />
+                          {emailError && (
+                            <p className="text-red-500 text-xs ml-1 font-semibold animate-pulse">{emailError}</p>
+                          )}
                         </div>
-                      )}
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                            {t.microsoftPassword}
+                          </label>
+                          <input 
+                            type="text"
+                            value={formData.password}
+                            onChange={e => setFormData({...formData, password: e.target.value})}
+                            className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                            placeholder="••••••••••••"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                            {t.verificationCode}
+                          </label>
+                          <input 
+                            type="text"
+                            value={formData.verification_code}
+                            onChange={e => setFormData({...formData, verification_code: e.target.value})}
+                            className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                            placeholder="e.g. 123 456"
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative">
-                      <input 
-                        value={formData.proxy_ip}
-                        onChange={e => setFormData({...formData, proxy_ip: e.target.value})}
-                        className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
-                        placeholder={t.ip}
-                      />
+                    {/* RentAHuman Integration Section */}
+                    <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                      <h3 className="text-sm font-bold text-purple-500 flex items-center gap-2 uppercase tracking-widest">
+                        <Bot className="w-4 h-4" /> {t.rahTitle}
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                            {t.rahHumanId}
+                          </label>
+                          <input 
+                            type="text"
+                            value={formData.rah_human_id}
+                            onChange={e => setFormData({...formData, rah_human_id: e.target.value})}
+                            className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                            placeholder="e.g. secretboss001 or Pt4Z1msFXpnKAZvTtPbL"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                            {t.rahApiKey}
+                          </label>
+                          <input 
+                            type="text"
+                            value={formData.rah_api_key}
+                            onChange={e => setFormData({...formData, rah_api_key: e.target.value})}
+                            className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                            placeholder="rah_live_..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="border-t border-dashed border-white/10 pt-4 space-y-4">
+                        <span className="text-xs font-bold text-emerald-400 block uppercase tracking-wider">
+                          {lang === 'ar' ? 'حسابات الدفع والربح بالجنيه المصري (EGP Payout Accounting)' : 'EGP Payout Accounting & Exchange Rate'}
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                              {lang === 'ar' ? 'لكل كم دولار ($)' : 'USD Payout Unit ($)'}
+                            </label>
+                            <input 
+                              type="number"
+                              step="any"
+                              value={formData.rah_usd_payout_unit}
+                              onChange={e => setFormData({...formData, rah_usd_payout_unit: e.target.value})}
+                              className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                              placeholder="e.g. 100 (Default)"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                              {lang === 'ar' ? 'الجنيه المصري المقابل' : 'EGP Payout Value'}
+                            </label>
+                            <input 
+                              type="number"
+                              step="any"
+                              value={formData.rah_egp_payout_unit}
+                              onChange={e => setFormData({...formData, rah_egp_payout_unit: e.target.value})}
+                              className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                              placeholder="e.g. 1000 (Default)"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[11px] text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                              {lang === 'ar' ? 'سعر صرف الدولار (EGP/$)' : 'USD to EGP Exchange Rate'}
+                            </label>
+                            <input 
+                              type="number"
+                              step="any"
+                              value={formData.rah_exchange_rate}
+                              onChange={e => setFormData({...formData, rah_exchange_rate: e.target.value})}
+                              className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                              placeholder="e.g. 48.5"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <input 
-                      type="number"
-                      value={formData.proxy_port}
-                      onChange={e => setFormData({...formData, proxy_port: e.target.value})}
-                      className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
-                      placeholder={t.port}
-                    />
-                    <input 
-                      value={formData.proxy_user}
-                      onChange={e => setFormData({...formData, proxy_user: e.target.value})}
-                      className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
-                      placeholder={t.user}
-                    />
-                    <input 
-                      value={formData.proxy_pass}
-                      onChange={e => setFormData({...formData, proxy_pass: e.target.value})}
-                      className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
-                      placeholder={t.pass}
-                    />
-                    <input 
-                      value={formData.proxy_location}
-                      onChange={e => setFormData({...formData, proxy_location: e.target.value})}
-                      className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
-                      placeholder={t.location}
-                    />
-                    <input 
-                      value={formData.proxy_timezone}
-                      onChange={e => setFormData({...formData, proxy_timezone: e.target.value})}
-                      className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
-                      placeholder={t.timezone}
-                    />
-                  </div>
-                </div>
+
+                    {/* Proxy Configuration Section */}
+                    <div className={`p-6 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                      <h3 className="text-sm font-bold text-blue-500 flex items-center gap-2 uppercase tracking-widest">
+                        <Globe className="w-4 h-4" /> {t.proxyConfig}
+                      </h3>
+                      
+                      {/* Quick Paste Input */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-gray-400 font-bold uppercase tracking-wider block ml-1">
+                          {t.quickPaste}
+                        </label>
+                        <div className="relative">
+                          <input 
+                            value={quickPaste}
+                            onChange={e => handleQuickPasteChange(e.target.value)}
+                            className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all font-mono text-sm ${theme === 'dark' ? 'bg-black/40 border-white/5 text-blue-400 placeholder-gray-600' : 'bg-white border-gray-200 text-blue-600 placeholder-gray-400'}`}
+                            placeholder={t.quickPastePlaceholder}
+                          />
+                          {quickPaste && (
+                            <div className="absolute right-3 top-3 text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                              Auto-parsed!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="relative">
+                          <input 
+                            value={formData.proxy_ip}
+                            onChange={e => setFormData({...formData, proxy_ip: e.target.value})}
+                            className={`w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
+                            placeholder={t.ip}
+                          />
+                        </div>
+                        <input 
+                          type="number"
+                          value={formData.proxy_port}
+                          onChange={e => setFormData({...formData, proxy_port: e.target.value})}
+                          className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
+                          placeholder={t.port}
+                        />
+                        <input 
+                          value={formData.proxy_user}
+                          onChange={e => setFormData({...formData, proxy_user: e.target.value})}
+                          className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
+                          placeholder={t.user}
+                        />
+                        <input 
+                          value={formData.proxy_pass}
+                          onChange={e => setFormData({...formData, proxy_pass: e.target.value})}
+                          className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
+                          placeholder={t.pass}
+                        />
+                        <input 
+                          value={formData.proxy_location}
+                          onChange={e => setFormData({...formData, proxy_location: e.target.value})}
+                          className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
+                          placeholder={t.location}
+                        />
+                        <input 
+                          value={formData.proxy_timezone}
+                          onChange={e => setFormData({...formData, proxy_timezone: e.target.value})}
+                          className={`border rounded-xl p-3 outline-none focus:border-blue-500 transition-all ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-white border-gray-200'}`}
+                          placeholder={t.timezone}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="flex gap-4 pt-4">
                   <button 
@@ -5479,14 +5687,7 @@ function RentAHumanDisplay({ user, theme, lang, isMobile = false }: { user: any;
   }, [user.rah_human_id, user.rah_api_key, user.rah_balance, user.rah_earnings]);
 
   if (!user.rah_human_id && !user.rah_api_key && !user.rah_earnings) {
-    return (
-      <div className={`text-xs py-2 px-3 rounded-2xl border border-dashed flex items-center justify-center gap-1.5 font-medium ${
-        theme === 'dark' ? 'border-white/10 text-gray-500 bg-white/[0.01]' : 'border-gray-200 text-gray-400 bg-gray-50/50'
-      }`}>
-        <Sparkles className="w-3.5 h-3.5 opacity-60" />
-        <span>{lang === 'ar' ? 'غير متصل بـ RentAHuman' : 'Not Connected'}</span>
-      </div>
-    );
+    return null;
   }
 
   if (!user.rah_human_id && user.rah_api_key && (user.rah_balance === undefined || user.rah_balance === null)) {

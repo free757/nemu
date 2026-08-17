@@ -1,0 +1,7 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/correct-label/route": "app/api/correct-label/route.js",
+  "/api/upload-video/route": "app/api/upload-video/route.js",
+  "/page": "app/page.js"
+}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { GeminiService } from "@/services/gemini.service";
-import { memoryStore } from "@/services/memory-store.service";
-import { ApiResponse, UploadVideoResponse } from "@/types/atlas";
+import { GeminiService } from "../../../services/gemini.service";
+import { memoryStore } from "../../../services/memory-store.service";
+import { ApiResponse, UploadVideoResponse } from "../../../types/atlas";
 
 export async function POST(req: Request) {
   try {

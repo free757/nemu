@@ -1,18 +1,21 @@
 "use client";
 
 import React, { useState } from "react";
-import { VideoUploader } from "@/components/atlas/VideoUploader";
-import { BatchLabelForm } from "@/components/atlas/BatchLabelForm";
-import { Sparkles, ShieldCheck, Cpu } from "lucide-react";
+import { VideoUploader } from "../components/atlas/VideoUploader";
+import { BatchLabelForm } from "../components/atlas/BatchLabelForm";
+import { NotesDrawer } from "../components/atlas/NotesDrawer";
+import { Sparkles, ShieldCheck, Cpu, Notebook } from "lucide-react";
 
 export default function HomePage() {
   const [fileUri, setFileUri] = useState<string | null>(null);
   const [loadedUrl, setLoadedUrl] = useState<string>("");
+  const [isNotesOpen, setIsNotesOpen] = useState<boolean>(false);
 
   const handleVideoLoaded = (uri: string, url: string) => {
     setFileUri(uri);
     setLoadedUrl(url);
   };
+
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -36,14 +39,24 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-4 text-xs text-slate-400">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Strict Atlas Rubric</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Cpu className="w-4 h-4 text-brand-400" />
-              <span>File API In-Memory</span>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsNotesOpen(true)}
+              className="flex items-center gap-1.5 text-xs text-white bg-slate-800 border border-slate-700 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors font-semibold"
+            >
+              <Notebook className="w-4 h-4 text-brand-400" />
+              <span>درج الملاحظات</span>
+            </button>
+
+            <div className="hidden sm:flex items-center gap-4 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Strict Atlas Rubric</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-brand-400" />
+                <span>File API In-Memory</span>
+              </div>
             </div>
           </div>
         </div>
@@ -56,11 +69,17 @@ export default function HomePage() {
           onVideoLoaded={handleVideoLoaded}
           isLoaded={Boolean(fileUri)}
           loadedUrl={loadedUrl}
+          fileUri={fileUri}
         />
 
+
         {/* Step 2: Batch Segments Form */}
-        <BatchLabelForm fileUri={fileUri} isLoaded={Boolean(fileUri)} />
+        <BatchLabelForm fileUri={fileUri} isLoaded={Boolean(fileUri)} videoUrl={loadedUrl} />
+
       </div>
+
+      {/* Shared Notes Drawer */}
+      <NotesDrawer isOpen={isNotesOpen} onClose={() => setIsNotesOpen(false)} />
 
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">

@@ -1,0 +1,3 @@
+module.exports=[6987,a=>{"use strict";var b=a.i(31696);a.s(["default",0,function({children:a}){return(0,b.jsx)("html",{lang:"en",className:"dark",children:(0,b.jsx)("body",{className:"bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-brand-500 selection:text-white",children:a})})},"metadata",0,{title:"Atlas Helper | AI Action Label Corrector",description:"Production-ready tool to validate and correct Atlas Capture action labels using Google Gemini 2.5 Pro."}])},6931,a=>{a.n(a.i(6987))}];
+
+//# sourceMappingURL=dashboard_AI%20Tools%20Suite_atlas-helper_src_app_layout_tsx_0a7.xnq._.js.map

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { GeminiService } from "@/services/gemini.service";
-import { ApiResponse, CorrectLabelsResponse } from "@/types/atlas";
+import { GeminiService } from "../../../services/gemini.service";
+import { ApiResponse, CorrectLabelsResponse } from "../../../types/atlas";
 
 export async function POST(req: Request) {
   try {

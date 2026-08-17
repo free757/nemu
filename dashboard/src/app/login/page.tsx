@@ -23,13 +23,21 @@ export default function LoginPage() {
   // Dynamic Wallpaper State loaded from LocalStorage
   const [selectedBg, setSelectedBg] = useState<BackgroundType>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('nemu_lock_bg') as BackgroundType) || 'nebula';
+      try {
+        return (localStorage.getItem('nemu_lock_bg') as BackgroundType) || 'nebula';
+      } catch (e) {
+        console.warn('localStorage read error', e);
+      }
     }
     return 'nebula';
   });
 
   useEffect(() => {
-    localStorage.setItem('nemu_lock_bg', selectedBg);
+    try {
+      localStorage.setItem('nemu_lock_bg', selectedBg);
+    } catch (e) {
+      console.warn('localStorage write error', e);
+    }
   }, [selectedBg]);
 
   // Live clock
@@ -107,7 +115,7 @@ export default function LoginPage() {
     try {
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, username, pin, is_manager')
+        .select('id, username, pin, is_manager, is_team_manager')
         .eq('pin', enteredPin)
         .eq('is_manager', true)
         .single();
@@ -124,7 +132,15 @@ export default function LoginPage() {
         }, 600);
       } else {
         // Success — store session and redirect
-        sessionStorage.setItem('dashboard_auth', JSON.stringify({ id: data.id, username: data.username }));
+        try {
+          sessionStorage.setItem('dashboard_auth', JSON.stringify({ 
+            id: data.id, 
+            username: data.username,
+            is_team_manager: data.is_team_manager || false
+          }));
+        } catch (e) {
+          console.warn('sessionStorage write error', e);
+        }
         router.push('/');
       }
     } catch {

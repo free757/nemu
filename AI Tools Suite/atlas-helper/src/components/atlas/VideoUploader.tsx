@@ -1,20 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "../ui/Button";
 import { Video, CheckCircle2, AlertCircle, Link2 } from "lucide-react";
-import { ApiResponse, UploadVideoResponse } from "@/types/atlas";
+import { ApiResponse, UploadVideoResponse } from "../../types/atlas";
 
 interface VideoUploaderProps {
   onVideoLoaded: (fileUri: string, videoUrl: string) => void;
   isLoaded: boolean;
   loadedUrl?: string;
+  fileUri?: string | null;
 }
 
 export const VideoUploader: React.FC<VideoUploaderProps> = ({
   onVideoLoaded,
   isLoaded,
   loadedUrl,
+  fileUri,
 }) => {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -91,9 +93,18 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
       </form>
 
       {isLoaded && loadedUrl && (
-        <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-2 rounded-lg">
+        <div className={`mt-3 flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
+          fileUri?.startsWith('text-rubric-')
+            ? 'text-amber-400 bg-amber-950/40 border-amber-800/40'
+            : 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40'
+        }`}>
           <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span className="truncate">Video active in Gemini memory: {loadedUrl}</span>
+          <span className="truncate">
+            {fileUri?.startsWith('text-rubric-')
+              ? `✍️ Text Rubric Mode (Gemini key not found — check GEMINI_API_KEY_1 in Vercel)`
+              : `👁️ Video active in Gemini memory: ${loadedUrl.slice(0, 70)}...`
+            }
+          </span>
         </div>
       )}
 

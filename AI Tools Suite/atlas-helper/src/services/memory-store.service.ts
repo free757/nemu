@@ -35,6 +35,14 @@ class MemoryStoreService {
     return this.videoStore.has(videoUrl);
   }
 
+  public getVideoUrlByFileUri(fileUri: string): string | null {
+    for (const [url, data] of this.videoStore.entries()) {
+      if (data.fileUri === fileUri) return url;
+    }
+    return null;
+  }
+
+
   public clear(): void {
     this.videoStore.clear();
   }
