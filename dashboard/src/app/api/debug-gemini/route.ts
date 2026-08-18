@@ -35,7 +35,7 @@ export async function GET() {
       const ai = new GoogleGenAI({ apiKey: key });
 
       // Test 2: Try a simple text-only generateContent (no video)
-      const textModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+      const textModels = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-1.5-flash"];
       for (const model of textModels) {
         try {
           const response = await ai.models.generateContent({
