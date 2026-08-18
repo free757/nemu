@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FileText, Sparkles, AlertCircle, Trash2 } from "lucide-react";
+import { FileText, Sparkles, AlertCircle, Trash2, Clipboard } from "lucide-react";
 import { Button } from "./ui/Button";
 
 interface BatchInputCardProps {
@@ -12,6 +12,7 @@ interface BatchInputCardProps {
   isLoaded: boolean;
   onCorrectAll: () => void;
   onClearText?: () => void;
+  onPasteText?: (text: string) => void;
 }
 
 export const BatchInputCard: React.FC<BatchInputCardProps> = ({
@@ -22,7 +23,19 @@ export const BatchInputCard: React.FC<BatchInputCardProps> = ({
   isLoaded,
   onCorrectAll,
   onClearText,
+  onPasteText,
 }) => {
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && onPasteText) {
+        onPasteText(text);
+      }
+    } catch (err) {
+      console.error("Failed to read clipboard:", err);
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm dark:shadow-lg space-y-4 transition-colors">
       <div className="flex items-center justify-between">
@@ -31,17 +44,30 @@ export const BatchInputCard: React.FC<BatchInputCardProps> = ({
           Paste Segments Text (Time Ranges + Current AI Labels)
         </label>
         <div className="flex items-center gap-2">
+          {onPasteText && (
+            <button
+              type="button"
+              onClick={handlePaste}
+              className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium flex items-center gap-1 transition-colors px-2 py-1 rounded-md bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 border border-brand-200 dark:border-brand-800/40"
+              title="لصق النص المنسوخ مباشرة من الحافظة"
+            >
+              <Clipboard className="w-3.5 h-3.5" />
+              <span>📋 لصق النص</span>
+            </button>
+          )}
+
           {bulkText.length > 0 && onClearText && (
             <button
               type="button"
               onClick={onClearText}
-              className="text-xs text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 font-medium flex items-center gap-1 transition-colors px-2 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30"
+              className="text-xs text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 font-medium flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30"
               title="مسح نص المقاطع"
             >
-              <Trash2 className="w-3 h-3" />
+              <Trash2 className="w-3.5 h-3.5" />
               <span>مسح النص</span>
             </button>
           )}
+
           <span className="text-xs font-mono px-2.5 py-1 rounded-md text-brand-700 bg-brand-50 border border-brand-200 dark:text-brand-400 dark:bg-brand-950/60 dark:border-brand-800/40">
             {detectedCount} segment(s) detected
           </span>

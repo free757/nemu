@@ -38,6 +38,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({
     handleCorrectAll,
     handleCorrectSingleSegment,
     handleReset,
+    setDirectBulkText,
   } = useBatchSegments({ fileUri, videoUrl });
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({
         isLoaded={isLoaded}
         onCorrectAll={handleCorrectAll}
         onClearText={handleReset}
+        onPasteText={setDirectBulkText}
       />
 
       {/* 2. Segments List */}

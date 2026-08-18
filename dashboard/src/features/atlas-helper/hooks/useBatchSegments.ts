@@ -19,8 +19,7 @@ export function useBatchSegments({ fileUri, videoUrl }: UseBatchSegmentsProps) {
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
   const [arabicMap, setArabicMap] = useState<Record<string, boolean>>({});
 
-  const handleBulkTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
+  const setDirectBulkText = useCallback((text: string) => {
     setBulkText(text);
     if (!text.trim()) {
       setSegments([]);
@@ -29,6 +28,10 @@ export function useBatchSegments({ fileUri, videoUrl }: UseBatchSegmentsProps) {
     const parsed = parseBulkSegmentsText(text);
     setSegments(parsed);
   }, []);
+
+  const handleBulkTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDirectBulkText(e.target.value);
+  }, [setDirectBulkText]);
 
   const handleUpdateSegment = useCallback((id: string, field: keyof SegmentItem, value: string) => {
     setSegments((prev) =>
@@ -211,5 +214,6 @@ export function useBatchSegments({ fileUri, videoUrl }: UseBatchSegmentsProps) {
     handleCorrectAll,
     handleCorrectSingleSegment,
     handleReset,
+    setDirectBulkText,
   };
 }

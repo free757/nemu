@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/Button";
-import { Video, CheckCircle2, AlertCircle, Link2, X } from "lucide-react";
+import { Video, CheckCircle2, AlertCircle, Link2, X, Clipboard } from "lucide-react";
 import { ApiResponse, UploadVideoResponse } from "../types/atlas";
 
 interface VideoUploaderProps {
@@ -35,6 +35,17 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
       onVideoUrlChange(val);
     } else {
       setInternalUrl(val);
+    }
+  };
+
+  const handlePasteUrl = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        handleUrlChange(text.trim());
+      }
+    } catch (err) {
+      console.error("Failed to read clipboard:", err);
     }
   };
 
@@ -121,6 +132,16 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePasteUrl}
+            icon={<Clipboard className="w-4 h-4 text-brand-600 dark:text-brand-400" />}
+            title="لصق الرابط من الحافظة مباشرة"
+          >
+            لصق الرابط
+          </Button>
+
           <Button
             type="submit"
             variant={isLoaded ? "secondary" : "primary"}
