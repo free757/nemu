@@ -155,11 +155,13 @@ export const SegmentCard: React.FC<SegmentCardProps> = ({
           </div>
 
           {/* Visual Evidence / Proof Box */}
-          {segment.visualEvidence && (
+          {segment.visualEvidence && segment.usedModel !== "rule-engine" && (
             <div className="mt-2 text-xs bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 p-2.5 rounded-lg text-slate-700 dark:text-slate-300 flex items-start gap-2">
               <Eye className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" />
               <div className="text-[11px] sm:text-xs">
-                <span className="font-semibold text-brand-700 dark:text-brand-300">Proof: </span>
+                <span className="font-semibold text-brand-700 dark:text-brand-300">
+                  {segment.analysisMode === "visual" ? "👁️ Visual Evidence:" : "📋 Rubric Note:"}
+                </span>{" "}
                 <span>{segment.visualEvidence}</span>
                 {isArabic && (
                   <p className="mt-1 text-[11px] text-amber-900 dark:text-amber-200/90 font-sans dir-rtl bg-amber-50 dark:bg-slate-900/80 p-1.5 rounded border border-amber-200 dark:border-amber-500/20">
@@ -167,6 +169,16 @@ export const SegmentCard: React.FC<SegmentCardProps> = ({
                   </p>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Fallback Warning — shown when no AI model ran */}
+          {segment.usedModel === "rule-engine" && (
+            <div className="mt-2 text-[11px] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 p-2.5 rounded-lg text-amber-800 dark:text-amber-300 flex items-start gap-2">
+              <span className="shrink-0 text-sm">⚠️</span>
+              <span>
+                <strong>لم يعمل أي موديل AI على هذا المقطع.</strong> تم تطبيق التنظيف اللغوي فقط. تأكد من صحة مفاتيح GEMINI_API_KEY في الإعدادات وأن الفيديو تم رفعه بنجاح.
+              </span>
             </div>
           )}
         </div>
