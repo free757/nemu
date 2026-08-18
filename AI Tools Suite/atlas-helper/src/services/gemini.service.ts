@@ -43,49 +43,40 @@ export class GeminiService {
     const tempFilePath = path.join(os.tmpdir(), `atlas-video-${Date.now()}.mp4`);
     await fs.promises.writeFile(tempFilePath, buffer);
 
-    if (this.apiKeys.length > 0) {
-      for (const key of this.apiKeys) {
-        try {
-          const ai = new GoogleGenAI({
-            apiKey: key,
-            httpOptions: {
-              headers: {
-                "x-goog-api-key": key,
-              },
-            },
-          });
-          const fileUpload = await ai.files.upload({
-            file: tempFilePath,
-            config: {
-              mimeType: "video/mp4",
-            },
-          });
+    // Upload using key rotation — temp file is cleaned up only once after all attempts
+    try {
+      if (this.apiKeys.length > 0) {
+        for (const key of this.apiKeys) {
+          try {
+            const ai = new GoogleGenAI({ apiKey: key });
+            const fileUpload = await ai.files.upload({
+              file: tempFilePath,
+              config: { mimeType: "video/mp4" },
+            });
 
-          if (!fileUpload.name) continue;
-          const fileName: string = fileUpload.name;
+            if (!fileUpload.name) continue;
+            const fileName: string = fileUpload.name;
 
-          let file = await ai.files.get({ name: fileName });
-          while (file.state === "PROCESSING") {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            file = await ai.files.get({ name: fileName });
-          }
+            let file = await ai.files.get({ name: fileName });
+            while (file.state === "PROCESSING") {
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              file = await ai.files.get({ name: fileName });
+            }
 
-          if (file.state === "FAILED" || !file.uri) {
-            continue;
-          }
+            if (file.state === "FAILED" || !file.uri) continue;
 
-          return {
-            fileUri: file.uri,
-            mimeType: file.mimeType || "video/mp4",
-          };
-        } catch (err: any) {
-          console.warn(`Gemini upload warning for key ending in ...${key.slice(-4)}:`, err?.message || err);
-        } finally {
-          if (fs.existsSync(tempFilePath)) {
-            await fs.promises.unlink(tempFilePath).catch(() => {});
+            return {
+              fileUri: file.uri,
+              mimeType: file.mimeType || "video/mp4",
+            };
+          } catch (err: any) {
+            console.warn(`Gemini upload warning for key ending in ...${key.slice(-4)}:`, err?.message || err);
           }
         }
       }
+    } finally {
+      // Clean up temp file once after all key attempts
+      await fs.promises.unlink(tempFilePath).catch(() => {});
     }
 
     // Fallback: Return pseudo URI for text-rubric mode using OpenRouter/Groq
@@ -209,7 +200,7 @@ export class GeminiService {
           "water plant in bucket with hose in both hands",
           "fill watering can with water with hose in both hands",
           "fill watering can with water with hose in both hands",
-          "set hose on ground with left hand, pick up watering can with right hand"
+          "place hose on ground with left hand, pick up watering can with right hand"
         ];
       } else if (combinedLabels.includes("needle") || combinedLabels.includes("cap") || combinedLabels.includes("sewing")) {
         scenarioName = "Sewing (Text Fallback)";
