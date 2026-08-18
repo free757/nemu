@@ -232,14 +232,6 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
   return (
     <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl">
-        <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5 text-brand-500" />
-          <h2 className="text-base font-semibold text-white">2. Action Labels & Segments</h2>
-        </div>
-      </div>
-
       {/* Bulk Input Box */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
         <div className="flex items-center justify-between">
