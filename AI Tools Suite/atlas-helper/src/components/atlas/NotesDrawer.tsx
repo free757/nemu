@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import React from "react";
 import {
   Notebook,
   X,
@@ -13,13 +12,7 @@ import {
   FileText,
   Search,
 } from "lucide-react";
-
-interface NoteItem {
-  id: number;
-  title: string;
-  content: string;
-  created_at: string;
-}
+import { useSharedNotes } from "../hooks/useSharedNotes";
 
 interface NotesDrawerProps {
   isOpen: boolean;
@@ -27,91 +20,26 @@ interface NotesDrawerProps {
 }
 
 export const NotesDrawer: React.FC<NotesDrawerProps> = ({ isOpen, onClose }) => {
-  const [notes, setNotes] = useState<NoteItem[]>([]);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const fetchNotes = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data, error: err } = await supabase
-        .from("shared_notes")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (err) throw err;
-      setNotes(data || []);
-    } catch (err: any) {
-      setError(err.message || "فشل تحميل الملاحظات.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchNotes();
-    }
-  }, [isOpen]);
-
-  const handleAddNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
-
-    setIsSaving(true);
-    setError(null);
-    try {
-      const { data, error: err } = await supabase
-        .from("shared_notes")
-        .insert([{ title: title.trim(), content: content.trim() }])
-        .select();
-
-      if (err) throw err;
-
-      if (data && data[0]) {
-        setNotes((prev) => [data[0] as NoteItem, ...prev]);
-      } else {
-        await fetchNotes();
-      }
-      setTitle("");
-      setContent("");
-    } catch (err: any) {
-      setError(err.message || "فشل حفظ الملاحظة.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteNote = async (id: number) => {
-    if (!window.confirm("هل أنت متأكد من حذف هذه الملاحظة؟")) return;
-
-    setError(null);
-    try {
-      const { error: err } = await supabase
-        .from("shared_notes")
-        .delete()
-        .eq("id", id);
-
-      if (err) throw err;
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-    } catch (err: any) {
-      setError(err.message || "فشل حذف الملاحظة.");
-    }
-  };
+  const {
+    notes,
+    totalNotesCount,
+    title,
+    setTitle,
+    content,
+    setContent,
+    isLoading,
+    isSaving,
+    error,
+    searchQuery,
+    setSearchQuery,
+    expandedNotes,
+    toggleExpand,
+    fetchNotes,
+    addNote,
+    deleteNote,
+  } = useSharedNotes(isOpen);
 
   if (!isOpen) return null;
-
-  const filteredNotes = notes.filter(
-    (n) =>
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <>
@@ -121,7 +49,7 @@ export const NotesDrawer: React.FC<NotesDrawerProps> = ({ isOpen, onClose }) => 
         onClick={onClose}
       />
 
-      {/* Drawer */}
+      {/* Drawer Panel */}
       <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 z-[1000] shadow-2xl flex flex-col transition-transform duration-300 animate-slide-in">
         {/* Drawer Header */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
@@ -151,7 +79,7 @@ export const NotesDrawer: React.FC<NotesDrawerProps> = ({ isOpen, onClose }) => 
           </div>
         </div>
 
-        {/* Drawer Content */}
+        {/* Drawer Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 text-slate-700 dark:text-slate-200 text-xs">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/40 dark:border-red-500/30 dark:text-red-200 text-xs rounded-lg flex items-center gap-2">
@@ -161,7 +89,7 @@ export const NotesDrawer: React.FC<NotesDrawerProps> = ({ isOpen, onClose }) => 
           )}
 
           {/* Add New Note Form */}
-          <form onSubmit={handleAddNote} className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+          <form onSubmit={addNote} className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
             <h3 className="text-xs font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wider flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" />
               <span>إضافة ملاحظة جديدة للجميع</span>
@@ -210,11 +138,11 @@ export const NotesDrawer: React.FC<NotesDrawerProps> = ({ isOpen, onClose }) => 
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-brand-500" />
-                <span>الملاحظات المسجلة ({notes.length})</span>
+                <span>الملاحظات المسجلة ({totalNotesCount})</span>
               </h3>
             </div>
 
-            {notes.length > 3 && (
+            {totalNotesCount > 3 && (
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
                 <input
@@ -227,21 +155,21 @@ export const NotesDrawer: React.FC<NotesDrawerProps> = ({ isOpen, onClose }) => 
               </div>
             )}
 
-            {isLoading && notes.length === 0 ? (
+            {isLoading && totalNotesCount === 0 ? (
               <div className="text-center py-8 text-xs text-slate-500">جاري تحميل الملاحظات...</div>
-            ) : notes.length === 0 ? (
+            ) : totalNotesCount === 0 ? (
               <div className="text-center py-8 text-xs text-slate-500 border border-dashed border-slate-300 dark:border-slate-800 rounded-xl">
                 لا توجد ملاحظات مسجلة بعد. كن أول من يضيف ملاحظة!
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredNotes.map((note) => (
+                {notes.map((note) => (
                   <div
                     key={note.id}
                     className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-800 rounded-xl p-4 space-y-2 relative group transition-all"
                   >
                     <button
-                      onClick={() => handleDeleteNote(note.id)}
+                      onClick={() => deleteNote(note.id)}
                       className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-md transition-all opacity-0 group-hover:opacity-100"
                       title="حذف"
                     >
@@ -281,7 +209,7 @@ export const NotesDrawer: React.FC<NotesDrawerProps> = ({ isOpen, onClose }) => 
                           </div>
                           {isLong && (
                             <button
-                              onClick={() => setExpandedNotes((prev) => ({ ...prev, [note.id]: !prev[note.id] }))}
+                              onClick={() => toggleExpand(note.id)}
                               className="text-[10px] text-brand-600 dark:text-brand-400 hover:underline font-bold focus:outline-none mt-1 select-none"
                             >
                               {isExpanded ? "عرض أقل ▲" : "عرض المزيد ▼"}

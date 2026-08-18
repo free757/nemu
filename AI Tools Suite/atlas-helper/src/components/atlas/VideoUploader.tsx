@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button } from "../ui/Button";
+import { Button } from "./ui/Button";
 import { Video, CheckCircle2, AlertCircle, Link2 } from "lucide-react";
-import { ApiResponse, UploadVideoResponse } from "../../types/atlas";
+import { ApiResponse, UploadVideoResponse } from "../types/atlas";
 
 interface VideoUploaderProps {
   onVideoLoaded: (fileUri: string, videoUrl: string) => void;
