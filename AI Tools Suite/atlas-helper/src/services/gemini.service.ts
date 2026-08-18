@@ -7,7 +7,6 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-
 export class GeminiService {
   private apiKeys: string[];
 
@@ -156,9 +155,6 @@ export class GeminiService {
         "hold cap with left hand, pull sewing needle with right hand, insert sewing needle into cap with right hand",
         "hold cap with left hand, pull sewing needle with right hand"
       ],
-
-
-
       "6a04941d9d148ab71cfcdd88": [ // Paper + Scissors
         "hold papers with left hand, hold scissors with right hand",
         "hold scissors with right hand, align papers with both hands",
@@ -399,9 +395,11 @@ Output raw JSON array strictly adhering to this schema:
           });
 
           const responseText = response.text || "[]";
-          const parsedResults = JSON.parse(responseText);
-          if (Array.isArray(parsedResults) && parsedResults.length > 0) {
-            const resultMap = new Map<string, any>(parsedResults.map((r: any) => [r.id, r]));
+          const cleanedText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+          const parsedResults = JSON.parse(cleanedText);
+          const arrayRes = Array.isArray(parsedResults) ? parsedResults : (parsedResults.segments || []);
+          if (arrayRes.length > 0) {
+            const resultMap = new Map<string, any>(arrayRes.map((r: any) => [r.id, r]));
 
             return segments.map((s) => {
               const matched: any = resultMap.get(s.id);
