@@ -226,20 +226,14 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
     navigator.clipboard.writeText(reportText);
     setCopiedReport(true);
-    setTimeout(() => setCopiedReport(false), 2000);
-  };
-
-
-  return (
-    <div className="space-y-6">
-      {/* Bulk Input Box */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
+    setTimeout(() =      {/* Bulk Input Box */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm dark:shadow-lg space-y-4 transition-colors">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-slate-200 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-brand-500" />
+          <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-brand-600 dark:text-brand-500" />
             Paste Segments Text (Time Ranges + Current AI Labels)
           </label>
-          <span className="text-xs text-brand-400 bg-brand-950/60 border border-brand-800/40 px-2.5 py-1 rounded-md font-mono">
+          <span className="text-xs font-mono px-2.5 py-1 rounded-md text-brand-700 bg-brand-50 border border-brand-200 dark:text-brand-400 dark:bg-brand-950/60 dark:border-brand-800/40">
             {segments.length} segment(s) detected
           </span>
         </div>
@@ -248,7 +242,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
           onChange={handleBulkTextChange}
           placeholder={`Paste your segment text block here, e.g.:\n\n0:00.00–0:03.00\npick up and place wrench with right hand\n\n0:03.00–0:07.33\npick up and place wrench with right hand`}
           rows={6}
-          className="w-full p-3 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-mono"
+          className="w-full p-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-mono"
         />
 
         {/* ALWAYS VISIBLE MAIN ACTION BUTTON */}
@@ -256,16 +250,16 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
           <Button
             variant="primary"
             size="lg"
-            className="w-full py-3.5 text-base font-bold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-xl shadow-brand-500/25 transition-all"
+            className="w-full py-3.5 text-base font-bold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-xl shadow-brand-500/25 transition-all text-white"
             onClick={handleCorrectAll}
             isLoading={isLoading}
             disabled={!isLoaded}
             icon={<Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />}
           >
-            ✨ Verify & Correct All Segments with AI
+            Verify & Correct All Segments with AI
           </Button>
           {!isLoaded && (
-            <p className="text-xs text-center text-amber-400/80 mt-2 flex items-center justify-center gap-1">
+            <p className="text-xs text-center text-amber-600 dark:text-amber-400/80 mt-2 flex items-center justify-center gap-1 font-medium">
               <AlertCircle className="w-3.5 h-3.5" />
               Please paste and load your video URL in Step 1 first to enable AI correction.
             </p>
@@ -277,7 +271,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
       {segments.length > 0 && (
         <div className="space-y-4 pt-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-slate-300">Parsed Segments Details</h3>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-300">Parsed Segments Details</h3>
             <div className="flex items-center gap-2">
               {segments.some((s) => s.correctedLabel) && (
                 <Button
@@ -301,19 +295,18 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
             </div>
           </div>
 
-
           <div className="grid gap-4">
             {segments.map((seg, index) => {
               const isArabic = !!arabicMap[seg.id];
               return (
                 <div
                   key={seg.id}
-                  className="bg-slate-900 border border-slate-800 rounded-xl p-4 transition-all hover:border-slate-700 shadow-md space-y-3"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 transition-all hover:border-slate-300 dark:hover:border-slate-700 shadow-sm dark:shadow-md space-y-3"
                 >
                   <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                     <div className="space-y-2 flex-1 w-full">
                       <div className="flex flex-wrap items-center justify-between gap-2 w-full">
-                        <div className="flex items-center gap-2 text-xs font-mono text-brand-400 bg-brand-950/60 border border-brand-800/40 px-2.5 py-1 rounded-md w-fit">
+                        <div className="flex items-center gap-2 text-xs font-mono text-brand-700 bg-brand-50 border border-brand-200 dark:text-brand-400 dark:bg-brand-950/60 dark:border-brand-800/40 px-2.5 py-1 rounded-md w-fit">
                           <Clock className="w-3.5 h-3.5" />
                           <span>
                             Segment {index + 1}: {seg.startTime} – {seg.endTime}
@@ -322,8 +315,8 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
                         <div className="flex items-center gap-2">
                           {seg.usedModel && (
-                            <div className="flex items-center gap-1 text-[11px] text-indigo-300 bg-indigo-950/60 border border-indigo-800/40 px-2.5 py-0.5 rounded-md font-mono">
-                              <Cpu className="w-3 h-3 text-indigo-400" />
+                            <div className="flex items-center gap-1 text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 dark:text-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-800/40 px-2.5 py-0.5 rounded-md font-mono">
+                              <Cpu className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
                               <span>{seg.usedModel}</span>
                             </div>
                           )}
@@ -332,8 +325,8 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
                             onClick={() => toggleArabicTranslation(seg.id)}
                             className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md transition-all font-medium border ${
                               isArabic
-                                ? "bg-amber-950/70 border-amber-500/50 text-amber-300"
-                                : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                                ? "bg-amber-100 border-amber-300 text-amber-900 dark:bg-amber-950/70 dark:border-amber-500/50 dark:text-amber-300"
+                                : "bg-slate-100 border-slate-300 text-slate-700 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white"
                             }`}
                           >
                             <Languages className="w-3.5 h-3.5" />
@@ -341,7 +334,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
                           </button>
 
                           {seg.correctedLabel && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/40 px-2.5 py-1 rounded-md font-medium">
+                            <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/50 dark:border-emerald-800/40 px-2.5 py-1 rounded-md font-medium">
                               <Eye className="w-3.5 h-3.5" />
                               <span>
                                 {seg.analysisMode === "visual"
@@ -355,7 +348,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                         <div>
-                          <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                             Current AI Label
                           </label>
                           <input
@@ -364,10 +357,10 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
                             onChange={(e) =>
                               handleUpdateSegment(seg.id, "currentLabel", e.target.value)
                             }
-                            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-xs text-slate-300 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-md text-xs text-slate-800 dark:text-slate-300 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
                           />
                           {isArabic && seg.currentLabel && (
-                            <p className="mt-1 text-xs text-amber-300/90 font-sans dir-rtl bg-slate-950/60 p-1.5 rounded border border-amber-500/20">
+                            <p className="mt-1 text-xs text-amber-900 dark:text-amber-300/90 font-sans dir-rtl bg-amber-50 dark:bg-slate-950/60 p-1.5 rounded border border-amber-200 dark:border-amber-500/20">
                               🇸🇦 <strong>الترجمة:</strong> {translateToArabic(seg.currentLabel)}
                             </p>
                           )}
@@ -375,7 +368,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
                         {seg.correctedLabel && (
                           <div>
-                            <label className="block text-[11px] font-medium text-emerald-400 mb-1">
+                            <label className="block text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
                               Corrected Action Label
                             </label>
                             <div className="flex items-center gap-2">
@@ -383,7 +376,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
                                 type="text"
                                 readOnly
                                 value={seg.correctedLabel}
-                                className="w-full px-3 py-1.5 bg-emerald-950/30 border border-emerald-800/50 rounded-md text-xs text-emerald-300 font-mono font-semibold focus:outline-none"
+                                className="w-full px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/50 rounded-md text-xs text-emerald-800 dark:text-emerald-300 font-mono font-semibold focus:outline-none"
                               />
                               <div className="flex items-center gap-2">
                                 <Button
@@ -392,9 +385,9 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
                                   onClick={() => handleCopy(seg.id, seg.correctedLabel!)}
                                   icon={
                                     copiedId === seg.id ? (
-                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                                     ) : (
-                                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                      <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                                     )
                                   }
                                 >
@@ -406,7 +399,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
                                   onClick={() => handleCorrectSingleSegment(seg.id)}
                                   isLoading={loadingSegmentId === seg.id}
                                   disabled={isLoading}
-                                  icon={<Sparkles className="w-3.5 h-3.5 text-amber-400" />}
+                                  icon={<Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />}
                                   title="إعادة تصحيح هذا المقطع فقط بالذكاء الاصطناعي"
                                 >
                                   {loadingSegmentId === seg.id ? "Correcting..." : "Re-AI"}
@@ -414,7 +407,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
                               </div>
                             </div>
                             {isArabic && seg.correctedLabel && (
-                              <p className="mt-1 text-xs text-emerald-300/90 font-sans dir-rtl bg-emerald-950/40 p-1.5 rounded border border-emerald-500/30">
+                              <p className="mt-1 text-xs text-emerald-900 dark:text-emerald-300/90 font-sans dir-rtl bg-emerald-50 dark:bg-emerald-950/40 p-1.5 rounded border border-emerald-200 dark:border-emerald-500/30">
                                 🇸🇦 <strong>التسمية المصححة:</strong> {translateToArabic(seg.correctedLabel)}
                               </p>
                             )}
@@ -424,13 +417,13 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
                       {/* Visual Evidence / Proof Box */}
                       {seg.visualEvidence && (
-                        <div className="mt-2 text-xs bg-slate-950/80 border border-slate-800 p-2.5 rounded-lg text-slate-300 flex items-start gap-2">
-                          <Eye className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
+                        <div className="mt-2 text-xs bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 p-2.5 rounded-lg text-slate-700 dark:text-slate-300 flex items-start gap-2">
+                          <Eye className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" />
                           <div>
-                            <span className="font-semibold text-brand-300">Visual Evidence: </span>
+                            <span className="font-semibold text-brand-700 dark:text-brand-300">Visual Evidence: </span>
                             <span>{seg.visualEvidence}</span>
                             {isArabic && (
-                              <p className="mt-1 text-amber-200/90 font-sans dir-rtl bg-slate-900/80 p-1.5 rounded border border-amber-500/20">
+                              <p className="mt-1 text-amber-900 dark:text-amber-200/90 font-sans dir-rtl bg-amber-50 dark:bg-slate-900/80 p-1.5 rounded border border-amber-200 dark:border-amber-500/20">
                                 🇸🇦 <strong>الملاحظة البصرية:</strong> {translateToArabic(seg.visualEvidence)}
                               </p>
                             )}
@@ -441,7 +434,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
                     <button
                       onClick={() => handleRemoveSegment(seg.id)}
-                      className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg transition-colors self-end md:self-center"
+                      className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 p-1.5 rounded-lg transition-colors self-end md:self-center"
                       title="Remove segment"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -455,8 +448,8 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
       )}
 
       {error && (
-        <div className="p-3.5 bg-red-950/50 border border-red-800/60 rounded-xl text-xs text-red-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+        <div className="p-3.5 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/60 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-red-500 dark:text-red-400" />
           <span>{error}</span>
         </div>
       )}
