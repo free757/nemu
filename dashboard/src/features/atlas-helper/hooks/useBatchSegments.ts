@@ -57,6 +57,15 @@ export function useBatchSegments({ fileUri, videoUrl }: UseBatchSegmentsProps) {
     setTimeout(() => setCopiedId(null), 2000);
   }, []);
 
+  const handleReset = useCallback(() => {
+    setBulkText("");
+    setSegments([]);
+    setError(null);
+    setCopiedId(null);
+    setCopiedReport(false);
+    setArabicMap({});
+  }, []);
+
   const toggleArabicTranslation = useCallback((id: string) => {
     setArabicMap((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
@@ -201,5 +210,6 @@ export function useBatchSegments({ fileUri, videoUrl }: UseBatchSegmentsProps) {
     handleCopyFullReport,
     handleCorrectAll,
     handleCorrectSingleSegment,
+    handleReset,
   };
 }

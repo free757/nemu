@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 import { useBatchSegments } from "../hooks/useBatchSegments";
 import { BatchInputCard } from "./BatchInputCard";
@@ -10,12 +10,14 @@ interface BatchLabelFormProps {
   fileUri: string | null;
   isLoaded: boolean;
   videoUrl?: string;
+  resetKey?: number;
 }
 
 export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({
   fileUri,
   isLoaded,
   videoUrl,
+  resetKey,
 }) => {
   const {
     segments,
@@ -35,7 +37,14 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({
     handleCopyFullReport,
     handleCorrectAll,
     handleCorrectSingleSegment,
+    handleReset,
   } = useBatchSegments({ fileUri, videoUrl });
+
+  useEffect(() => {
+    if (resetKey !== undefined && resetKey > 0) {
+      handleReset();
+    }
+  }, [resetKey, handleReset]);
 
   return (
     <div className="space-y-6">
@@ -47,6 +56,7 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({
         isLoading={isLoading}
         isLoaded={isLoaded}
         onCorrectAll={handleCorrectAll}
+        onClearText={handleReset}
       />
 
       {/* 2. Segments List */}

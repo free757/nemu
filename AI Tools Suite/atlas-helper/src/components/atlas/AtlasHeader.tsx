@@ -1,19 +1,21 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ShieldCheck, Cpu, Notebook, Sun, Moon } from "lucide-react";
+import { Sparkles, ShieldCheck, Cpu, Notebook, Sun, Moon, RotateCcw } from "lucide-react";
 import { ThemeMode } from "../hooks/useTheme";
 
 interface AtlasHeaderProps {
   theme: ThemeMode;
   onToggleTheme: () => void;
   onOpenNotes: () => void;
+  onResetAll?: () => void;
 }
 
 export const AtlasHeader: React.FC<AtlasHeaderProps> = ({
   theme,
   onToggleTheme,
   onOpenNotes,
+  onResetAll,
 }) => {
   return (
     <header className="border-b border-slate-200 dark:border-slate-800 bg-white/85 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 transition-colors">
@@ -38,6 +40,18 @@ export const AtlasHeader: React.FC<AtlasHeaderProps> = ({
 
         {/* Actions & Badges */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Reset All / New Task Button */}
+          {onResetAll && (
+            <button
+              onClick={onResetAll}
+              className="flex items-center gap-1.5 text-xs text-rose-700 dark:text-rose-300 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/60 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all font-semibold shadow-xs"
+              title="مسح رابط الفيديو وقائمة المقاطع والبدء من جديد"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span>فيديو جديد (مسح الكل)</span>
+            </button>
+          )}
+
           {/* Theme Switcher Button */}
           <button
             onClick={onToggleTheme}

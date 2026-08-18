@@ -10,12 +10,22 @@ import { NotesDrawer } from "./NotesDrawer";
 export default function AtlasHelperDashboard() {
   const [fileUri, setFileUri] = useState<string | null>(null);
   const [loadedUrl, setLoadedUrl] = useState<string>("");
+  const [videoInputUrl, setVideoInputUrl] = useState<string>("");
+  const [resetKey, setResetKey] = useState<number>(0);
   const [isNotesOpen, setIsNotesOpen] = useState<boolean>(false);
   const { theme, isDark, toggleTheme } = useTheme();
 
   const handleVideoLoaded = (uri: string, url: string) => {
     setFileUri(uri);
     setLoadedUrl(url);
+    setVideoInputUrl(url);
+  };
+
+  const handleResetAll = () => {
+    setFileUri(null);
+    setLoadedUrl("");
+    setVideoInputUrl("");
+    setResetKey((prev) => prev + 1);
   };
 
   return (
@@ -26,6 +36,7 @@ export default function AtlasHelperDashboard() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onOpenNotes={() => setIsNotesOpen(true)}
+          onResetAll={handleResetAll}
         />
 
         {/* Core Content Container */}
@@ -36,6 +47,13 @@ export default function AtlasHelperDashboard() {
             isLoaded={Boolean(fileUri)}
             loadedUrl={loadedUrl}
             fileUri={fileUri}
+            videoUrl={videoInputUrl}
+            onVideoUrlChange={setVideoInputUrl}
+            onClear={() => {
+              setFileUri(null);
+              setLoadedUrl("");
+              setVideoInputUrl("");
+            }}
           />
 
           {/* Step 2: Batch Segments Verification */}
@@ -43,6 +61,7 @@ export default function AtlasHelperDashboard() {
             fileUri={fileUri}
             isLoaded={Boolean(fileUri)}
             videoUrl={loadedUrl}
+            resetKey={resetKey}
           />
         </div>
 
