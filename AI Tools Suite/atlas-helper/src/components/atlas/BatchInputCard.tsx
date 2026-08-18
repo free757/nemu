@@ -37,22 +37,24 @@ export const BatchInputCard: React.FC<BatchInputCardProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm dark:shadow-lg space-y-4 transition-colors">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-brand-600 dark:text-brand-500" />
-          Paste Segments Text (Time Ranges + Current AI Labels)
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm dark:shadow-lg space-y-3.5 sm:space-y-4 transition-colors">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 sm:gap-2">
+          <FileText className="w-4 h-4 text-brand-600 dark:text-brand-500 shrink-0" />
+          <span>Paste Segments Text</span>
         </label>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {onPasteText && (
             <button
               type="button"
               onClick={handlePaste}
-              className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium flex items-center gap-1 transition-colors px-2 py-1 rounded-md bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 border border-brand-200 dark:border-brand-800/40"
-              title="لصق النص المنسوخ مباشرة من الحافظة"
+              className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium flex items-center gap-1 transition-colors px-2 py-1 rounded-md bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 border border-brand-200 dark:border-brand-800/40 shadow-xs"
+              title="لصق النص من الحافظة"
+              aria-label="لصق النص من الحافظة"
             >
-              <Clipboard className="w-3.5 h-3.5" />
-              <span>📋 لصق النص</span>
+              <Clipboard className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xs:inline">لصق</span>
             </button>
           )}
 
@@ -60,16 +62,17 @@ export const BatchInputCard: React.FC<BatchInputCardProps> = ({
             <button
               type="button"
               onClick={onClearText}
-              className="text-xs text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 font-medium flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30"
+              className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 font-medium flex items-center gap-1 transition-colors px-2 py-1 rounded-md bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/40 shadow-xs"
               title="مسح نص المقاطع"
+              aria-label="مسح نص المقاطع"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>مسح النص</span>
+              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xs:inline">مسح</span>
             </button>
           )}
 
-          <span className="text-xs font-mono px-2.5 py-1 rounded-md text-brand-700 bg-brand-50 border border-brand-200 dark:text-brand-400 dark:bg-brand-950/60 dark:border-brand-800/40">
-            {detectedCount} segment(s) detected
+          <span className="text-[11px] sm:text-xs font-mono px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md text-brand-700 bg-brand-50 border border-brand-200 dark:text-brand-400 dark:bg-brand-950/60 dark:border-brand-800/40">
+            {detectedCount} segment(s)
           </span>
         </div>
       </div>
@@ -78,25 +81,25 @@ export const BatchInputCard: React.FC<BatchInputCardProps> = ({
         value={bulkText}
         onChange={onBulkTextChange}
         placeholder={`Paste your segment text block here, e.g.:\n\n0:00.00–0:03.00\npick up and place wrench with right hand\n\n0:03.00–0:07.33\npick up and place wrench with right hand`}
-        rows={6}
-        className="w-full p-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-mono"
+        rows={5}
+        className="w-full p-2.5 sm:p-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-mono"
       />
 
-      <div className="pt-2">
+      <div className="pt-1">
         <Button
           variant="primary"
           size="lg"
-          className="w-full py-3.5 text-base font-bold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-xl shadow-brand-500/25 transition-all text-white"
+          className="w-full py-3 sm:py-3.5 text-sm sm:text-base font-bold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/25 transition-all text-white"
           onClick={onCorrectAll}
           isLoading={isLoading}
           disabled={!isLoaded}
-          icon={<Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />}
+          icon={<Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 animate-pulse" />}
         >
           Verify & Correct All Segments with AI
         </Button>
         {!isLoaded && (
-          <p className="text-xs text-center text-amber-600 dark:text-amber-400/80 mt-2 flex items-center justify-center gap-1 font-medium">
-            <AlertCircle className="w-3.5 h-3.5" />
+          <p className="text-[11px] sm:text-xs text-center text-amber-600 dark:text-amber-400/80 mt-2 flex items-center justify-center gap-1 font-medium">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             Please paste and load your video URL in Step 1 first to enable AI correction.
           </p>
         )}
