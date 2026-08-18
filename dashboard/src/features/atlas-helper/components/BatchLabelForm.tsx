@@ -230,43 +230,13 @@ export const BatchLabelForm: React.FC<BatchLabelFormProps> = ({ fileUri, isLoade
 
   return (
     <div className="space-y-6">
-      {/* Settings Toggle Bar */}
+      {/* Header Bar */}
       <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl">
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-brand-500" />
           <h2 className="text-base font-semibold text-white">2. Action Labels & Segments</h2>
         </div>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-        >
-          <Settings2 className="w-4 h-4" />
-          <span>{showSettings ? "Hide Rules" : "Edit Rubric Prompt"}</span>
-        </button>
       </div>
-
-      {/* Custom Prompt Settings Panel */}
-      {showSettings && (
-        <div className="bg-slate-950 border border-brand-500/30 p-4 rounded-xl space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="text-xs font-semibold text-brand-400 uppercase tracking-wider">
-              System Prompt & Rubric Instructions
-            </label>
-            <button
-              onClick={() => setCustomPrompt(DEFAULT_ATLAS_SYSTEM_PROMPT)}
-              className="text-xs text-slate-400 hover:text-white underline"
-            >
-              Reset to Default
-            </button>
-          </div>
-          <textarea
-            value={customPrompt}
-            onChange={(e) => setCustomPrompt(e.target.value)}
-            rows={8}
-            className="w-full p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-        </div>
-      )}
 
       {/* Bulk Input Box */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
