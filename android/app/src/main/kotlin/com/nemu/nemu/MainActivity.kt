@@ -15,6 +15,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.net.NetworkInterface as JavaNetworkInterface
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.nemu.nemu/overlay"
@@ -126,11 +127,90 @@ class MainActivity : FlutterActivity() {
                     startActivity(intent)
                     result.success(true)
                 }
+                "getHotspotIP" -> {
+                    result.success(getHotspotIP())
+                }
                 else -> {
                     result.notImplemented()
                 }
             }
         }
+    }
+
+    /**
+     * Uses Java's NetworkInterface (better Android visibility than Dart's)
+     * to find the hotspot gateway IP — excludes loopback, VPN/tun, mobile data.
+     */
+    private fun getHotspotIP(): String {
+        val excludeIfaceNames = listOf("tun", "vpn", "ppp", "dummy", "lo", "rmnet", "ccmni", "docker")
+        val excludeSubnets = listOf("127.", "26.26.", "10.0.2.") // loopback + emulator + VPN
+
+        fun isVpnRange(ip: String): Boolean {
+            if (ip.startsWith("127.")) return true
+            if (ip.startsWith("100.")) return true  // CGNAT / Tailscale
+            val parts = ip.split(".")
+            if (parts.size == 4 && parts[0] == "172") {
+                val second = parts[1].toIntOrNull() ?: 0
+                if (second in 16..31) return true  // Docker / V2Ray tun
+            }
+            return excludeSubnets.any { ip.startsWith(it) }
+        }
+
+        fun isHomeWifi(ip: String) =
+            ip.startsWith("192.168.0.") || ip.startsWith("192.168.1.") || ip.startsWith("192.168.2.")
+
+        fun isExcluded(name: String) = excludeIfaceNames.any { name.lowercase().contains(it) }
+
+        try {
+            val ifaces = JavaNetworkInterface.getNetworkInterfaces()?.toList() ?: emptyList()
+
+            android.util.Log.d("HotspotIP/Kotlin", "All interfaces:")
+            for (iface in ifaces) {
+                for (addr in iface.inetAddresses.toList()) {
+                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                        android.util.Log.d("HotspotIP/Kotlin", "  ${iface.name} → ${addr.hostAddress}")
+                    }
+                }
+            }
+
+            // Priority 1: Named hotspot interfaces
+            val hotspotNames = listOf("ap", "swlan", "softap", "wlan1", "hotspot", "p2p-wlan")
+            for (iface in ifaces) {
+                if (isExcluded(iface.name)) continue
+                if (hotspotNames.none { iface.name.lowercase().contains(it) }) continue
+                for (addr in iface.inetAddresses.toList()) {
+                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                        val ip = addr.hostAddress ?: continue
+                        if (!isVpnRange(ip)) return ip
+                    }
+                }
+            }
+
+            // Priority 2: Non-home, non-VPN subnet
+            for (iface in ifaces) {
+                if (isExcluded(iface.name)) continue
+                for (addr in iface.inetAddresses.toList()) {
+                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                        val ip = addr.hostAddress ?: continue
+                        if (!isVpnRange(ip) && !isHomeWifi(ip)) return ip
+                    }
+                }
+            }
+
+            // Priority 3: Any non-VPN IPv4
+            for (iface in ifaces) {
+                if (isExcluded(iface.name)) continue
+                for (addr in iface.inetAddresses.toList()) {
+                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                        val ip = addr.hostAddress ?: continue
+                        if (!isVpnRange(ip)) return ip
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("HotspotIP/Kotlin", "Error: $e")
+        }
+        return "192.168.43.1"
     }
 
     private fun downloadAndInstallApk(urlStr: String) {

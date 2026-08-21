@@ -4,13 +4,18 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 import 'package:nemu/features/auth/domain/entities/user_entity.dart';
 import 'package:nemu/features/auth/domain/repositories/auth_repository.dart';
+import 'package:nemu/features/security/domain/repositories/security_repository.dart';
 
 part 'auth_state.dart';
 
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository authRepository;
+  final SecurityRepository securityRepository;
 
-  AuthCubit({required this.authRepository}) : super(AuthInitial());
+  AuthCubit({
+    required this.authRepository,
+    required this.securityRepository,
+  }) : super(AuthInitial());
 
   Future<void> checkAuth() async {
     final failureOrUser = await authRepository.getSavedUser();
@@ -47,6 +52,11 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> logout() async {
+    try {
+      await securityRepository.disconnectVpn();
+    } catch (_) {
+      // Ignore errors if disconnection fails to guarantee logout completes
+    }
     await authRepository.logout();
     emit(AuthUnauthenticated());
   }

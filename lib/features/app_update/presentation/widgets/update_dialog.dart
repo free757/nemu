@@ -273,7 +273,27 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                   style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10),
                                   textAlign: TextAlign.center,
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.greenAccent,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  ),
+                                  onPressed: () async {
+                                    final Uri url = Uri.parse(widget.updateInfo.downloadUrl);
+                                    try {
+                                      if (await canLaunchUrl(url)) {
+                                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                                      }
+                                    } catch (_) {}
+                                  },
+                                  icon: const Icon(Icons.open_in_browser, size: 16, color: Colors.greenAccent),
+                                  label: const Text(
+                                    "التحميل من المتصفح (كبديل)",
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
                                 if (!widget.updateInfo.forceUpdate)
                                   TextButton.icon(
                                     style: TextButton.styleFrom(

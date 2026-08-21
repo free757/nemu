@@ -36,7 +36,7 @@ final vpnStatusNotifier = ValueNotifier<String>('DISCONNECTED');
 Future<void> init() async {
   //! Features - Auth
   // Cubit
-  sl.registerFactory(() => AuthCubit(authRepository: sl()));
+  sl.registerFactory(() => AuthCubit(authRepository: sl(), securityRepository: sl()));
   // Repository
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(remoteDataSource: sl(), sharedPreferences: sl()),
@@ -102,9 +102,11 @@ Future<void> init() async {
   sl.registerLazySingleton(() => Supabase.instance.client);
 
   final v2ray = FlutterV2ray(onStatusChanged: (status) {
-    // Update global notifier — SecurityCubit reads this to reflect real state
-    vpnStatusNotifier.value = status.state;
-    debugPrint('V2Ray Status: ${status.state}');
+    // Only log and notify when the state actually changes to avoid log spam
+    if (vpnStatusNotifier.value != status.state) {
+      debugPrint('[V2Ray] Status changed: ${vpnStatusNotifier.value} → ${status.state}');
+      vpnStatusNotifier.value = status.state;
+    }
   });
 
   try {

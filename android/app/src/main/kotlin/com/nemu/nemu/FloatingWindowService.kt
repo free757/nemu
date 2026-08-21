@@ -47,10 +47,16 @@ class FloatingWindowService : Service() {
     }
 
     private lateinit var windowManager: WindowManager
-    private var bubbleView: FrameLayout? = null
+    private var bubbleView: LinearLayout? = null
+    private var clockCircle: FrameLayout? = null
+    private var lockButton: FrameLayout? = null
     private var bubbleTextView: TextView? = null
     private var panelView: FrameLayout? = null
     private var containerHolder: FrameLayout? = null
+
+    private var isScreenLocked = false
+    private var touchBlockerView: FrameLayout? = null
+    private var lockWarningView: TextView? = null
  
     private val vpnCheckHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val vpnCheckRunnable = object : Runnable {
@@ -183,15 +189,26 @@ class FloatingWindowService : Service() {
     }
 
     private fun createBubble() {
+        val totalWidth = dpToPx(108f) // 60dp clock + 36dp lock + 12dp margins/gap
         val bubbleSize = dpToPx(60f)
-        bubbleView = FrameLayout(this)
-
-        // Perfect circle background with border
-        val shape = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.parseColor("#1A1A1E")) // Deep dark circle body
+        
+        // Root container for both clock and lock button
+        bubbleView = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            // Transparent background
+            setBackgroundColor(Color.TRANSPARENT)
         }
-        bubbleView?.background = shape
+
+        // 1. Clock Circle
+        clockCircle = FrameLayout(this).apply {
+            val shape = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#1A1A1E")) // Deep dark circle body
+            }
+            background = shape
+            layoutParams = LinearLayout.LayoutParams(bubbleSize, bubbleSize)
+        }
 
         // Main text clock instead of "N" inside bubble
         val textView = TextView(this).apply {
@@ -203,13 +220,48 @@ class FloatingWindowService : Service() {
             setLineSpacing(0f, 0.82f) // beautiful snug spacing for 2-line layout
         }
         bubbleTextView = textView
-        updateClockTime() // set correct Cairo time immediately
+        updateClockTime() // set Cairo time immediately
 
         val textParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         )
-        bubbleView?.addView(textView, textParams)
+        clockCircle?.addView(textView, textParams)
+
+        // 2. Lock Button
+        lockButton = FrameLayout(this).apply {
+            val size = dpToPx(36f)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                leftMargin = dpToPx(6f)
+                rightMargin = dpToPx(6f)
+            }
+            
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#1A1A1E"))
+                setStroke(dpToPx(1.5f), Color.parseColor("#4B5563")) // Default gray border
+            }
+            
+            val lockTextView = TextView(context).apply {
+                text = "🔓"
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                gravity = Gravity.CENTER
+            }
+            addView(lockTextView, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            
+            setOnClickListener {
+                toggleScreenLock()
+            }
+        }
+
+        // Add views to layout. Since we start at x=20 (left side), clock is left, lock is right
+        bubbleView?.addView(clockCircle)
+        bubbleView?.addView(lockButton)
 
         // Setup layouts params for WindowManager
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -220,8 +272,8 @@ class FloatingWindowService : Service() {
         }
 
         val params = WindowManager.LayoutParams(
-            bubbleSize,
-            bubbleSize,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             layoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
@@ -234,8 +286,8 @@ class FloatingWindowService : Service() {
         // Apply dynamic indicator color on initialization
         updateBubbleIndicator()
 
-        // Handle touch & drag listeners
-        bubbleView?.setOnTouchListener(object : View.OnTouchListener {
+        // Handle touch & drag listeners on clockCircle (moves entire bubbleView)
+        clockCircle?.setOnTouchListener(object : View.OnTouchListener {
             private var lastAction: Int = 0
             private var initialX: Int = 0
             private var initialY: Int = 0
@@ -265,16 +317,24 @@ class FloatingWindowService : Service() {
                         val distance = Math.sqrt((diffX * diffX + diffY * diffY).toDouble())
                         
                         if (distance < 10.0) {
-                            // Single tap: toggle expanded credentials panel
-                            togglePanelVisibility()
+                            if (isScreenLocked) {
+                                showLockWarning()
+                            } else {
+                                // Single tap: toggle expanded credentials panel
+                                togglePanelVisibility()
+                            }
                         } else {
                             // Snap to nearest screen edge (left or right)
                             val screenWidth = resources.displayMetrics.widthPixels
                             val middle = screenWidth / 2
-                            if (params.x + (bubbleSize / 2) < middle) {
+                            val isLeft = params.x + (totalWidth / 2) < middle
+                            
+                            if (isLeft) {
                                 params.x = 20
+                                updateLockButtonAlignment(true)
                             } else {
-                                params.x = screenWidth - bubbleSize - 20
+                                params.x = screenWidth - totalWidth - 20
+                                updateLockButtonAlignment(false)
                             }
                             windowManager.updateViewLayout(bubbleView, params)
                         }
@@ -289,7 +349,7 @@ class FloatingWindowService : Service() {
     }
 
     private fun updateBubbleIndicator() {
-        bubbleView?.let { view ->
+        clockCircle?.let { view ->
             val shape = view.background as? GradientDrawable ?: return
             
             // Border color: Green for connected, Red/Grey for disconnected
@@ -652,6 +712,143 @@ class FloatingWindowService : Service() {
         }
     }
 
+    private fun updateLockButtonAlignment(isLeft: Boolean) {
+        val root = bubbleView ?: return
+        val circle = clockCircle ?: return
+        val btn = lockButton ?: return
+        
+        root.removeAllViews()
+        if (isLeft) {
+            root.addView(circle)
+            root.addView(btn)
+        } else {
+            root.addView(btn)
+            root.addView(circle)
+        }
+    }
+
+    private fun toggleScreenLock() {
+        isScreenLocked = !isScreenLocked
+        val lockText = lockButton?.getChildAt(0) as? TextView
+        val lockBg = lockButton?.background as? GradientDrawable
+        
+        if (isScreenLocked) {
+            lockText?.text = "🔒"
+            lockBg?.apply {
+                setStroke(dpToPx(1.5f), Color.parseColor("#EF4444")) // Red border for locked
+            }
+            enableTouchBlocker()
+        } else {
+            lockText?.text = "🔓"
+            lockBg?.apply {
+                setStroke(dpToPx(1.5f), Color.parseColor("#4B5563")) // Gray border for unlocked
+            }
+            disableTouchBlocker()
+        }
+    }
+
+    private fun enableTouchBlocker() {
+        if (touchBlockerView != null) return
+        
+        val context = this
+        val blocker = FrameLayout(context).apply {
+            setBackgroundColor(Color.parseColor("#0F000000")) // Translucent blocker overlay
+        }
+        touchBlockerView = blocker
+        
+        val warningText = TextView(context).apply {
+            text = "🔒 Screen Locked\nTap lock button to unlock\n\nالشاشة مغلقة\nاضغط على زر القفل لفتحها"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            
+            val padH = dpToPx(16f)
+            val padV = dpToPx(12f)
+            setPadding(padH, padV, padH, padV)
+            
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(16f).toFloat()
+                setColor(Color.parseColor("#D91A1A1E"))
+                setStroke(dpToPx(1.5f), Color.parseColor("#33FFFFFF"))
+            }
+            alpha = 0f
+        }
+        lockWarningView = warningText
+        
+        blocker.addView(warningText, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+        })
+        
+        blocker.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                showLockWarning()
+            }
+            true
+        }
+        
+        val blockerType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        
+        val blockerParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            blockerType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        
+        try {
+            windowManager.addView(blocker, blockerParams)
+            bringBubbleToFront()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun disableTouchBlocker() {
+        touchBlockerView?.let {
+            try {
+                windowManager.removeView(it)
+            } catch (e: Exception) {}
+        }
+        touchBlockerView = null
+        lockWarningView = null
+    }
+
+    private fun showLockWarning() {
+        val warningText = lockWarningView ?: return
+        warningText.animate().cancel()
+        warningText.alpha = 1f
+        warningText.animate()
+            .alpha(0f)
+            .setStartDelay(1500)
+            .setDuration(500)
+            .start()
+    }
+
+    private fun bringBubbleToFront() {
+        bubbleView?.let { bubble ->
+            val params = bubble.layoutParams as? WindowManager.LayoutParams ?: return
+            try {
+                windowManager.removeView(bubble)
+                windowManager.addView(bubble, params)
+            } catch (e: Exception) {
+                try {
+                    windowManager.updateViewLayout(bubble, params)
+                } catch (ex: Exception) {}
+            }
+        }
+    }
+
 
     private fun checkNativeVpnStatus() {
         val active = isVpnActive()
@@ -793,6 +990,7 @@ class FloatingWindowService : Service() {
         clockHandler.removeCallbacks(clockRunnable)
         heartbeatHandler.removeCallbacks(heartbeatRunnable)
         hidePrayerPopupHandler.removeCallbacks(hidePrayerPopupRunnable)
+        disableTouchBlocker()
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         panelView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         prayerPopupView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
@@ -857,9 +1055,9 @@ class FloatingWindowService : Service() {
 
         // Layout params
         val bubbleParams = bubbleView?.layoutParams as? WindowManager.LayoutParams ?: return
-        val bubbleSize = dpToPx(60f)
+        val totalWidth = dpToPx(108f)
         val screenWidth = resources.displayMetrics.widthPixels
-        val isLeft = bubbleParams.x + (bubbleSize / 2) < screenWidth / 2
+        val isLeft = bubbleParams.x + (totalWidth / 2) < screenWidth / 2
 
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -878,7 +1076,7 @@ class FloatingWindowService : Service() {
             gravity = Gravity.TOP or Gravity.START
             y = bubbleParams.y + dpToPx(10f) // align vertically near center of bubble
             if (isLeft) {
-                x = bubbleParams.x + bubbleSize + dpToPx(8f)
+                x = bubbleParams.x + totalWidth + dpToPx(8f)
             } else {
                 // Since wrap content width is dynamic, we estimate width around 180dp
                 x = bubbleParams.x - dpToPx(180f)
