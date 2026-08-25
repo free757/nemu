@@ -70,10 +70,18 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
     WidgetsBinding.instance.addObserver(this);
     _subscribeToNotifications();
     _loadOverlayPreference();
+    _requestBatteryOptimizationExemption();
     _checkWebcamStatus();
     _webcamCheckTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       _checkWebcamStatus();
     });
+  }
+
+  Future<void> _requestBatteryOptimizationExemption() async {
+    try {
+      const platform = MethodChannel('com.nemu.nemu/overlay');
+      await platform.invokeMethod('requestIgnoreBatteryOptimizations');
+    } catch (_) {}
   }
 
   Future<void> _checkWebcamStatus() async {
