@@ -117,11 +117,11 @@ class SecurityRepositoryImpl implements SecurityRepository {
     ]
   },
   "routing": {
-    "domainStrategy": "IPIfNonMatch",
+    "domainStrategy": "AsIs",
     "rules": [
       {
         "type": "field",
-        "port": "53",
+        "network": "tcp,udp",
         "outboundTag": "proxy"
       }
     ]
