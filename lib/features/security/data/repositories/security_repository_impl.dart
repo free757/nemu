@@ -60,13 +60,21 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "listen": "0.0.0.0",
       "port": 10808,
       "protocol": "socks",
-      "settings": { "auth": "noauth", "udp": true }
+      "settings": { "auth": "noauth", "udp": true },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
     },
     {
       "listen": "0.0.0.0",
       "port": 10809,
       "protocol": "http",
-      "settings": { "allowTransparent": false }
+      "settings": { "allowTransparent": false },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
     }
   ],
   "outbounds": [{
@@ -95,6 +103,10 @@ class SecurityRepositoryImpl implements SecurityRepository {
           "Host": "$_workerHost"
         }
       }
+    },
+    "mux": {
+      "enabled": true,
+      "concurrency": 8
     }
   },
   {
