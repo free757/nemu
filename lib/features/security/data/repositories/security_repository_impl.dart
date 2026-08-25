@@ -112,24 +112,26 @@ class SecurityRepositoryImpl implements SecurityRepository {
   }],
   "dns": {
     "hosts": {
-      "dns.google": "8.8.8.8"
+      "dns.google": "8.8.8.8",
+      "nemu-proxy.free75711.workers.dev": "172.67.207.164"
     },
     "servers": [
+      "8.8.8.8",
       "1.1.1.1",
-      "8.8.8.8"
+      "localhost"
     ]
   },
   "routing": {
-    "domainStrategy": "IPIfNonMatch",
+    "domainStrategy": "UseIP",
     "rules": [
       {
         "type": "field",
-        "port": "53",
-        "outboundTag": "proxy"
+        "domain": ["nemu-proxy.free75711.workers.dev"],
+        "outboundTag": "direct"
       },
       {
         "type": "field",
-        "ip": ["0.0.0.0/0", "::/0"],
+        "network": "tcp,udp",
         "outboundTag": "proxy"
       }
     ]
