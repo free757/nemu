@@ -23,7 +23,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
               Uri.parse('https://api.ipify.org?format=json'),
               headers: {'Connection': 'close'},
             )
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 5));
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['ip'] != null) {

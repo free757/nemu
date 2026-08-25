@@ -130,35 +130,11 @@ class SecurityCubit extends Cubit<SecurityState> {
         await securityRepository.connectVpn(ip: ip, port: port, user: user, pass: pass);
         
         // Wait for V2Ray to start connecting and establish status
-        debugPrint('[SecurityCubit] Waiting 3 seconds for V2Ray handshake...');
-        await Future.delayed(const Duration(seconds: 3));
+        debugPrint('[SecurityCubit] Waiting 2 seconds for V2Ray handshake...');
+        await Future.delayed(const Duration(seconds: 2));
         
         debugPrint('[SecurityCubit] Running connection verification check...');
-        final failureOrStatus = await checkConnectionUseCase();
-        
-        failureOrStatus.fold(
-          (failure) {
-            debugPrint('[SecurityCubit] Silent connection verification failed: ${failure.message}');
-            emit(SecurityLoaded(
-              ConnectionStatus(
-                ip: 'Connection Failed',
-                country: 'Unknown',
-                countryCode: 'XX',
-                timezone: 'Unknown',
-                remoteTime: 'Unknown',
-                offsetSeconds: 0,
-                isUSA: false,
-                timezoneMismatch: false,
-              ),
-              isConnected: _isVpnConnected,
-            ));
-          },
-          (status) {
-            final isConn = _isVpnConnected;
-            debugPrint('[SecurityCubit] Silent connection verification succeeded. IP: ${status.ip}, isUSA: ${status.isUSA}, isVpnConnected: $isConn');
-            emit(SecurityLoaded(status, isConnected: isConn));
-          },
-        );
+        await checkConnection(retryCount: 0);
       } catch (e) {
         debugPrint('[SecurityCubit] Exception caught during VPN connection: $e');
         emit(SecurityError(e.toString()));
