@@ -111,17 +111,25 @@ class SecurityRepositoryImpl implements SecurityRepository {
     "settings": {}
   }],
   "dns": {
+    "hosts": {
+      "dns.google": "8.8.8.8"
+    },
     "servers": [
       "1.1.1.1",
       "8.8.8.8"
     ]
   },
   "routing": {
-    "domainStrategy": "AsIs",
+    "domainStrategy": "IPIfNonMatch",
     "rules": [
       {
         "type": "field",
-        "network": "tcp,udp",
+        "port": "53",
+        "outboundTag": "proxy"
+      },
+      {
+        "type": "field",
+        "ip": ["0.0.0.0/0", "::/0"],
         "outboundTag": "proxy"
       }
     ]
