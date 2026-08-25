@@ -45,6 +45,7 @@ class _PinLoginPageState extends State<PinLoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
       backgroundColor: Colors.black,
       body: Container(
         width: double.infinity,
