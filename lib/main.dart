@@ -43,7 +43,14 @@ class NemuApp extends StatelessWidget {
         theme: ThemeData(
           useMaterial3: true,
           brightness: Brightness.dark,
-          colorSchemeSeed: Colors.blueAccent,
+          scaffoldBackgroundColor: Colors.black,
+          canvasColor: Colors.black,
+          dialogBackgroundColor: Colors.black,
+          colorScheme: const ColorScheme.dark(
+            surface: Colors.black,
+            background: Colors.black,
+            primary: Colors.blueAccent,
+          ),
         ),
         home: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, state) {
