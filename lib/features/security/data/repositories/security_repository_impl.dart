@@ -103,10 +103,6 @@ class SecurityRepositoryImpl implements SecurityRepository {
           "Host": "$_workerHost"
         }
       }
-    },
-    "mux": {
-      "enabled": true,
-      "concurrency": 8
     }
   },
   {
