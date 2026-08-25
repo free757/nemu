@@ -1377,7 +1377,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                 _buildInfoRow(Icons.language, "Current IP", ip),
                 _buildInfoRow(Icons.security, "Protocol", "SOCKS5"),
                 _buildInfoRow(Icons.location_on, "Target", "United States"),
-                if (isUSA) ...[
+                if (isConnected && isUSA) ...[
                    const Padding(
                      padding: EdgeInsets.only(top: 10),
                      child: Text("Connected Successfully ✅", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
