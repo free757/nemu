@@ -89,7 +89,7 @@ Future<void> init() async {
   );
   // Data sources
   sl.registerLazySingleton<SecurityRemoteDataSource>(
-    () => SecurityRemoteDataSourceImpl(client: sl()),
+    () => SecurityRemoteDataSourceImpl(),
   );
 
   //! Core

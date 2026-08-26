@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import '../models/connection_status_model.dart';
 
 abstract class SecurityRemoteDataSource {
@@ -8,84 +10,97 @@ abstract class SecurityRemoteDataSource {
 }
 
 class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
-  final http.Client client;
+  SecurityRemoteDataSourceImpl();
 
-  SecurityRemoteDataSourceImpl({required this.client});
+  Dio _getDio({bool useProxy = false}) {
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 6),
+      sendTimeout: const Duration(seconds: 6),
+    ));
+
+    if (useProxy) {
+      (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.findProxy = (uri) => 'PROXY 127.0.0.1:10809; DIRECT';
+        client.badCertificateCallback = (cert, host, port) => true;
+        return client;
+      };
+    }
+
+    return dio;
+  }
+
+  Future<Map<String, dynamic>?> _tryFetch(String url, bool useProxy) async {
+    final label = useProxy ? '[ViaProxy]' : '[Direct]';
+    print('[Datasource]$label Trying: $url');
+    try {
+      final dio = _getDio(useProxy: useProxy);
+      final response = await dio.get(
+        url,
+        options: Options(headers: {'Connection': 'close'}),
+      );
+      print('[Datasource]$label StatusCode: ${response.statusCode} for $url');
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = response.data is String
+            ? json.decode(response.data as String) as Map<String, dynamic>
+            : response.data as Map<String, dynamic>;
+        print('[Datasource]$label Raw data keys: ${data.keys.toList()}');
+        return data;
+      }
+    } catch (e) {
+      print('[Datasource]$label ERROR fetching $url: $e');
+    }
+    return null;
+  }
 
   @override
   Future<ConnectionStatusModel> checkIP() async {
-    // 0. Try ipwho.is (Free HTTPS + accurate country detection)
-    try {
-      final freshClient = http.Client();
-      try {
-        final response = await freshClient
-            .get(
-              Uri.parse('https://ipwho.is/'),
-              headers: {'Connection': 'close'},
-            )
-            .timeout(const Duration(seconds: 5));
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['success'] == true) {
-            return ConnectionStatusModel.fromIpWhoIs(data);
-          }
-        }
-      } finally {
-        freshClient.close();
-      }
-    } catch (_) {}
+    print('[Datasource] ===== checkIP() START =====');
 
-    // 1. Try ip-api.com (HTTP)
-    try {
-      final freshClient = http.Client();
+    for (final useProxy in [true, false]) {
+      final label = useProxy ? '[ViaProxy]' : '[Direct]';
+
+      // 0. ipwho.is
       try {
-        final response = await freshClient
-            .get(
-              Uri.parse('http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query'),
-              headers: {
-                'Connection': 'close',
-              },
-            )
-            .timeout(const Duration(seconds: 4));
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['status'] == 'success') {
-            return ConnectionStatusModel.fromJson(data);
-          }
+        final data = await _tryFetch('https://ipwho.is/', useProxy);
+        if (data != null && data['success'] == true) {
+          print('[Datasource]$label SUCCESS from ipwho.is: ip=${data['ip']}, country=${data['country']}');
+          return ConnectionStatusModel.fromIpWhoIs(data);
         }
-      } finally {
-        freshClient.close();
+      } catch (e) {
+        print('[Datasource]$label ipwho.is parse exception: $e');
       }
-    } catch (e) {
-      // Fail silently to try fallback 1
+
+      // 1. ip-api.com
+      try {
+        final data = await _tryFetch(
+          'http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query',
+          useProxy,
+        );
+        if (data != null && data['status'] == 'success') {
+          print('[Datasource]$label SUCCESS from ip-api.com: ip=${data['query']}, country=${data['country']}');
+          return ConnectionStatusModel.fromJson(data);
+        }
+      } catch (e) {
+        print('[Datasource]$label ip-api.com parse exception: $e');
+      }
+
+      // 2. ipapi.co
+      try {
+        final data = await _tryFetch('https://ipapi.co/json/', useProxy);
+        if (data != null && (data['error'] == null || data['error'] == false)) {
+          print('[Datasource]$label SUCCESS from ipapi.co: ip=${data['ip']}, country=${data['country_name']}');
+          return ConnectionStatusModel.fromIpApiCo(data);
+        }
+      } catch (e) {
+        print('[Datasource]$label ipapi.co parse exception: $e');
+      }
+
+      print('[Datasource]$label All endpoints failed, trying ${!useProxy ? "direct" : "proxy"}...');
     }
 
-    // 2. Try ipapi.co (HTTPS Fallback 2)
-    try {
-      final freshClient = http.Client();
-      try {
-        final response = await freshClient
-            .get(
-              Uri.parse('https://ipapi.co/json/'),
-              headers: {
-                'Connection': 'close',
-              },
-            )
-            .timeout(const Duration(seconds: 4));
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['error'] == null || data['error'] == false) {
-            return ConnectionStatusModel.fromIpApiCo(data);
-          }
-        }
-      } finally {
-        freshClient.close();
-      }
-    } catch (e) {
-      // Fail silently
-    }
-
-    // Final fallback: throw timeout
+    print('[Datasource] ===== checkIP() FAILED ALL =====');
     throw Exception('Connection timed out. Please check your internet.');
   }
 }

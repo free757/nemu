@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
 import '../../../../core/error/failures.dart';
@@ -44,13 +45,29 @@ class SecurityRepositoryImpl implements SecurityRepository {
     required String user,
     required String pass,
   }) async {
-    if (await v2ray.requestPermission()) {
-      // Build WebSocket path with per-user SOCKS5 credentials
-      // Cloudflare Worker connects to user's SOCKS5 proxy on their behalf
-      // This bypasses ISP DPI blocking since phone only speaks TLS to Cloudflare
-      final encodedUser = Uri.encodeComponent(user);
-      final encodedPass = Uri.encodeComponent(pass);
-      final wsPath = '/?ph=${Uri.encodeComponent(ip)}&pp=$port&pu=$encodedUser&pw=$encodedPass';
+    // Request permission from Android system
+    // On first run, the dialog will show and requestPermission() returns false.
+    // We retry once to catch the case where the user just granted permission.
+    bool permissionGranted = await v2ray.requestPermission();
+    if (!permissionGranted) {
+      print('[SecurityRepository] Permission not yet granted, retrying after 2s...');
+      await Future.delayed(const Duration(seconds: 2));
+      permissionGranted = await v2ray.requestPermission();
+      if (!permissionGranted) {
+        print('[SecurityRepository] VPN permission denied by user.');
+        return;
+      }
+    }
+    print('[SecurityRepository] VPN permission granted!');
+
+    // Build WebSocket path with per-user SOCKS5 credentials
+    // Cloudflare Worker connects to user's SOCKS5 proxy on their behalf
+    // This bypasses ISP DPI blocking since phone only speaks TLS to Cloudflare
+    final encodedUser = Uri.encodeComponent(user);
+    final encodedPass = Uri.encodeComponent(pass);
+    final wsPath = '/?ph=${Uri.encodeComponent(ip)}&pp=$port&pu=$encodedUser&pw=$encodedPass';
+    print('[SecurityRepository] Worker host: $_workerHost');
+    print('[SecurityRepository] WS path: $wsPath');
 
       final v2rayConfig = '''
 {
@@ -108,13 +125,9 @@ class SecurityRepositoryImpl implements SecurityRepository {
   ],
   "dns": {
     "hosts": {
-      "$_workerHost": "172.67.207.164",
-      "cloudflare-dns.com": "1.1.1.1",
-      "dns.google": "8.8.8.8"
+      "$_workerHost": "172.67.207.164"
     },
     "servers": [
-      "https://cloudflare-dns.com/dns-query",
-      "https://dns.google/dns-query",
       "1.1.1.1",
       "8.8.8.8"
     ]
@@ -136,7 +149,6 @@ class SecurityRepositoryImpl implements SecurityRepository {
         config: v2rayConfig,
         proxyOnly: false,
       );
-    }
   }
 
   @override
