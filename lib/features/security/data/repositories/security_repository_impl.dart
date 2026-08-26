@@ -108,9 +108,13 @@ class SecurityRepositoryImpl implements SecurityRepository {
   ],
   "dns": {
     "hosts": {
-      "$_workerHost": "172.67.207.164"
+      "$_workerHost": "172.67.207.164",
+      "cloudflare-dns.com": "1.1.1.1",
+      "dns.google": "8.8.8.8"
     },
     "servers": [
+      "https://cloudflare-dns.com/dns-query",
+      "https://dns.google/dns-query",
       "1.1.1.1",
       "8.8.8.8"
     ]
