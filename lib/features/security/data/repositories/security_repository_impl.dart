@@ -57,81 +57,70 @@ class SecurityRepositoryImpl implements SecurityRepository {
   "log": { "loglevel": "warning" },
   "inbounds": [
     {
+      "tag": "socks-in",
       "listen": "0.0.0.0",
       "port": 10808,
       "protocol": "socks",
-      "settings": { "auth": "noauth", "udp": true },
-      "sniffing": {
-        "enabled": true,
-        "destOverride": ["http", "tls"]
-      }
+      "settings": { "auth": "noauth", "udp": true }
     },
     {
+      "tag": "http-in",
       "listen": "0.0.0.0",
       "port": 10809,
       "protocol": "http",
-      "settings": { "allowTransparent": false },
-      "sniffing": {
-        "enabled": true,
-        "destOverride": ["http", "tls"]
-      }
+      "settings": { "allowTransparent": false }
     }
   ],
-  "outbounds": [{
-    "tag": "proxy",
-    "protocol": "vless",
-    "settings": {
-      "vnext": [{
-        "address": "$_workerHost",
-        "port": 443,
-        "users": [{
-          "id": "$_vlessUUID",
-          "encryption": "none"
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [{
+          "address": "$_workerHost",
+          "port": 443,
+          "users": [{
+            "id": "$_vlessUUID",
+            "encryption": "none"
+          }]
         }]
-      }]
-    },
-    "streamSettings": {
-      "network": "ws",
-      "security": "tls",
-      "tlsSettings": {
-        "allowInsecure": false,
-        "serverName": "$_workerHost"
       },
-      "wsSettings": {
-        "path": "$wsPath",
-        "headers": {
-          "Host": "$_workerHost"
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "allowInsecure": false,
+          "serverName": "$_workerHost"
+        },
+        "wsSettings": {
+          "path": "$wsPath",
+          "headers": {
+            "Host": "$_workerHost"
+          }
         }
       }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
     }
-  },
-  {
-    "tag": "direct",
-    "protocol": "freedom",
-    "settings": {}
-  }],
+  ],
   "dns": {
     "hosts": {
-      "dns.google": "8.8.8.8",
-      "nemu-proxy.free75711.workers.dev": "172.67.207.164"
+      "$_workerHost": "172.67.207.164"
     },
     "servers": [
-      "8.8.8.8",
       "1.1.1.1",
-      "localhost"
+      "8.8.8.8"
     ]
   },
   "routing": {
-    "domainStrategy": "UseIP",
+    "domainStrategy": "AsIs",
     "rules": [
       {
         "type": "field",
-        "domain": ["nemu-proxy.free75711.workers.dev"],
-        "outboundTag": "direct"
-      },
-      {
-        "type": "field",
-        "network": "tcp,udp",
+        "inboundTag": ["socks-in", "http-in"],
         "outboundTag": "proxy"
       }
     ]
