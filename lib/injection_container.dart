@@ -75,8 +75,8 @@ Future<void> init() async {
   );
 
   //! Features - Security
-  // Cubit — passes vpnStatusNotifier so it reads real V2Ray state
-  sl.registerFactory(() => SecurityCubit(
+  // Cubit — singleton so state and loaded IP persist instantly when returning to screen
+  sl.registerLazySingleton(() => SecurityCubit(
     checkConnectionUseCase: sl(),
     securityRepository: sl(),
     vpnStatusNotifier: vpnStatusNotifier,

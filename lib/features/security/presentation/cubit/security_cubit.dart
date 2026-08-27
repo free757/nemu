@@ -69,10 +69,8 @@ class SecurityCubit extends Cubit<SecurityState> {
   }
 
   Future<void> checkConnection({int retryCount = 0}) async {
-    print('[SecurityCubit] checkConnection() triggered. Retry count: $retryCount. Current state: $state');
-    
-    // Only emit SecurityLoading on the first attempt to prevent visual blinking
-    if (retryCount == 0) {
+    // Only emit SecurityLoading if we don't have any loaded status yet
+    if (state is! SecurityLoaded && retryCount == 0) {
       emit(SecurityLoading());
     }
     
@@ -80,26 +78,22 @@ class SecurityCubit extends Cubit<SecurityState> {
     
     await failureOrStatus.fold(
       (failure) async {
-        print('[SecurityCubit] checkConnection failed: ${failure.message}');
-        
-        // If VPN is reported connected, retry after a delay
-        if (_isVpnConnected && retryCount < 4) {
-          print('[SecurityCubit] VPN is connected but check failed. Retrying in 2 seconds...');
-          await Future.delayed(const Duration(seconds: 2));
+        // If VPN is reported connected, retry after a very brief delay
+        if (_isVpnConnected && retryCount < 3) {
+          await Future.delayed(const Duration(milliseconds: 600));
           return checkConnection(retryCount: retryCount + 1);
         }
         
-        emit(SecurityError(failure.message));
+        if (state is! SecurityLoaded) {
+          emit(SecurityError(failure.message));
+        }
       },
       (status) async {
         final isConn = _isVpnConnected;
-        print('[SecurityCubit] checkConnection success. IP: ${status.ip}, Country: ${status.country}, isUSA: ${status.isUSA}, isVpnConnected: $isConn');
         
-        // If VPN is reported connected, but we fetched a non-USA IP, the routing is not ready yet!
-        // Retry checking after a short delay!
-        if (isConn && !status.isUSA && retryCount < 4) {
-          print('[SecurityCubit] VPN is connected but fetched non-USA IP (${status.ip}). Routing is not fully ready. Retrying in 2 seconds...');
-          await Future.delayed(const Duration(seconds: 2));
+        // If VPN is reported connected, but we fetched a non-USA IP, retry very quickly
+        if (isConn && !status.isUSA && retryCount < 3) {
+          await Future.delayed(const Duration(milliseconds: 600));
           return checkConnection(retryCount: retryCount + 1);
         }
         

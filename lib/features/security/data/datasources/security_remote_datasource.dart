@@ -12,11 +12,15 @@ abstract class SecurityRemoteDataSource {
 class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
   SecurityRemoteDataSourceImpl();
 
+  // In-memory cache for ultra-fast instant UI loading
+  static ConnectionStatusModel? _cachedStatus;
+  static DateTime? _lastFetchTime;
+
   Dio _getDio({bool useProxy = false}) {
     final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 6),
-      receiveTimeout: const Duration(seconds: 6),
-      sendTimeout: const Duration(seconds: 6),
+      connectTimeout: const Duration(milliseconds: 2500),
+      receiveTimeout: const Duration(milliseconds: 2500),
+      sendTimeout: const Duration(milliseconds: 2500),
     ));
 
     if (useProxy) {
@@ -31,76 +35,113 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
     return dio;
   }
 
-  Future<Map<String, dynamic>?> _tryFetch(String url, bool useProxy) async {
-    final label = useProxy ? '[ViaProxy]' : '[Direct]';
-    print('[Datasource]$label Trying: $url');
+  Future<ConnectionStatusModel?> _fetchIpWhoIs(bool useProxy) async {
     try {
       final dio = _getDio(useProxy: useProxy);
       final response = await dio.get(
-        url,
+        'https://ipwho.is/',
         options: Options(headers: {'Connection': 'close'}),
       );
-      print('[Datasource]$label StatusCode: ${response.statusCode} for $url');
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = response.data is String
             ? json.decode(response.data as String) as Map<String, dynamic>
             : response.data as Map<String, dynamic>;
-        print('[Datasource]$label Raw data keys: ${data.keys.toList()}');
-        return data;
+        if (data['success'] == true) {
+          return ConnectionStatusModel.fromIpWhoIs(data);
+        }
       }
-    } catch (e) {
-      print('[Datasource]$label ERROR fetching $url: $e');
-    }
+    } catch (_) {}
     return null;
+  }
+
+  Future<ConnectionStatusModel?> _fetchIpApi(bool useProxy) async {
+    try {
+      final dio = _getDio(useProxy: useProxy);
+      final response = await dio.get(
+        'http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query',
+        options: Options(headers: {'Connection': 'close'}),
+      );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = response.data is String
+            ? json.decode(response.data as String) as Map<String, dynamic>
+            : response.data as Map<String, dynamic>;
+        if (data['status'] == 'success') {
+          return ConnectionStatusModel.fromJson(data);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<ConnectionStatusModel?> _fetchIpApiCo(bool useProxy) async {
+    try {
+      final dio = _getDio(useProxy: useProxy);
+      final response = await dio.get(
+        'https://ipapi.co/json/',
+        options: Options(headers: {'Connection': 'close'}),
+      );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = response.data is String
+            ? json.decode(response.data as String) as Map<String, dynamic>
+            : response.data as Map<String, dynamic>;
+        if (data['error'] == null || data['error'] == false) {
+          return ConnectionStatusModel.fromIpApiCo(data);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<ConnectionStatusModel?> _fastParallelRace(bool useProxy) async {
+    final completer = Completer<ConnectionStatusModel>();
+    int completedCount = 0;
+    const totalRequests = 3;
+
+    void handleResult(ConnectionStatusModel? result) {
+      completedCount++;
+      if (result != null && !completer.isCompleted) {
+        completer.complete(result);
+      } else if (completedCount == totalRequests && !completer.isCompleted) {
+        completer.completeError('All endpoints failed');
+      }
+    }
+
+    _fetchIpWhoIs(useProxy).then(handleResult).catchError((_) => handleResult(null));
+    _fetchIpApi(useProxy).then(handleResult).catchError((_) => handleResult(null));
+    _fetchIpApiCo(useProxy).then(handleResult).catchError((_) => handleResult(null));
+
+    return completer.future;
   }
 
   @override
   Future<ConnectionStatusModel> checkIP() async {
-    print('[Datasource] ===== checkIP() START =====');
-
-    for (final useProxy in [true, false]) {
-      final label = useProxy ? '[ViaProxy]' : '[Direct]';
-
-      // 0. ipwho.is
-      try {
-        final data = await _tryFetch('https://ipwho.is/', useProxy);
-        if (data != null && data['success'] == true) {
-          print('[Datasource]$label SUCCESS from ipwho.is: ip=${data['ip']}, country=${data['country']}');
-          return ConnectionStatusModel.fromIpWhoIs(data);
-        }
-      } catch (e) {
-        print('[Datasource]$label ipwho.is parse exception: $e');
+    // 1. Try Fast Parallel Race via V2Ray proxy first
+    try {
+      final status = await _fastParallelRace(true);
+      if (status != null) {
+        _cachedStatus = status;
+        _lastFetchTime = DateTime.now();
+        return status;
       }
+    } catch (_) {}
 
-      // 1. ip-api.com
-      try {
-        final data = await _tryFetch(
-          'http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query',
-          useProxy,
-        );
-        if (data != null && data['status'] == 'success') {
-          print('[Datasource]$label SUCCESS from ip-api.com: ip=${data['query']}, country=${data['country']}');
-          return ConnectionStatusModel.fromJson(data);
-        }
-      } catch (e) {
-        print('[Datasource]$label ip-api.com parse exception: $e');
+    // 2. Direct fast race fallback if proxy isn't routing yet
+    try {
+      final status = await _fastParallelRace(false);
+      if (status != null) {
+        _cachedStatus = status;
+        _lastFetchTime = DateTime.now();
+        return status;
       }
+    } catch (_) {}
 
-      // 2. ipapi.co
-      try {
-        final data = await _tryFetch('https://ipapi.co/json/', useProxy);
-        if (data != null && (data['error'] == null || data['error'] == false)) {
-          print('[Datasource]$label SUCCESS from ipapi.co: ip=${data['ip']}, country=${data['country_name']}');
-          return ConnectionStatusModel.fromIpApiCo(data);
-        }
-      } catch (e) {
-        print('[Datasource]$label ipapi.co parse exception: $e');
-      }
-
-      print('[Datasource]$label All endpoints failed, trying ${!useProxy ? "direct" : "proxy"}...');
+    // 3. If everything fails but we have a recent cache (< 3 minutes), return it
+    if (_cachedStatus != null &&
+        _lastFetchTime != null &&
+        DateTime.now().difference(_lastFetchTime!).inMinutes < 3) {
+      return _cachedStatus!;
     }
 
-    print('[Datasource] ===== checkIP() FAILED ALL =====');
     throw Exception('Connection timed out. Please check your internet.');
   }
 }

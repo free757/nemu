@@ -34,8 +34,8 @@ class CheckConnectionPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (context) => sl<SecurityCubit>()..checkConnection(),
+        BlocProvider.value(
+          value: sl<SecurityCubit>()..checkConnection(),
         ),
         BlocProvider(
           create: (context) => sl<RemoteConfigCubit>()..fetchProjects(),
