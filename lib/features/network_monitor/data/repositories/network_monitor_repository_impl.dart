@@ -15,6 +15,9 @@ class NetworkMonitorRepositoryImpl implements NetworkMonitorRepository {
   int _totalSessionTx = 0;
   bool _isFirstReading = true;
 
+  double _smoothedUploadSpeed = 0.0;
+  double _smoothedDownloadSpeed = 0.0;
+
   NetworkMonitorRepositoryImpl({required this.dataSource});
 
   @override
@@ -28,8 +31,12 @@ class NetworkMonitorRepositoryImpl implements NetworkMonitorRepository {
 
   void _startMonitoring() {
     _isFirstReading = true;
+    _smoothedUploadSpeed = 0.0;
+    _smoothedDownloadSpeed = 0.0;
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
+
+    // Sample every 500ms for responsiveness and apply Exponential Moving Average (EMA)
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
       final traffic = await dataSource.getRawTrafficBytes();
       final currentRx = traffic['rx'] ?? 0;
       final currentTx = traffic['tx'] ?? 0;
@@ -56,9 +63,22 @@ class NetworkMonitorRepositoryImpl implements NetworkMonitorRepository {
       _totalSessionRx += diffRx;
       _totalSessionTx += diffTx;
 
+      // Convert 500ms diff to rate per second (* 2)
+      final instantTxSpeed = (diffTx * 2).toDouble();
+      final instantRxSpeed = (diffRx * 2).toDouble();
+
+      // Exponential Moving Average (EMA): smooths out micro-burst gaps and prevents jumping to zero
+      const alpha = 0.45; // Weight given to current reading
+      _smoothedUploadSpeed = (_smoothedUploadSpeed * (1 - alpha)) + (instantTxSpeed * alpha);
+      _smoothedDownloadSpeed = (_smoothedDownloadSpeed * (1 - alpha)) + (instantRxSpeed * alpha);
+
+      // Snap to absolute zero if negligible
+      if (_smoothedUploadSpeed < 100) _smoothedUploadSpeed = 0.0;
+      if (_smoothedDownloadSpeed < 100) _smoothedDownloadSpeed = 0.0;
+
       final entity = NetworkSpeedEntity(
-        uploadSpeedBytesPerSec: diffTx.toDouble(),
-        downloadSpeedBytesPerSec: diffRx.toDouble(),
+        uploadSpeedBytesPerSec: _smoothedUploadSpeed,
+        downloadSpeedBytesPerSec: _smoothedDownloadSpeed,
         totalSessionUploadBytes: _totalSessionTx,
         totalSessionDownloadBytes: _totalSessionRx,
       );
@@ -76,5 +96,7 @@ class NetworkMonitorRepositoryImpl implements NetworkMonitorRepository {
   void resetSessionStats() {
     _totalSessionRx = 0;
     _totalSessionTx = 0;
+    _smoothedUploadSpeed = 0.0;
+    _smoothedDownloadSpeed = 0.0;
   }
 }
