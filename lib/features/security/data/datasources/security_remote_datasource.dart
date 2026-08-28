@@ -93,7 +93,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
   }
 
   Future<ConnectionStatusModel?> _fastParallelRace(bool useProxy) async {
-    final completer = Completer<ConnectionStatusModel>();
+    final completer = Completer<ConnectionStatusModel?>();
     int completedCount = 0;
     const totalRequests = 3;
 
@@ -102,7 +102,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       if (result != null && !completer.isCompleted) {
         completer.complete(result);
       } else if (completedCount == totalRequests && !completer.isCompleted) {
-        completer.completeError('All endpoints failed');
+        completer.complete(null);
       }
     }
 
