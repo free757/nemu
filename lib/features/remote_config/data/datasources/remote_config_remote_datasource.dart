@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nemu/core/utils/constants.dart';
 import '../models/project_config_model.dart';
 
 abstract class RemoteConfigRemoteDataSource {
@@ -14,9 +15,9 @@ class RemoteConfigRemoteDataSourceImpl implements RemoteConfigRemoteDataSource {
   @override
   Future<List<ProjectConfigModel>> getProjects() async {
     final response = await supabaseClient
-        .from('remote_configs')
+        .from(AppConstants.remoteConfigsTable)
         .select()
-        .eq('config_key', 'projects')
+        .eq('config_key', AppConstants.projectsConfigKey)
         .single();
     
     final List<dynamic> data = jsonDecode(jsonEncode(response['config_value']));

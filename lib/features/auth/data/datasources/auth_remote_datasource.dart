@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nemu/core/utils/constants.dart';
 import 'package:nemu/features/auth/data/models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -15,7 +16,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> loginWithPin(String pin, String deviceId) async {
     // 1. Fetch current user state
     final userResponse = await supabaseClient
-        .from('app_users')
+        .from(AppConstants.appUsersTable)
         .select()
         .eq('pin', pin)
         .single();
@@ -31,7 +32,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     // 3. Otherwise, update last_device_id and log in
     final response = await supabaseClient
-        .from('app_users')
+        .from(AppConstants.appUsersTable)
         .update({'last_device_id': deviceId})
         .eq('pin', pin)
         .select()
@@ -43,7 +44,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> clearDeviceId(String pin) async {
     await supabaseClient
-        .from('app_users')
+        .from(AppConstants.appUsersTable)
         .update({'last_device_id': null})
         .eq('pin', pin);
   }

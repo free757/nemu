@@ -1,7 +1,12 @@
 class AppConstants {
   // App Version
   static const String appVersion = '1.0.39+42';
+
+  // Remote Config Keys
   static const String appUpdateConfigKey = 'app_update';
+  static const String projectsConfigKey = 'projects';
+  static const String appUsersTable = 'app_users';
+  static const String remoteConfigsTable = 'remote_configs';
 
   // Cloudflare Proxy & VLESS Network Architecture
   static const String workerHost = 'nemu-proxy.free75711.workers.dev';

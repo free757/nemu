@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nemu/core/utils/constants.dart';
 import '../models/app_update_info_model.dart';
 
 abstract class AppUpdateRemoteDataSource {
@@ -14,9 +15,9 @@ class AppUpdateRemoteDataSourceImpl implements AppUpdateRemoteDataSource {
   @override
   Future<AppUpdateInfoModel> getLatestUpdateInfo() async {
     final response = await supabaseClient
-        .from('remote_configs')
+        .from(AppConstants.remoteConfigsTable)
         .select()
-        .eq('config_key', 'app_update')
+        .eq('config_key', AppConstants.appUpdateConfigKey)
         .single();
     
     final Map<String, dynamic> data = jsonDecode(jsonEncode(response['config_value']));
