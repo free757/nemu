@@ -1,9 +1,13 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/network_monitor_cubit.dart';
 
 class LiveTrafficCard extends StatelessWidget {
+  // Max scale benchmark: 10 MB/s (10 * 1024 * 1024 bytes/sec)
+  static const double _maxBenchmarkBytes = 10 * 1024 * 1024;
+
   const LiveTrafficCard({super.key});
 
   @override
@@ -11,10 +15,22 @@ class LiveTrafficCard extends StatelessWidget {
     return BlocBuilder<NetworkMonitorCubit, NetworkMonitorState>(
       builder: (context, state) {
         final speed = (state is NetworkMonitorActive) ? state.speed : null;
+        final uploadBytes = speed?.uploadSpeedBytesPerSec ?? 0;
+        final downloadBytes = speed?.downloadSpeedBytesPerSec ?? 0;
+
         final uploadStr = speed?.formattedUploadSpeed ?? "0 B/s";
         final downloadStr = speed?.formattedDownloadSpeed ?? "0 B/s";
         final totalUploadStr = speed?.formattedTotalUpload ?? "0 B";
-        final isUploading = (speed?.uploadSpeedBytesPerSec ?? 0) > 1024; // > 1 KB/s
+
+        final isUploading = uploadBytes > 1024; // > 1 KB/s
+
+        // Calculate progress between 0.0 and 1.0 (logarithmic/scaled for smooth visual feedback)
+        final double uploadProgress = uploadBytes <= 0
+            ? 0.0
+            : min(1.0, max(0.04, uploadBytes / _maxBenchmarkBytes));
+        final double downloadProgress = downloadBytes <= 0
+            ? 0.0
+            : min(1.0, max(0.04, downloadBytes / _maxBenchmarkBytes));
 
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -32,6 +48,7 @@ class LiveTrafficCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -88,97 +105,35 @@ class LiveTrafficCard extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  // Upload speed box
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isUploading
-                            ? Colors.greenAccent.withOpacity(0.08)
-                            : Colors.black26,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isUploading
-                              ? Colors.greenAccent.withOpacity(0.25)
-                              : Colors.white10,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 14),
-                              const SizedBox(width: 4),
-                              Text(
-                                "سرعة الرفع",
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6),
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            uploadStr,
-                            style: const TextStyle(
-                              color: Colors.greenAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Download speed box
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.arrow_downward, color: Colors.blueAccent, size: 14),
-                              const SizedBox(width: 4),
-                              Text(
-                                "سرعة التنزيل",
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.6),
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            downloadStr,
-                            style: const TextStyle(
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 16),
+
+              // Upload Linear Indicator Bar
+              _buildLinearSpeedRow(
+                title: "الرفع (Upload)",
+                icon: Icons.arrow_upward,
+                speedText: uploadStr,
+                progress: uploadProgress,
+                activeColor: Colors.greenAccent,
+                isActive: isUploading,
               ),
+
               const SizedBox(height: 12),
+
+              // Download Linear Indicator Bar
+              _buildLinearSpeedRow(
+                title: "التنزيل (Download)",
+                icon: Icons.arrow_downward,
+                speedText: downloadStr,
+                progress: downloadProgress,
+                activeColor: Colors.blueAccent,
+                isActive: downloadBytes > 1024,
+              ),
+
+              const SizedBox(height: 14),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 10),
+
+              // Footer: Session Stats & Reset
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -220,6 +175,89 @@ class LiveTrafficCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildLinearSpeedRow({
+    required String title,
+    required IconData icon,
+    required String speedText,
+    required double progress,
+    required Color activeColor,
+    required bool isActive,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: activeColor, size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              speedText,
+              style: TextStyle(
+                color: activeColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        // Smooth Animated Progress Track
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final double maxWidth = constraints.maxWidth;
+            final double barWidth = maxWidth * progress;
+
+            return Container(
+              height: 6,
+              width: maxWidth,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Stack(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                    height: 6,
+                    width: barWidth,
+                    decoration: BoxDecoration(
+                      color: activeColor,
+                      borderRadius: BorderRadius.circular(4),
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: activeColor.withOpacity(0.5),
+                                blurRadius: 6,
+                                spreadRadius: 0.5,
+                              )
+                            ]
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
