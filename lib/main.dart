@@ -45,10 +45,9 @@ class NemuApp extends StatelessWidget {
           brightness: Brightness.dark,
           scaffoldBackgroundColor: Colors.black,
           canvasColor: Colors.black,
-          dialogBackgroundColor: Colors.black,
+          dialogTheme: const DialogThemeData(backgroundColor: Colors.black),
           colorScheme: const ColorScheme.dark(
             surface: Colors.black,
-            background: Colors.black,
             primary: Colors.blueAccent,
           ),
         ),

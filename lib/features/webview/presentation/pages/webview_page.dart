@@ -24,26 +24,9 @@ class _WebViewPageState extends State<WebViewPage> {
   late final WebViewController controller;
   bool _isLoading = true;
   bool _customizationApplied = false;
-  String? _nemuBotBase64;
-
-  Future<void> _loadBotImage() async {
-    try {
-      final byteData = await rootBundle.load('assets/nemu_bot.png');
-      final bytes = byteData.buffer.asUint8List();
-      if (mounted) {
-        setState(() {
-          _nemuBotBase64 = base64Encode(bytes);
-        });
-      }
-    } catch (e) {
-      debugPrint("Failed to load bot image: $e");
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    _loadBotImage();
     
     // 1. Force clear all cookies BEFORE loading to guarantee absolute privacy
     WebViewCookieManager().clearCookies();
