@@ -28,6 +28,9 @@ import '../widgets/notifications_bottom_sheet.dart';
 import '../widgets/vpn_sharing_bottom_sheet.dart';
 import '../widgets/security_card_widget.dart';
 
+import 'package:nemu/features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
+import 'package:nemu/features/network_monitor/presentation/widgets/live_traffic_card.dart';
+
 final ValueNotifier<bool> showOverlayNotifier = ValueNotifier<bool>(false);
 
 class CheckConnectionPage extends StatelessWidget {
@@ -39,6 +42,9 @@ class CheckConnectionPage extends StatelessWidget {
       providers: [
         BlocProvider.value(
           value: sl<SecurityCubit>()..checkConnection(),
+        ),
+        BlocProvider(
+          create: (context) => sl<NetworkMonitorCubit>(),
         ),
         BlocProvider(
           create: (context) => sl<RemoteConfigCubit>()..fetchProjects(),
@@ -267,7 +273,9 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                               _buildQuickActionsGrid(context, user),
                               const SizedBox(height: 20),
                               _buildProxyCard(context, user),
-                              const SizedBox(height: 30),
+                              const SizedBox(height: 12),
+                              const LiveTrafficCard(),
+                              const SizedBox(height: 20),
                               const ProjectButtonsSection(),
                               const SizedBox(height: 32),
                               Text(

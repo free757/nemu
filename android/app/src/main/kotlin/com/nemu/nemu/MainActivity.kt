@@ -147,6 +147,15 @@ class MainActivity : FlutterActivity() {
                 "getHotspotIP" -> {
                     result.success(getHotspotIP())
                 }
+                "getNetworkTraffic" -> {
+                    val totalRx = android.net.TrafficStats.getTotalRxBytes()
+                    val totalTx = android.net.TrafficStats.getTotalTxBytes()
+                    val trafficMap = mapOf(
+                        "rxBytes" to totalRx,
+                        "txBytes" to totalTx
+                    )
+                    result.success(trafficMap)
+                }
                 else -> {
                     result.notImplemented()
                 }

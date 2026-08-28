@@ -104,6 +104,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "cross_file",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/cross_file-0.3.5+2",
+      "packageUri": "lib/",
+      "languageVersion": "3.8"
+    },
+    {
       "name": "crypto",
       "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/crypto-3.0.7",
       "packageUri": "lib/",
@@ -186,6 +192,12 @@
       "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/file-7.0.1",
       "packageUri": "lib/",
       "languageVersion": "3.0"
+    },
+    {
+      "name": "fixnum",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/fixnum-1.1.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.1"
     },
     {
       "name": "flutter",
@@ -518,6 +530,18 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "qr",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/qr-3.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "qr_flutter",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/qr_flutter-4.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.19"
+    },
+    {
       "name": "realtime_client",
       "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/realtime_client-2.7.3",
       "packageUri": "lib/",
@@ -540,6 +564,18 @@
       "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/rxdart-0.28.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "share_plus",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/share_plus-13.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.10"
+    },
+    {
+      "name": "share_plus_platform_interface",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/share_plus_platform_interface-7.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.10"
     },
     {
       "name": "shared_preferences",
@@ -696,6 +732,12 @@
       "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/url_launcher_windows-3.1.5",
       "packageUri": "lib/",
       "languageVersion": "3.8"
+    },
+    {
+      "name": "uuid",
+      "rootUri": "file:///home/zero/.pub-cache/hosted/pub.dev/uuid-4.5.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "vector_math",

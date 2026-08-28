@@ -28,6 +28,12 @@ import 'package:nemu/features/app_update/domain/repositories/app_update_reposito
 import 'package:nemu/features/app_update/domain/usecases/get_latest_update_info.dart';
 import 'package:nemu/features/app_update/presentation/cubit/app_update_cubit.dart';
 
+import 'package:nemu/features/network_monitor/data/datasources/network_monitor_datasource.dart';
+import 'package:nemu/features/network_monitor/data/repositories/network_monitor_repository_impl.dart';
+import 'package:nemu/features/network_monitor/domain/repositories/network_monitor_repository.dart';
+import 'package:nemu/features/network_monitor/domain/usecases/network_monitor_usecases.dart';
+import 'package:nemu/features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
+
 final sl = GetIt.instance;
 
 /// Global notifier for V2Ray connection state — updated by onStatusChanged callback
@@ -90,6 +96,24 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<SecurityRemoteDataSource>(
     () => SecurityRemoteDataSourceImpl(),
+  );
+
+  //! Features - Network Monitor
+  // Cubit
+  sl.registerLazySingleton(() => NetworkMonitorCubit(
+    getLiveNetworkSpeedUseCase: sl(),
+    resetNetworkSessionUseCase: sl(),
+  ));
+  // Use cases
+  sl.registerLazySingleton(() => GetLiveNetworkSpeedUseCase(repository: sl()));
+  sl.registerLazySingleton(() => ResetNetworkSessionUseCase(repository: sl()));
+  // Repository
+  sl.registerLazySingleton<NetworkMonitorRepository>(
+    () => NetworkMonitorRepositoryImpl(dataSource: sl()),
+  );
+  // Data sources
+  sl.registerLazySingleton<NetworkMonitorDataSource>(
+    () => NetworkMonitorDataSourceImpl(),
   );
 
   //! Core

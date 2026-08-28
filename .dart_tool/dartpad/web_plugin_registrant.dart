@@ -9,6 +9,7 @@
 import 'package:app_links_web/app_links_web.dart';
 import 'package:device_info_plus/src/device_info_plus_web.dart';
 import 'package:permission_handler_html/permission_handler_html.dart';
+import 'package:share_plus/src/share_plus_web.dart';
 import 'package:shared_preferences_web/shared_preferences_web.dart';
 import 'package:url_launcher_web/url_launcher_web.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -18,6 +19,7 @@ void registerPlugins([final Registrar? pluginRegistrar]) {
   AppLinksPluginWeb.registerWith(registrar);
   DeviceInfoPlusWebPlugin.registerWith(registrar);
   WebPermissionHandler.registerWith(registrar);
+  SharePlusWebPlugin.registerWith(registrar);
   SharedPreferencesPlugin.registerWith(registrar);
   UrlLauncherPlugin.registerWith(registrar);
   registrar.registerMessageHandler();
