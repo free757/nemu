@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import '../../../../core/utils/constants.dart';
 import '../models/connection_status_model.dart';
 
 abstract class SecurityRemoteDataSource {
@@ -18,15 +19,15 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
 
   Dio _getDio({bool useProxy = false}) {
     final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(milliseconds: 2500),
-      receiveTimeout: const Duration(milliseconds: 2500),
-      sendTimeout: const Duration(milliseconds: 2500),
+      connectTimeout: AppConstants.networkTimeout,
+      receiveTimeout: AppConstants.networkTimeout,
+      sendTimeout: AppConstants.networkTimeout,
     ));
 
     if (useProxy) {
       (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
         final client = HttpClient();
-        client.findProxy = (uri) => 'PROXY 127.0.0.1:10809; DIRECT';
+        client.findProxy = (uri) => 'PROXY 127.0.0.1:${AppConstants.localHttpPort}; DIRECT';
         client.badCertificateCallback = (cert, host, port) => true;
         return client;
       };
@@ -39,7 +40,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
     try {
       final dio = _getDio(useProxy: useProxy);
       final response = await dio.get(
-        'https://ipwho.is/',
+        AppConstants.ipWhoIsUrl,
         options: Options(headers: {'Connection': 'close'}),
       );
       if (response.statusCode == 200) {
@@ -58,7 +59,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
     try {
       final dio = _getDio(useProxy: useProxy);
       final response = await dio.get(
-        'http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query',
+        AppConstants.ipApiUrl,
         options: Options(headers: {'Connection': 'close'}),
       );
       if (response.statusCode == 200) {
@@ -77,7 +78,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
     try {
       final dio = _getDio(useProxy: useProxy);
       final response = await dio.get(
-        'https://ipapi.co/json/',
+        AppConstants.ipApiCoUrl,
         options: Options(headers: {'Connection': 'close'}),
       );
       if (response.statusCode == 200) {

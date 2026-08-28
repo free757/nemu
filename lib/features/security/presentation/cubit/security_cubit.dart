@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:equatable/equatable.dart';
+import '../../../../core/utils/constants.dart';
 import '../../domain/entities/connection_status.dart';
 import '../../domain/repositories/security_repository.dart';
 import '../../domain/usecases/check_connection_usecase.dart';
@@ -124,8 +124,8 @@ class SecurityCubit extends Cubit<SecurityState> {
         await securityRepository.connectVpn(ip: ip, port: port, user: user, pass: pass);
         
         // Wait for V2Ray to start connecting and establish status
-        print('[SecurityCubit] Waiting 2 seconds for V2Ray handshake...');
-        await Future.delayed(const Duration(seconds: 2));
+        print('[SecurityCubit] Waiting for V2Ray handshake...');
+        await Future.delayed(AppConstants.vpnHandshakeDelay);
         
         print('[SecurityCubit] Running connection verification check...');
         await checkConnection(retryCount: 0);
@@ -138,8 +138,8 @@ class SecurityCubit extends Cubit<SecurityState> {
         print('[SecurityCubit] Initiating VPN disconnect command...');
         await securityRepository.disconnectVpn();
         
-        print('[SecurityCubit] Waiting 1 second for teardown...');
-        await Future.delayed(const Duration(seconds: 1));
+        print('[SecurityCubit] Waiting for teardown...');
+        await Future.delayed(AppConstants.vpnTeardownDelay);
         
         print('[SecurityCubit] Verifying disconnection status...');
         final failureOrStatus = await checkConnectionUseCase();

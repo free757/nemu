@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'dart:convert';
-import 'package:flutter/services.dart';
 import '../../../remote_config/domain/entities/project_config.dart';
 
 class WebViewPage extends StatefulWidget {
