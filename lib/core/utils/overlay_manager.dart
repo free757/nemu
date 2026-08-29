@@ -175,4 +175,13 @@ class OverlayManager {
       return false;
     }
   }
+
+  static Future<int> getConnectedHotspotDevicesCount() async {
+    try {
+      final int? res = await _channel.invokeMethod('getConnectedHotspotDevicesCount');
+      return res ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
 }
