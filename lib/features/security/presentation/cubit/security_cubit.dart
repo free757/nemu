@@ -70,13 +70,13 @@ class SecurityCubit extends Cubit<SecurityState> {
     }
   }
 
-  Future<void> checkConnection({int retryCount = 0}) async {
+  Future<void> checkConnection({int retryCount = 0, bool forceRefresh = false}) async {
     // Only emit SecurityLoading if we don't have any loaded status yet
     if (state is! SecurityLoaded && retryCount == 0) {
       emit(SecurityLoading());
     }
     
-    final failureOrStatus = await checkConnectionUseCase();
+    final failureOrStatus = await checkConnectionUseCase(forceRefresh: forceRefresh);
     
     await failureOrStatus.fold(
       (failure) async {
@@ -127,12 +127,12 @@ class SecurityCubit extends Cubit<SecurityState> {
         await OverlayManager.acquireWakeLock();
         await securityRepository.connectVpn(ip: ip, port: port, user: user, pass: pass);
         
-        // Wait for V2Ray to start connecting and establish status
+        // Wait for V2Ray handshake
         print('[SecurityCubit] Waiting for V2Ray handshake...');
         await Future.delayed(AppConstants.vpnHandshakeDelay);
         
-        print('[SecurityCubit] Running connection verification check...');
-        await checkConnection(retryCount: 0);
+        // Clear cache and verify actual connection IP via Worker proxy
+        await checkConnection(forceRefresh: true);
       } catch (e) {
         print('[SecurityCubit] Exception caught during VPN connection: $e');
         emit(SecurityError(e.toString()));

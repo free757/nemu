@@ -7,7 +7,7 @@ import '../../../../core/utils/constants.dart';
 import '../models/connection_status_model.dart';
 
 abstract class SecurityRemoteDataSource {
-  Future<ConnectionStatusModel> checkIP();
+  Future<ConnectionStatusModel> checkIP({bool forceRefresh = false});
 }
 
 class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
@@ -115,7 +115,12 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
   }
 
   @override
-  Future<ConnectionStatusModel> checkIP() async {
+  Future<ConnectionStatusModel> checkIP({bool forceRefresh = false}) async {
+    if (forceRefresh) {
+      _cachedStatus = null;
+      _lastFetchTime = null;
+    }
+
     // 1. Try Fast Parallel Race via V2Ray proxy first
     try {
       final status = await _fastParallelRace(true);

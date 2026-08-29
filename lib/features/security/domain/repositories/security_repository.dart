@@ -3,7 +3,7 @@ import '../../../../core/error/failures.dart';
 import '../../domain/entities/connection_status.dart';
 
 abstract class SecurityRepository {
-  Future<Either<Failure, ConnectionStatus>> checkConnection();
+  Future<Either<Failure, ConnectionStatus>> checkConnection({bool forceRefresh = false});
   Future<void> connectVpn({
     required String ip,
     required int port,

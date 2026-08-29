@@ -8,7 +8,7 @@ class CheckConnectionUseCase {
 
   CheckConnectionUseCase(this.repository);
 
-  Future<Either<Failure, ConnectionStatus>> call() async {
-    return await repository.checkConnection();
+  Future<Either<Failure, ConnectionStatus>> call({bool forceRefresh = false}) async {
+    return await repository.checkConnection(forceRefresh: forceRefresh);
   }
 }

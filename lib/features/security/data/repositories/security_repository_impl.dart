@@ -19,9 +19,9 @@ class SecurityRepositoryImpl implements SecurityRepository {
   });
 
   @override
-  Future<Either<Failure, ConnectionStatus>> checkConnection() async {
+  Future<Either<Failure, ConnectionStatus>> checkConnection({bool forceRefresh = false}) async {
     try {
-      final status = await remoteDataSource.checkIP();
+      final status = await remoteDataSource.checkIP(forceRefresh: forceRefresh);
       return Right(status);
     } catch (e) {
       return Left(ServerFailure(e.toString()));
