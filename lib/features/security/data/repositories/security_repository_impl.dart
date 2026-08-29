@@ -85,7 +85,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
-          "tcpKeepAliveInterval": 10
+          "tcpKeepAliveInterval": 15
         }
       }
     },
@@ -94,11 +94,11 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "listen": "0.0.0.0",
       "port": ${AppConstants.localHttpPort},
       "protocol": "http",
-      "settings": { "allowTransparent": false, "timeout": 300 },
+      "settings": { "allowTransparent": false, "timeout": 0 },
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
-          "tcpKeepAliveInterval": 10
+          "tcpKeepAliveInterval": 15
         }
       }
     }

@@ -202,6 +202,14 @@ class MainActivity : FlutterActivity() {
                 "stopStrictHotspot" -> {
                     stopStrictHotspot(result)
                 }
+                "acquireWakeLock" -> {
+                    acquireWakeLock()
+                    result.success(true)
+                }
+                "releaseWakeLock" -> {
+                    releaseWakeLock()
+                    result.success(true)
+                }
                 "isStrictHotspotRunning" -> {
                     result.success(hotspotReservation != null)
                 }
