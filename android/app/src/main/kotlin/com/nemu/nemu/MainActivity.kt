@@ -434,6 +434,13 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                if (hotspotReservation != null) {
+                    try {
+                        hotspotReservation?.close()
+                    } catch (_) {}
+                    hotspotReservation = null
+                }
+
                 android.util.Log.d("StrictHotspot", "Starting local-only hotspot...")
                 val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                 wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
