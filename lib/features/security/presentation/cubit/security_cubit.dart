@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/utils/constants.dart';
+import '../../../../core/utils/overlay_manager.dart';
 import '../../domain/entities/connection_status.dart';
 import '../../domain/repositories/security_repository.dart';
 import '../../domain/usecases/check_connection_usecase.dart';
@@ -122,6 +123,8 @@ class SecurityCubit extends Cubit<SecurityState> {
       
       try {
         print('[SecurityCubit] Initiating VPN connection command...');
+        // Acquire wake lock & wifi lock to keep CPU and networking alive during long hotspot sharing/uploads
+        await OverlayManager.acquireWakeLock();
         await securityRepository.connectVpn(ip: ip, port: port, user: user, pass: pass);
         
         // Wait for V2Ray to start connecting and establish status
@@ -138,6 +141,7 @@ class SecurityCubit extends Cubit<SecurityState> {
       try {
         print('[SecurityCubit] Initiating VPN disconnect command...');
         await securityRepository.disconnectVpn();
+        await OverlayManager.releaseWakeLock();
         
         print('[SecurityCubit] Waiting for teardown...');
         await Future.delayed(AppConstants.vpnTeardownDelay);

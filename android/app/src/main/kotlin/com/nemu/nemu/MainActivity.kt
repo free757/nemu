@@ -13,6 +13,8 @@ import androidx.annotation.NonNull
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import android.os.PowerManager
+import android.net.wifi.WifiManager
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.net.NetworkInterface as JavaNetworkInterface
@@ -20,6 +22,8 @@ import java.net.NetworkInterface as JavaNetworkInterface
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.nemu.nemu/overlay"
     private var channel: MethodChannel? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -27,6 +31,38 @@ class MainActivity : FlutterActivity() {
         this.channel = mChannel
         mChannel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "acquireWakeLock" -> {
+                    try {
+                        if (wakeLock == null) {
+                            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Nemu::ProxyWakeLock")
+                            wakeLock?.acquire()
+                        }
+                        if (wifiLock == null) {
+                            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Nemu::ProxyWifiLock")
+                            wifiLock?.acquire()
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "releaseWakeLock" -> {
+                    try {
+                        if (wakeLock?.isHeld == true) {
+                            wakeLock?.release()
+                        }
+                        wakeLock = null
+                        if (wifiLock?.isHeld == true) {
+                            wifiLock?.release()
+                        }
+                        wifiLock = null
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 "checkOverlayPermission" -> {
                     val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         Settings.canDrawOverlays(this)

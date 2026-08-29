@@ -135,4 +135,16 @@ class OverlayManager {
       // Ignore
     }
   }
+
+  static Future<void> acquireWakeLock() async {
+    try {
+      await _channel.invokeMethod('acquireWakeLock');
+    } catch (_) {}
+  }
+
+  static Future<void> releaseWakeLock() async {
+    try {
+      await _channel.invokeMethod('releaseWakeLock');
+    } catch (_) {}
+  }
 }
