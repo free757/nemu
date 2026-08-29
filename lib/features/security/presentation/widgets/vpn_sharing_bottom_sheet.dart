@@ -238,6 +238,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                                 final stopped = await OverlayManager.stopStrictHotspot();
                                 if (stopped) {
                                   _isStrictRunning = false;
+                                  await _loadSavedHotspotCredentials();
                                   setModalState(() {});
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -255,7 +256,6 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                                   if (res['password'] != null && res['password'].toString().isNotEmpty) {
                                     _passController.text = res['password'];
                                   }
-                                  await _saveHotspotCredentials();
                                   setModalState(() {});
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
