@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'core/utils/overlay_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'injection_container.dart' as di;
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'features/security/presentation/pages/check_connection_page.dart';
 import 'features/auth/presentation/pages/pin_login_page.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'features/auth/presentation/widgets/user_session_guard.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
