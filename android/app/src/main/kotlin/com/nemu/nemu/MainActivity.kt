@@ -238,7 +238,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-            // Priority 1: Named hotspot interfaces
+            // Priority 1: Named hotspot interfaces (like ap0, swlan, softap)
             val hotspotNames = listOf("ap", "swlan", "softap", "wlan1", "hotspot", "p2p-wlan")
             for (iface in ifaces) {
                 if (isExcluded(iface.name)) continue
@@ -246,7 +246,7 @@ class MainActivity : FlutterActivity() {
                 for (addr in iface.inetAddresses.toList()) {
                     if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
                         val ip = addr.hostAddress ?: continue
-                        if (!isVpnRange(ip)) return ip
+                        return ip
                     }
                 }
             }
