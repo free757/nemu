@@ -420,10 +420,12 @@ class MainActivity : FlutterActivity() {
     private fun startStrictHotspot(result: MethodChannel.Result) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
+                android.util.Log.d("StrictHotspot", "Starting local-only hotspot...")
                 val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                 wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
                     override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
                         super.onStarted(reservation)
+                        android.util.Log.d("StrictHotspot", "Hotspot onStarted called successfully!")
                         hotspotReservation = reservation
                         val config = reservation.wifiConfiguration
                         val ssid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -436,6 +438,7 @@ class MainActivity : FlutterActivity() {
                         } else {
                             config?.preSharedKey ?: ""
                         }
+                        android.util.Log.d("StrictHotspot", "SSID: $ssid, Pass: $password")
                         val responseMap = mapOf(
                             "success" to true,
                             "ssid" to ssid,
@@ -447,15 +450,18 @@ class MainActivity : FlutterActivity() {
 
                     override fun onFailed(reason: Int) {
                         super.onFailed(reason)
+                        android.util.Log.e("StrictHotspot", "Failed with reason code: $reason")
                         result.success(mapOf("success" to false, "error" to "Failed reason code: $reason"))
                     }
 
                     override fun onStopped() {
                         super.onStopped()
+                        android.util.Log.d("StrictHotspot", "Hotspot onStopped called")
                         hotspotReservation = null
                     }
-                }, null)
+                }, android.os.Handler(android.os.Looper.getMainLooper()))
             } catch (e: Exception) {
+                android.util.Log.e("StrictHotspot", "Exception starting hotspot: $e")
                 result.success(mapOf("success" to false, "error" to e.message))
             }
         } else {
