@@ -437,7 +437,7 @@ class MainActivity : FlutterActivity() {
                 if (hotspotReservation != null) {
                     try {
                         hotspotReservation?.close()
-                    } catch (_) {}
+                    } catch (e: Exception) {}
                     hotspotReservation = null
                 }
 
