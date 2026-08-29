@@ -107,17 +107,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
           }]
         }]
       },
-      "mux": {
-        "enabled": true,
-        "concurrency": 8
-      },
       "streamSettings": {
         "network": "ws",
         "security": "tls",
         "tlsSettings": {
           "allowInsecure": false,
-          "serverName": "${AppConstants.workerHost}",
-          "alpn": ["h2", "http/1.1"]
+          "serverName": "${AppConstants.workerHost}"
         },
         "wsSettings": {
           "path": "$wsPath",
@@ -145,15 +140,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
   ],
   "dns": {
     "hosts": {
-      "${AppConstants.workerHost}": [
-        "${AppConstants.workerIP}",
-        "104.16.132.229",
-        "104.16.133.229",
-        "104.17.232.29",
-        "104.17.233.29",
-        "162.159.192.1",
-        "172.64.155.249"
-      ]
+      "${AppConstants.workerHost}": "${AppConstants.workerIP}"
     },
     "servers": [
       "${AppConstants.primaryDns}",
@@ -161,7 +148,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
     ]
   },
   "routing": {
-    "domainStrategy": "UseIP",
+    "domainStrategy": "AsIs",
     "rules": [
       {
         "type": "field",
