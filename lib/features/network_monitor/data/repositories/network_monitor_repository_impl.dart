@@ -76,11 +76,14 @@ class NetworkMonitorRepositoryImpl implements NetworkMonitorRepository {
       if (_smoothedUploadSpeed < 100) _smoothedUploadSpeed = 0.0;
       if (_smoothedDownloadSpeed < 100) _smoothedDownloadSpeed = 0.0;
 
+      final devicesCount = await dataSource.getConnectedDevicesCount();
+
       final entity = NetworkSpeedEntity(
         uploadSpeedBytesPerSec: _smoothedUploadSpeed,
         downloadSpeedBytesPerSec: _smoothedDownloadSpeed,
         totalSessionUploadBytes: _totalSessionTx,
         totalSessionDownloadBytes: _totalSessionRx,
+        connectedDevicesCount: devicesCount,
       );
 
       _controller?.add(entity);

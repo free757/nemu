@@ -156,6 +156,9 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(trafficMap)
                 }
+                "getConnectedHotspotDevicesCount" -> {
+                    result.success(getConnectedHotspotDevicesCount())
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -237,6 +240,27 @@ class MainActivity : FlutterActivity() {
             android.util.Log.e("HotspotIP/Kotlin", "Error: $e")
         }
         return "192.168.43.1"
+    }
+
+    private fun getConnectedHotspotDevicesCount(): Int {
+        var count = 0
+        try {
+            val file = java.io.File("/proc/net/arp")
+            if (file.exists() && file.canRead()) {
+                file.forEachLine { line ->
+                    val parts = line.split("\\s+".toRegex())
+                    // ARP format: IP, HW type, Flags, MAC, Mask, Device
+                    if (parts.size >= 6 && !line.startsWith("IP address")) {
+                        val flags = parts[2]
+                        val mac = parts[3]
+                        if (flags != "0x0" && mac != "00:00:00:00:00:00") {
+                            count++
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return count
     }
 
     private fun downloadAndInstallApk(urlStr: String) {

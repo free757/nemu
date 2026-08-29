@@ -87,6 +87,7 @@ class SecurityCardWidget extends StatelessWidget {
                 _buildInfoRow(Icons.language, "Current IP", ip),
                 _buildInfoRow(Icons.security, "Protocol", "SOCKS5"),
                 _buildInfoRow(Icons.location_on, "Target", "United States"),
+                _buildInfoRow(Icons.shield_outlined, "Leak Shield", isUSA ? "Protected (DNS / WebRTC Safe) 🛡️" : "Standard"),
                 if (isConnected && isUSA) ...[
                   const Padding(
                     padding: EdgeInsets.only(top: 10),

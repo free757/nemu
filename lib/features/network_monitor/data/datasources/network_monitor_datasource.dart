@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 
 abstract class NetworkMonitorDataSource {
   Future<Map<String, int>> getRawTrafficBytes();
+  Future<int> getConnectedDevicesCount();
 }
 
 class NetworkMonitorDataSourceImpl implements NetworkMonitorDataSource {
@@ -18,5 +19,14 @@ class NetworkMonitorDataSourceImpl implements NetworkMonitorDataSource {
       }
     } catch (_) {}
     return {'rx': 0, 'tx': 0};
+  }
+
+  @override
+  Future<int> getConnectedDevicesCount() async {
+    try {
+      final count = await _channel.invokeMethod<int>('getConnectedHotspotDevicesCount');
+      return count ?? 0;
+    } catch (_) {}
+    return 0;
   }
 }

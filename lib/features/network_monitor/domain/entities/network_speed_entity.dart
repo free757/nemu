@@ -5,12 +5,14 @@ class NetworkSpeedEntity extends Equatable {
   final double downloadSpeedBytesPerSec;
   final int totalSessionUploadBytes;
   final int totalSessionDownloadBytes;
+  final int connectedDevicesCount;
 
   const NetworkSpeedEntity({
     required this.uploadSpeedBytesPerSec,
     required this.downloadSpeedBytesPerSec,
     required this.totalSessionUploadBytes,
     required this.totalSessionDownloadBytes,
+    this.connectedDevicesCount = 0,
   });
 
   String get formattedUploadSpeed => _formatSpeed(uploadSpeedBytesPerSec);
@@ -46,5 +48,6 @@ class NetworkSpeedEntity extends Equatable {
         downloadSpeedBytesPerSec,
         totalSessionUploadBytes,
         totalSessionDownloadBytes,
+        connectedDevicesCount,
       ];
 }

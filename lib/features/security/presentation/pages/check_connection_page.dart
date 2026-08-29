@@ -24,6 +24,8 @@ import 'package:nemu/features/network_monitor/presentation/widgets/live_traffic_
 import 'package:nemu/features/remote_config/presentation/widgets/project_buttons_section.dart';
 import 'package:nemu/features/auth/presentation/widgets/user_session_guard.dart';
 
+import 'black_clock_screensaver_page.dart';
+
 class CheckConnectionPage extends StatelessWidget {
   const CheckConnectionPage({super.key});
 
@@ -318,6 +320,15 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
           ),
           Row(
             children: [
+              IconButton(
+                tooltip: "شاشة التوقف والساعة المصرية",
+                icon: const Icon(Icons.bedtime_outlined, color: Colors.amberAccent, size: 24),
+                onPressed: () {
+                  HapticFeedback.mediumImpact();
+                  BlackClockScreenSaverPage.open(context);
+                },
+              ),
+              const SizedBox(width: 4),
               const AppUpdateIconButton(currentVersion: AppConstants.appVersion),
               const SizedBox(width: 8),
               Stack(
