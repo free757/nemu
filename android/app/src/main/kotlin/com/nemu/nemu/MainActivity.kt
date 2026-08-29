@@ -245,21 +245,9 @@ class MainActivity : FlutterActivity() {
     private fun getConnectedHotspotDevicesCount(): Int {
         var count = 0
         try {
-            // Check direct proc file first (Android 9 and below or rooted)
-            val file = java.io.File("/proc/net/arp")
-            if (file.exists() && file.canRead()) {
-                file.forEachLine { line ->
-                    val parts = line.trim().split("\\s+".toRegex())
-                    if (parts.size >= 4 && !line.startsWith("IP")) {
-                        val flags = parts[2]
-                        val mac = parts[3]
-                        if (flags != "0x0" && mac != "00:00:00:00:00:00") {
-                            count++
-                        }
-                    }
-                }
-            } else {
-                // If SELinux blocked direct read on non-root Android 10+, fallback to su command if available
+            // First check if su binary is available before attempting read
+            val suExists = java.io.File("/system/bin/su").exists() || java.io.File("/system/xbin/su").exists()
+            if (suExists) {
                 val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat /proc/net/arp"))
                 val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
                 var line: String?
