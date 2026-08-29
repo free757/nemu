@@ -68,7 +68,7 @@ class VpnSharingBottomSheet extends StatefulWidget {
     } catch (e) {
       debugPrint('[HotspotIP] Error: $e');
     }
-    return "192.168.43.1";
+    return AppConstants.defaultHotspotFallbackIp;
   }
 
   static void show(BuildContext context) {
@@ -140,7 +140,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
       builder: (context, snapshot) {
         final ipAddress = (snapshot.data != null && snapshot.data![0] != null)
             ? snapshot.data![0] as String
-            : '192.168.43.1';
+            : AppConstants.defaultHotspotFallbackIp;
         final hasRoot = (snapshot.data != null && snapshot.data!.length > 1)
             ? snapshot.data![1] as bool
             : false;
