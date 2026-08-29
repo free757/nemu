@@ -71,7 +71,11 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "listen": "0.0.0.0",
       "port": ${AppConstants.localSocksPort},
       "protocol": "socks",
-      "settings": { "auth": "noauth", "udp": true },
+      "settings": {
+        "auth": "noauth",
+        "udp": true,
+        "userLevel": 0
+      },
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
@@ -84,7 +88,11 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "listen": "0.0.0.0",
       "port": ${AppConstants.localHttpPort},
       "protocol": "http",
-      "settings": { "allowTransparent": false, "timeout": 0 },
+      "settings": {
+        "allowTransparent": false,
+        "timeout": 0,
+        "userLevel": 0
+      },
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
