@@ -414,11 +414,11 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                         gapless: false,
                         eyeStyle: const QrEyeStyle(
                           eyeShape: QrEyeShape.square,
-                          color: Color(0xFF16161A),
+                          color: AppTheme.darkInk,
                         ),
                         dataModuleStyle: const QrDataModuleStyle(
                           dataModuleShape: QrDataModuleShape.square,
-                          color: Color(0xFF16161A),
+                          color: AppTheme.darkInk,
                         ),
                       ),
                     ),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import '../../../../core/utils/overlay_manager.dart';
 import '../../domain/entities/app_update_info.dart';
 
@@ -88,7 +89,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
+          color: AppTheme.darkCard,
           borderRadius: BorderRadius.circular(30),
           border: Border.all(color: Colors.blueAccent.withOpacity(0.3), width: 1.5),
           boxShadow: [

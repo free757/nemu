@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import '../../../remote_config/domain/entities/project_config.dart';
 
 class WebViewPage extends StatefulWidget {
@@ -322,7 +323,7 @@ class _WebViewPageState extends State<WebViewPage> {
             child: IgnorePointer(
               ignoring: _customizationApplied,
               child: Container(
-                color: const Color(0xFF121212),
+                color: AppTheme.darkBackground,
                 child: const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

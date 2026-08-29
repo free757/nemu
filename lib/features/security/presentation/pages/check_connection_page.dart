@@ -156,9 +156,9 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
         content: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E3A8A).withOpacity(0.95),
+            color: AppTheme.notificationBlue.withOpacity(0.95),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.blueAccent.withOpacity(0.5)),
+            border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.5)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.3),
@@ -315,7 +315,7 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
         color: isDark ? AppTheme.darkSurface : Colors.white,
         border: Border(
           top: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0),
+            color: isDark ? Colors.white.withOpacity(0.06) : AppTheme.lightBorder,
             width: 1,
           ),
         ),

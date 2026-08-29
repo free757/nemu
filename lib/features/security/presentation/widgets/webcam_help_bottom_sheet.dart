@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nemu/core/utils/overlay_manager.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 
 class WebcamHelpBottomSheet extends StatelessWidget {
   final VoidCallback onRefresh;
@@ -121,7 +122,7 @@ class WebcamHelpBottomSheet extends StatelessWidget {
                   label: const Text("فتح إعدادات الهاتف", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amberAccent,
-                    foregroundColor: const Color(0xFF16161A),
+                    foregroundColor: AppTheme.darkInk,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
@@ -172,7 +173,7 @@ class WebcamHelpBottomSheet extends StatelessWidget {
           ),
           child: Text(
             number,
-            style: const TextStyle(color: Color(0xFF16161A), fontSize: 11, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: AppTheme.darkInk, fontSize: 11, fontWeight: FontWeight.bold),
           ),
         ),
         const SizedBox(width: 10),

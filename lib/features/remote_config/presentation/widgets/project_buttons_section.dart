@@ -4,6 +4,7 @@ import 'package:external_app_launcher/external_app_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nemu/injection_container.dart';
 import 'package:nemu/core/utils/overlay_manager.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:nemu/features/auth/data/models/user_model.dart';
 import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
@@ -229,6 +230,6 @@ class _ProjectButtonsSectionState extends State<ProjectButtonsSection> {
         return Color(int.parse('0x$cleaned'));
       }
     } catch (_) {}
-    return const Color(0xFF2563EB); // Fallback safe blue accent
+    return AppTheme.primaryBlue; // Fallback safe blue accent
   }
 }

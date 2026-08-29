@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:nemu/core/utils/constants.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'package:nemu/features/app_update/presentation/cubit/app_update_cubit.dart';
 import 'package:nemu/features/app_update/presentation/cubit/app_update_state.dart';
 
@@ -82,11 +83,11 @@ class AppShareBottomSheet extends StatelessWidget {
               gapless: false,
               eyeStyle: const QrEyeStyle(
                 eyeShape: QrEyeShape.square,
-                color: Color(0xFF16161A),
+                color: AppTheme.darkInk,
               ),
               dataModuleStyle: const QrDataModuleStyle(
                 dataModuleShape: QrDataModuleShape.square,
-                color: Color(0xFF16161A),
+                color: AppTheme.darkInk,
               ),
             ),
           ),
@@ -150,7 +151,7 @@ class AppShareBottomSheet extends StatelessWidget {
                   label: const Text("مشاركة الرابط", style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.greenAccent,
-                    foregroundColor: const Color(0xFF16161A),
+                    foregroundColor: AppTheme.darkInk,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),

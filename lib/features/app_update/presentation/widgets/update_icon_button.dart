@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import '../cubit/app_update_cubit.dart';
 import '../cubit/app_update_state.dart';
 import 'update_dialog.dart';
@@ -59,7 +60,7 @@ class _AppUpdateIconButtonState extends State<AppUpdateIconButton> with SingleTi
             insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: AppTheme.darkCard,
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(color: Colors.greenAccent.withOpacity(0.3), width: 1.5),
                 boxShadow: [
@@ -218,7 +219,7 @@ class _AppUpdateIconButtonState extends State<AppUpdateIconButton> with SingleTi
           content: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: AppTheme.darkCard,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
               boxShadow: [
@@ -264,7 +265,7 @@ class _AppUpdateIconButtonState extends State<AppUpdateIconButton> with SingleTi
           content: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: AppTheme.darkCard,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
               boxShadow: [
@@ -307,7 +308,7 @@ class _AppUpdateIconButtonState extends State<AppUpdateIconButton> with SingleTi
           content: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: AppTheme.darkCard,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
               boxShadow: [

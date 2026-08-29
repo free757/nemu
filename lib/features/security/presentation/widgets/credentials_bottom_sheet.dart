@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nemu/core/theme/app_theme.dart';
+import 'package:nemu/features/auth/domain/entities/user_entity.dart';
 import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:nemu/features/auth/data/models/user_model.dart';
 
@@ -291,7 +293,7 @@ class _CredentialsBottomSheetState extends State<CredentialsBottomSheet> {
               child: const Text("إغلاق النافذة", style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amberAccent,
-                foregroundColor: const Color(0xFF16161A),
+                foregroundColor: AppTheme.darkInk,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
