@@ -20,17 +20,21 @@ class SecurityCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<SecurityCubit, SecurityState>(
       builder: (context, state) {
+        final bool isDark = Theme.of(context).brightness == Brightness.dark;
         final bool isLoaded = state is SecurityLoaded;
         final bool isUSA = isLoaded && (state as SecurityLoaded).status.isUSA;
         final bool isConnected = isLoaded && (state as SecurityLoaded).isConnected;
         final String ip = isLoaded ? (state as SecurityLoaded).status.ip : 'Checking...';
 
         return Card(
-          color: Colors.white.withOpacity(0.08),
+          color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
+          elevation: isDark ? 0 : 1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(25),
             side: BorderSide(
-              color: isUSA ? Colors.greenAccent.withOpacity(0.3) : Colors.white10,
+              color: isUSA
+                  ? Colors.greenAccent.withOpacity(0.4)
+                  : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
             ),
           ),
           child: Padding(
@@ -42,9 +46,13 @@ class SecurityCardWidget extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Text(
+                        Text(
                           "Proxy Connection",
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         IconButton(
@@ -84,10 +92,10 @@ class SecurityCardWidget extends StatelessWidget {
                   ],
                 ),
                 const Divider(color: Colors.white10, height: 30),
-                _buildInfoRow(Icons.language, "Current IP", ip),
-                _buildInfoRow(Icons.security, "Protocol", "SOCKS5"),
-                _buildInfoRow(Icons.location_on, "Target", "United States"),
-                _buildInfoRow(Icons.shield_outlined, "Leak Shield", isUSA ? "Protected (DNS / WebRTC Safe) 🛡️" : "Standard"),
+                _buildInfoRow(context, Icons.language, "Current IP", ip),
+                _buildInfoRow(context, Icons.security, "Protocol", "SOCKS5"),
+                _buildInfoRow(context, Icons.location_on, "Target", "United States"),
+                _buildInfoRow(context, Icons.shield_outlined, "Leak Shield", isUSA ? "Protected (DNS / WebRTC Safe) 🛡️" : "Standard"),
                 if (isConnected && isUSA) ...[
                   const Padding(
                     padding: EdgeInsets.only(top: 10),
@@ -236,14 +244,22 @@ class SecurityCardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.white38),
+          Icon(icon, size: 16, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
           const SizedBox(width: 10),
-          Text(label, style: const TextStyle(color: Colors.white38, fontSize: 13)),
+          Text(
+            label,
+            style: TextStyle(
+              color: isDark ? Colors.white38 : const Color(0xFF64748B),
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -251,7 +267,11 @@ class SecurityCardWidget extends StatelessWidget {
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

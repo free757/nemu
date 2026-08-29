@@ -32,6 +32,7 @@ class QuickActionsGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _buildGridItem(
+                context: context,
                 icon: Icons.layers,
                 iconColor: Colors.blueAccent,
                 title: "الزر العائم",
@@ -55,6 +56,7 @@ class QuickActionsGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildGridItem(
+                context: context,
                 icon: Icons.security,
                 iconColor: Colors.amberAccent,
                 title: "بيانات الحساب",
@@ -72,6 +74,7 @@ class QuickActionsGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _buildGridItem(
+                context: context,
                 icon: statusIcon,
                 iconColor: statusColor,
                 title: "كاميرا الويب",
@@ -105,6 +108,7 @@ class QuickActionsGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildGridItem(
+                context: context,
                 icon: Icons.settings_input_antenna,
                 iconColor: Colors.greenAccent,
                 title: "مشاركة هوت سبوت",
@@ -125,16 +129,25 @@ class QuickActionsGrid extends StatelessWidget {
   }
 
   Widget _buildGridItem({
+    required BuildContext context,
     required IconData icon,
     required Color iconColor,
     required String title,
     required VoidCallback onTap,
     Widget? trailing,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       margin: EdgeInsets.zero,
-      color: Colors.white.withOpacity(0.05),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+      elevation: isDark ? 0 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE2E8F0),
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
@@ -156,8 +169,8 @@ class QuickActionsGrid extends StatelessWidget {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),

@@ -12,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
 import 'features/app_update/presentation/cubit/app_update_cubit.dart';
 
+import 'core/theme/app_theme.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   OverlayManager.initialize();
@@ -54,17 +56,9 @@ class NemuApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Nemu',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: Colors.black,
-          canvasColor: Colors.black,
-          dialogTheme: const DialogThemeData(backgroundColor: Colors.black),
-          colorScheme: const ColorScheme.dark(
-            surface: Colors.black,
-            primary: Colors.blueAccent,
-          ),
-        ),
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
         home: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, state) {
             if (state is AuthAuthenticated) {

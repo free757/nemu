@@ -24,6 +24,9 @@ import 'package:nemu/features/network_monitor/presentation/widgets/live_traffic_
 import 'package:nemu/features/remote_config/presentation/widgets/project_buttons_section.dart';
 import 'package:nemu/features/auth/presentation/widgets/user_session_guard.dart';
 
+import '../widgets/tools_tab_section.dart';
+import '../widgets/projects_tab_section.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'black_clock_screensaver_page.dart';
 
 class CheckConnectionPage extends StatelessWidget {
@@ -53,6 +56,7 @@ class CheckConnectionView extends StatefulWidget {
 }
 
 class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsBindingObserver {
+  int _currentTabIndex = 0;
   StreamSubscription<List<Map<String, dynamic>>>? _notificationsSubscription;
   List<Map<String, dynamic>> _notifications = [];
   int _lastSeenCount = 0;
@@ -223,93 +227,156 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.black,
-        child: SafeArea(
-          child: BlocBuilder<AuthCubit, AuthState>(
-            builder: (context, authState) {
-              if (authState is! AuthAuthenticated) return const SizedBox.shrink();
-              final user = authState.user;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-              return UserSessionGuard(
-                userId: user.id,
-                child: Column(
-                  children: [
-                    _buildHeader(context, user.username ?? 'User'),
-                    Expanded(
-                      child: RefreshIndicator(
-                        color: Colors.greenAccent,
-                        backgroundColor: Colors.black,
-                        onRefresh: () async {
-                          HapticFeedback.mediumImpact();
-                          await Future.wait([
-                            context.read<SecurityCubit>().checkConnection(),
-                            context.read<AppUpdateCubit>().checkForUpdate(AppConstants.appVersion),
-                          ]);
-                        },
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          child: Column(
-                            children: [
-                              UserProfileCard(user: user),
-                              const SizedBox(height: 12),
-                              QuickActionsGrid(
-                                user: user,
-                                isWebcamConnected: _isWebcamConnected,
-                                showOverlay: _showOverlay,
-                                onToggleOverlay: _toggleOverlay,
-                                onRefreshWebcam: _checkWebcamStatus,
-                              ),
-                              const SizedBox(height: 20),
-                              SecurityCardWidget(user: user),
-                              const SizedBox(height: 12),
-                              const LiveTrafficCard(),
-                              const SizedBox(height: 20),
-                              const ProjectButtonsSection(),
-                              const SizedBox(height: 32),
-                              Text(
-                                "إصدار التطبيق: ${AppConstants.appVersion}",
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.35),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
+    return Scaffold(
+      backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+      bottomNavigationBar: _buildBottomNavigationBar(context, isDark),
+      body: SafeArea(
+        child: BlocBuilder<AuthCubit, AuthState>(
+          builder: (context, authState) {
+            if (authState is! AuthAuthenticated) return const SizedBox.shrink();
+            final user = authState.user;
+
+            return UserSessionGuard(
+              userId: user.id,
+              child: Column(
+                children: [
+                  _buildHeader(context, user.username ?? 'User', isDark),
+                  Expanded(
+                    child: RefreshIndicator(
+                      color: Colors.greenAccent,
+                      backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+                      onRefresh: () async {
+                        HapticFeedback.mediumImpact();
+                        await Future.wait([
+                          context.read<SecurityCubit>().checkConnection(),
+                          context.read<AppUpdateCubit>().checkForUpdate(AppConstants.appVersion),
+                        ]);
+                      },
+                      child: IndexedStack(
+                        index: _currentTabIndex,
+                        children: [
+                          // Tab 0: Dashboard
+                          _buildDashboardTab(context, user, isDark),
+                          // Tab 1: Projects
+                          const ProjectsTabSection(),
+                          // Tab 2: Tools & Sharing
+                          ToolsTabSection(
+                            user: user,
+                            isWebcamConnected: _isWebcamConnected,
+                            showOverlay: _showOverlay,
+                            onToggleOverlay: _toggleOverlay,
+                            onRefreshWebcam: _checkWebcamStatus,
                           ),
-                        ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, String name) {
+  Widget _buildDashboardTab(BuildContext context, dynamic user, bool isDark) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        children: [
+          UserProfileCard(user: user),
+          const SizedBox(height: 12),
+          SecurityCardWidget(user: user),
+          const SizedBox(height: 12),
+          const LiveTrafficCard(),
+          const SizedBox(height: 24),
+          Text(
+            "إصدار التطبيق: ${AppConstants.appVersion}",
+            style: TextStyle(
+              color: isDark ? Colors.white30 : Colors.black38,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar(BuildContext context, bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurface : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+      ),
+      child: NavigationBar(
+        selectedIndex: _currentTabIndex,
+        onDestinationSelected: (index) {
+          HapticFeedback.lightImpact();
+          setState(() {
+            _currentTabIndex = index;
+          });
+        },
+        backgroundColor: Colors.transparent,
+        indicatorColor: Colors.blueAccent.withOpacity(isDark ? 0.25 : 0.15),
+        elevation: 0,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.shield_outlined),
+            selectedIcon: Icon(Icons.shield, color: Colors.blueAccent),
+            label: 'الرئيسية',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.rocket_launch_outlined),
+            selectedIcon: Icon(Icons.rocket_launch, color: Colors.blueAccent),
+            label: 'المشاريع',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view, color: Colors.blueAccent),
+            label: 'الأدوات',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, String name, bool isDark) {
     final int unreadCount = _notifications.length - _lastSeenCount;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textSecondary = isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF64748B);
+    final iconColor = isDark ? Colors.white70 : const Color(0xFF475569);
 
     return Padding(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Hello,", style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16)),
-              Text(name, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              Text("مرحباً بك 👋", style: TextStyle(color: textSecondary, fontSize: 13)),
+              Text(name, style: TextStyle(color: textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
             ],
           ),
           Row(
@@ -324,12 +391,12 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
               ),
               const SizedBox(width: 4),
               const AppUpdateIconButton(currentVersion: AppConstants.appVersion),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               Stack(
                 clipBehavior: Clip.none,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_none, color: Colors.white70, size: 28),
+                    icon: Icon(Icons.notifications_none, color: iconColor, size: 26),
                     onPressed: () {
                       setState(() {
                         _lastSeenCount = _notifications.length;
@@ -364,9 +431,9 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
                     ),
                 ],
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white70, size: 26),
+                icon: Icon(Icons.logout, color: iconColor, size: 24),
                 onPressed: () => context.read<AuthCubit>().logout(),
               ),
             ],
