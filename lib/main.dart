@@ -13,6 +13,7 @@ import 'features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
 import 'features/app_update/presentation/cubit/app_update_cubit.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/utils/constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,7 @@ void main() async {
   
   // Initialize Supabase
   await Supabase.initialize(
-    url: 'https://wliqqvdypzpnmwoegvam.supabase.co',
+    url: AppConstants.supabaseUrl,
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndsaXFxdmR5cHpwbm13b2VndmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTg1MDAsImV4cCI6MjA5NDE5NDUwMH0.zAaOnvTsgkrt2_OKSxNYpdSMxHfTKMbUEtv7uePte_g',
   );
 

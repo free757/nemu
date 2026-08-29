@@ -25,7 +25,7 @@ class AppShareBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appUpdateState = context.read<AppUpdateCubit>().state;
-    String apkUrl = "https://github.com/free757/nemu/releases/download/v${AppConstants.appVersion.split('+')[0]}/app-release.apk";
+    String apkUrl = "${AppConstants.githubReleaseBaseUrl}/v${AppConstants.appVersion.split('+')[0]}/app-release.apk";
     if (appUpdateState is AppUpdateLoaded) {
       apkUrl = appUpdateState.updateInfo.downloadUrl;
     }

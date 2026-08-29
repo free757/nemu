@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nemu/core/utils/constants.dart';
 
 class RentAHumanSyncService {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://rentahuman.ai/api',
+    baseUrl: AppConstants.rentAHumanApiUrl,
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 15),
   ));

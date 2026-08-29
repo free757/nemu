@@ -17,6 +17,11 @@ class AppConstants {
   static const String defaultHotspotFallbackIp = '192.168.43.1';
   static const String proxyOnlyRemark = 'Nemu Proxy';
 
+  // External Endpoints & Services
+  static const String supabaseUrl = 'https://wliqqvdypzpnmwoegvam.supabase.co';
+  static const String rentAHumanApiUrl = 'https://rentahuman.ai/api';
+  static const String githubReleaseBaseUrl = 'https://github.com/free757/nemu/releases/download';
+
   // Security Endpoints
   static const String ipWhoIsUrl = 'https://ipwho.is/';
   static const String ipApiUrl = 'http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query';
