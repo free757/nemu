@@ -15,6 +15,9 @@ class NetworkMonitorRepositoryImpl implements NetworkMonitorRepository {
   int _totalSessionTx = 0;
   bool _isFirstReading = true;
 
+  int _tickCount = 0;
+  int _cachedDevicesCount = 0;
+
   double _smoothedUploadSpeed = 0.0;
   double _smoothedDownloadSpeed = 0.0;
 
@@ -76,14 +79,18 @@ class NetworkMonitorRepositoryImpl implements NetworkMonitorRepository {
       if (_smoothedUploadSpeed < 100) _smoothedUploadSpeed = 0.0;
       if (_smoothedDownloadSpeed < 100) _smoothedDownloadSpeed = 0.0;
 
-      final devicesCount = await dataSource.getConnectedDevicesCount();
+      // Throttle devices count checking to every 4 seconds (8 ticks of 500ms) to avoid spamming system
+      if (_tickCount % 8 == 0) {
+        _cachedDevicesCount = await dataSource.getConnectedDevicesCount();
+      }
+      _tickCount++;
 
       final entity = NetworkSpeedEntity(
         uploadSpeedBytesPerSec: _smoothedUploadSpeed,
         downloadSpeedBytesPerSec: _smoothedDownloadSpeed,
         totalSessionUploadBytes: _totalSessionTx,
         totalSessionDownloadBytes: _totalSessionRx,
-        connectedDevicesCount: devicesCount,
+        connectedDevicesCount: _cachedDevicesCount,
       );
 
       _controller?.add(entity);
