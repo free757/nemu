@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app_share_bottom_sheet.dart';
 
 class VpnSharingBottomSheet extends StatefulWidget {
@@ -88,8 +89,39 @@ class VpnSharingBottomSheet extends StatefulWidget {
 
 class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   int _selectedQrMode = 0; // 0: WiFi connect, 1: Proxy URL
-  final TextEditingController _ssidController = TextEditingController(text: "NemuHotspot");
-  final TextEditingController _passController = TextEditingController(text: "12345678");
+  final TextEditingController _ssidController = TextEditingController();
+  final TextEditingController _passController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedHotspotCredentials();
+  }
+
+  Future<void> _loadSavedHotspotCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedSsid = prefs.getString('hotspot_custom_ssid') ?? "NemuHotspot";
+      final savedPass = prefs.getString('hotspot_custom_pass') ?? "12345678";
+      if (mounted) {
+        setState(() {
+          _ssidController.text = savedSsid;
+          _passController.text = savedPass;
+        });
+      }
+    } catch (_) {
+      _ssidController.text = "NemuHotspot";
+      _passController.text = "12345678";
+    }
+  }
+
+  Future<void> _saveHotspotCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('hotspot_custom_ssid', _ssidController.text);
+      await prefs.setString('hotspot_custom_pass', _passController.text);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -325,7 +357,10 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                                 fillColor: Colors.white.withOpacity(0.04),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                               ),
-                              onChanged: (_) => setModalState(() {}),
+                              onChanged: (_) {
+                                _saveHotspotCredentials();
+                                setModalState(() {});
+                              },
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -341,7 +376,10 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                                 fillColor: Colors.white.withOpacity(0.04),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                               ),
-                              onChanged: (_) => setModalState(() {}),
+                              onChanged: (_) {
+                                _saveHotspotCredentials();
+                                setModalState(() {});
+                              },
                             ),
                           ),
                         ],
