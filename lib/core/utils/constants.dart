@@ -36,9 +36,16 @@ class AppConstants {
   static const String ipApiUrl = 'http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,timezone,offset,query';
   static const String ipApiCoUrl = 'https://ipapi.co/json/';
 
-  // DNS Resolvers
+  // DNS Resolvers & Security
   static const String primaryDns = '1.1.1.1';
   static const String secondaryDns = '8.8.8.8';
+  static const String privateDnsOneDot = 'one.one.one.one';
+
+  // Hotspot Defaults
+  static const String defaultHotspotSsid = 'NemuHotspot';
+  static const String defaultHotspotPass = '12345678';
+  static const String hotspotPrefKeySsid = 'hotspot_custom_ssid';
+  static const String hotspotPrefKeyPass = 'hotspot_custom_pass';
 
   // Timeouts & Durations
   static const Duration networkTimeout = Duration(milliseconds: 2500);

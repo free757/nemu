@@ -115,8 +115,8 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   Future<void> _loadSavedHotspotCredentials() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedSsid = prefs.getString('hotspot_custom_ssid') ?? "NemuHotspot";
-      final savedPass = prefs.getString('hotspot_custom_pass') ?? "12345678";
+      final savedSsid = prefs.getString(AppConstants.hotspotPrefKeySsid) ?? AppConstants.defaultHotspotSsid;
+      final savedPass = prefs.getString(AppConstants.hotspotPrefKeyPass) ?? AppConstants.defaultHotspotPass;
       if (mounted) {
         setState(() {
           _ssidController.text = savedSsid;
@@ -124,16 +124,16 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
         });
       }
     } catch (_) {
-      _ssidController.text = "NemuHotspot";
-      _passController.text = "12345678";
+      _ssidController.text = AppConstants.defaultHotspotSsid;
+      _passController.text = AppConstants.defaultHotspotPass;
     }
   }
 
   Future<void> _saveHotspotCredentials() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('hotspot_custom_ssid', _ssidController.text);
-      await prefs.setString('hotspot_custom_pass', _passController.text);
+      await prefs.setString(AppConstants.hotspotPrefKeySsid, _ssidController.text);
+      await prefs.setString(AppConstants.hotspotPrefKeyPass, _passController.text);
     } catch (_) {}
   }
 
@@ -707,7 +707,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
           const Divider(color: Colors.white10, height: 16),
           _buildSharingDetailRow(context, "منفذ التطبيقات (SOCKS5 Port)", "${AppConstants.localSocksPort}", Icons.cable_outlined),
           const Divider(color: Colors.white10, height: 16),
-          _buildSharingDetailRow(context, "الـ Private DNS (لمنع التسريب)", "one.one.one.one", Icons.dns_outlined),
+          _buildSharingDetailRow(context, "الـ Private DNS (لمنع التسريب)", AppConstants.privateDnsOneDot, Icons.dns_outlined),
         ],
       ),
     );
@@ -822,7 +822,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
             const SizedBox(height: 6),
             _buildSharingStepRow("3", "اكتب عنوان الـ Host والمنفذ ${AppConstants.localHttpPort} (أو ضعهما داخل Minute Data مباشرة)."),
             const SizedBox(height: 6),
-            _buildSharingStepRow("4", "🛡️ لمنع تسريب الـ DNS: في إعدادات الهاتف الثاني اذهب إلى Private DNS -> واكتب: one.one.one.one."),
+            _buildSharingStepRow("4", "🛡️ لمنع تسريب الـ DNS: في إعدادات الهاتف الثاني اذهب إلى Private DNS -> واكتب: ${AppConstants.privateDnsOneDot}."),
           ],
         ],
       ),
