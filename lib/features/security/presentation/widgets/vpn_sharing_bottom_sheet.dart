@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
+import 'package:nemu/core/utils/overlay_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nemu/core/theme/app_theme.dart';
 import 'app_share_bottom_sheet.dart';
@@ -196,6 +197,70 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
                     ),
                     const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.amberAccent.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.amberAccent.withOpacity(0.3), width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shield_outlined, color: Colors.amberAccent, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "وضع الحظر التام (Strict Proxy Only)",
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "منع تسريب أي إنترنت مباشر للأجهزة المتصلة إلا بعد كتابة الهوست والمنفذ.",
+                                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amberAccent,
+                              foregroundColor: AppTheme.darkInk,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () async {
+                              final res = await OverlayManager.startStrictHotspot();
+                              if (res != null && res['success'] == true) {
+                                if (res['ssid'] != null && res['ssid'].toString().isNotEmpty) {
+                                  _ssidController.text = res['ssid'];
+                                }
+                                if (res['password'] != null && res['password'].toString().isNotEmpty) {
+                                  _passController.text = res['password'];
+                                }
+                                await _saveHotspotCredentials();
+                                setModalState(() {});
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("تم تشغيل الهوت سبوت الآمن! لن يعمل الإنترنت إلا بالبروكسي 🛡️")),
+                                  );
+                                }
+                              } else {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text("فشل تشغيل النمط المعزول: ${res?['error'] ?? 'غير مدعوم'}")),
+                                  );
+                                }
+                              }
+                            },
+                            child: const Text("تشغيل الآمن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (hasRoot) ...[
                       Container(
                         padding: const EdgeInsets.all(16),

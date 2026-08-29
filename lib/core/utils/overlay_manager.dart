@@ -147,4 +147,23 @@ class OverlayManager {
       await _channel.invokeMethod('releaseWakeLock');
     } catch (_) {}
   }
+
+  static Future<Map<String, dynamic>?> startStrictHotspot() async {
+    try {
+      final res = await _channel.invokeMethod('startStrictHotspot');
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<bool> stopStrictHotspot() async {
+    try {
+      final bool? res = await _channel.invokeMethod('stopStrictHotspot');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

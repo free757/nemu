@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var hotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -194,6 +195,12 @@ class MainActivity : FlutterActivity() {
                 }
                 "getConnectedHotspotDevicesCount" -> {
                     result.success(getConnectedHotspotDevicesCount())
+                }
+                "startStrictHotspot" -> {
+                    startStrictHotspot(result)
+                }
+                "stopStrictHotspot" -> {
+                    stopStrictHotspot(result)
                 }
                 else -> {
                     result.notImplemented()
@@ -407,6 +414,62 @@ class MainActivity : FlutterActivity() {
             context.startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun startStrictHotspot(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
+                    override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
+                        super.onStarted(reservation)
+                        hotspotReservation = reservation
+                        val config = reservation.wifiConfiguration
+                        val ssid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            reservation.softApConfiguration?.ssid ?: config?.SSID ?: "NemuStrictHotspot"
+                        } else {
+                            config?.SSID ?: "NemuStrictHotspot"
+                        }
+                        val password = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            reservation.softApConfiguration?.passphrase ?: config?.preSharedKey ?: ""
+                        } else {
+                            config?.preSharedKey ?: ""
+                        }
+                        val responseMap = mapOf(
+                            "success" to true,
+                            "ssid" to ssid,
+                            "password" to password,
+                            "ip" to getHotspotIP()
+                        )
+                        result.success(responseMap)
+                    }
+
+                    override fun onFailed(reason: Int) {
+                        super.onFailed(reason)
+                        result.success(mapOf("success" to false, "error" to "Failed reason code: $reason"))
+                    }
+
+                    override fun onStopped() {
+                        super.onStopped()
+                        hotspotReservation = null
+                    }
+                }, null)
+            } catch (e: Exception) {
+                result.success(mapOf("success" to false, "error" to e.message))
+            }
+        } else {
+            result.success(mapOf("success" to false, "error" to "Android 8.0+ required for Strict Hotspot"))
+        }
+    }
+
+    private fun stopStrictHotspot(result: MethodChannel.Result) {
+        try {
+            hotspotReservation?.close()
+            hotspotReservation = null
+            result.success(true)
+        } catch (e: Exception) {
+            result.success(false)
         }
     }
 }
