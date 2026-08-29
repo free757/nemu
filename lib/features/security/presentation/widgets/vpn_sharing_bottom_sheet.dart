@@ -6,7 +6,7 @@ import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
 import 'app_share_bottom_sheet.dart';
 
-class VpnSharingBottomSheet extends StatelessWidget {
+class VpnSharingBottomSheet extends StatefulWidget {
   const VpnSharingBottomSheet({super.key});
 
   static Future<String> getHotspotIP() async {
@@ -83,10 +83,26 @@ class VpnSharingBottomSheet extends StatelessWidget {
   }
 
   @override
+  State<VpnSharingBottomSheet> createState() => _VpnSharingBottomSheetState();
+}
+
+class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
+  int _selectedQrMode = 0; // 0: WiFi connect, 1: Proxy URL
+  final TextEditingController _ssidController = TextEditingController(text: "NemuHotspot");
+  final TextEditingController _passController = TextEditingController(text: "12345678");
+
+  @override
+  void dispose() {
+    _ssidController.dispose();
+    _passController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<dynamic>>(
       future: Future.wait([
-        getHotspotIP(),
+        VpnSharingBottomSheet.getHotspotIP(),
         RootSharingService().checkRoot(),
       ]),
       builder: (context, snapshot) {
@@ -227,11 +243,116 @@ class VpnSharingBottomSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      "كود QR للإعداد السريع",
-                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  _selectedQrMode = 0;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _selectedQrMode == 0 ? Colors.greenAccent : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  "اتصال واي فاي سريع 📶",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _selectedQrMode == 0 ? Colors.black : Colors.white70,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  _selectedQrMode = 1;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _selectedQrMode == 1 ? Colors.greenAccent : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  "إعدادات البروكسي ⚡",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _selectedQrMode == 1 ? Colors.black : Colors.white70,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
+                    if (_selectedQrMode == 0) ...[
+                      Text(
+                        "امسح الكاميرا من الهاتف الآخر للاتصال بالهوت سبوت فوراً:",
+                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _ssidController,
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              decoration: InputDecoration(
+                                labelText: "اسم الهوت سبوت (SSID)",
+                                labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                                isDense: true,
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.04),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                              ),
+                              onChanged: (_) => setModalState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _passController,
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              decoration: InputDecoration(
+                                labelText: "كلمة السر (Password)",
+                                labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                                isDense: true,
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.04),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                              ),
+                              onChanged: (_) => setModalState(() {}),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      Text(
+                        "كود إعدادات البروكسي لبرامج الشبكة:",
+                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -246,7 +367,9 @@ class VpnSharingBottomSheet extends StatelessWidget {
                         ],
                       ),
                       child: QrImageView(
-                        data: proxyUrl,
+                        data: _selectedQrMode == 0
+                            ? "WIFI:S:${_ssidController.text};T:WPA;P:${_passController.text};;"
+                            : proxyUrl,
                         version: QrVersions.auto,
                         size: 140.0,
                         gapless: false,
