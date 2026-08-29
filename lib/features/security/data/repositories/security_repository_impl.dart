@@ -107,13 +107,23 @@ class SecurityRepositoryImpl implements SecurityRepository {
           "headers": {
             "Host": "${AppConstants.workerHost}"
           }
+        },
+        "sockopt": {
+          "tcpKeepAliveInterval": 15,
+          "tcpNoDelay": true
         }
       }
     },
     {
       "tag": "direct",
       "protocol": "freedom",
-      "settings": {}
+      "settings": {},
+      "streamSettings": {
+        "sockopt": {
+          "tcpKeepAliveInterval": 15,
+          "tcpNoDelay": true
+        }
+      }
     }
   ],
   "dns": {
