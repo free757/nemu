@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nemu/features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
 
+import 'package:nemu/injection_container.dart';
+
 class BlackClockScreenSaverPage extends StatefulWidget {
   const BlackClockScreenSaverPage({super.key});
 
@@ -12,7 +14,10 @@ class BlackClockScreenSaverPage extends StatefulWidget {
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: true,
-        pageBuilder: (context, _, __) => const BlackClockScreenSaverPage(),
+        pageBuilder: (context, _, __) => BlocProvider.value(
+          value: sl<NetworkMonitorCubit>(),
+          child: const BlackClockScreenSaverPage(),
+        ),
         transitionsBuilder: (context, animation, _, child) {
           return FadeTransition(opacity: animation, child: child);
         },

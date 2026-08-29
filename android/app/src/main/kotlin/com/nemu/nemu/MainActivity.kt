@@ -245,12 +245,12 @@ class MainActivity : FlutterActivity() {
     private fun getConnectedHotspotDevicesCount(): Int {
         var count = 0
         try {
+            // Check direct proc file first (Android 9 and below or rooted)
             val file = java.io.File("/proc/net/arp")
             if (file.exists() && file.canRead()) {
                 file.forEachLine { line ->
-                    val parts = line.split("\\s+".toRegex())
-                    // ARP format: IP, HW type, Flags, MAC, Mask, Device
-                    if (parts.size >= 6 && !line.startsWith("IP address")) {
+                    val parts = line.trim().split("\\s+".toRegex())
+                    if (parts.size >= 4 && !line.startsWith("IP")) {
                         val flags = parts[2]
                         val mac = parts[3]
                         if (flags != "0x0" && mac != "00:00:00:00:00:00") {
@@ -258,6 +258,22 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+            } else {
+                // If SELinux blocked direct read on non-root Android 10+, fallback to su command if available
+                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat /proc/net/arp"))
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val parts = line!!.trim().split("\\s+".toRegex())
+                    if (parts.size >= 4 && !line!!.startsWith("IP")) {
+                        val flags = parts[2]
+                        val mac = parts[3]
+                        if (flags != "0x0" && mac != "00:00:00:00:00:00") {
+                            count++
+                        }
+                    }
+                }
+                process.waitFor()
             }
         } catch (_: Exception) {}
         return count
