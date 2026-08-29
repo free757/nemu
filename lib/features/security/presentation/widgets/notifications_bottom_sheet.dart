@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 
 class NotificationsBottomSheet extends StatelessWidget {
   final List<Map<String, dynamic>> notifications;
@@ -19,13 +20,19 @@ class NotificationsBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
-          BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5),
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
         ],
       ),
       child: Column(
@@ -35,7 +42,7 @@ class NotificationsBottomSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white24,
+              color: isDark ? Colors.white24 : Colors.black12,
               borderRadius: BorderRadius.circular(10),
             ),
           ),
@@ -45,33 +52,46 @@ class NotificationsBottomSheet extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Notifications",
+                Text(
+                  "الإشعارات 🔔",
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
+                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: Icon(
+                    Icons.close,
+                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
           ),
-          const Divider(color: Colors.white12, height: 20),
+          Divider(
+            color: isDark ? Colors.white12 : AppTheme.lightBorder,
+            height: 20,
+          ),
           Expanded(
             child: notifications.isEmpty
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.notifications_off_outlined, color: Colors.white24, size: 60),
-                        SizedBox(height: 16),
+                        Icon(
+                          Icons.notifications_off_outlined,
+                          color: isDark ? Colors.white24 : Colors.black26,
+                          size: 60,
+                        ),
+                        const SizedBox(height: 16),
                         Text(
-                          "No Notifications Yet",
-                          style: TextStyle(color: Colors.white38, fontSize: 16),
+                          "لا توجد إشعارات حالياً",
+                          style: TextStyle(
+                            color: isDark ? Colors.white38 : AppTheme.lightTextSecondary,
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
@@ -92,9 +112,20 @@ class NotificationsBottomSheet extends StatelessWidget {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white10),
+                          border: Border.all(
+                            color: isDark ? Colors.white10 : AppTheme.lightBorder,
+                          ),
+                          boxShadow: isDark
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,24 +136,31 @@ class NotificationsBottomSheet extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     notif['title'] ?? 'Notice',
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                      fontSize: 15,
                                     ),
                                   ),
                                 ),
                                 if (dateStr.isNotEmpty)
                                   Text(
                                     dateStr,
-                                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                                    style: TextStyle(
+                                      color: isDark ? Colors.white38 : AppTheme.lightTextSecondary,
+                                      fontSize: 11,
+                                    ),
                                   ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             Text(
                               notif['content'] ?? '',
-                              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                              style: TextStyle(
+                                color: isDark ? Colors.white70 : AppTheme.lightTextSecondary,
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
                             ),
                           ],
                         ),
