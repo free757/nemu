@@ -177,15 +177,15 @@ class _ProjectButtonsSectionState extends State<ProjectButtonsSection> {
                         child: Container(
                           padding: const EdgeInsets.all(15),
                           decoration: BoxDecoration(
-                            color: Color(int.parse(project.color)).withOpacity(0.2),
+                            color: _parseColor(project.color).withOpacity(0.2),
                             borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: Color(int.parse(project.color)).withOpacity(0.5)),
+                            border: Border.all(color: _parseColor(project.color).withOpacity(0.5)),
                           ),
                           child: Row(
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: Color(int.parse(project.color)), borderRadius: BorderRadius.circular(10)),
+                                decoration: BoxDecoration(color: _parseColor(project.color), borderRadius: BorderRadius.circular(10)),
                                 child: const Icon(Icons.language, color: Colors.white),
                               ),
                               const SizedBox(width: 15),
@@ -215,5 +215,20 @@ class _ProjectButtonsSectionState extends State<ProjectButtonsSection> {
         );
       },
     );
+  }
+
+  Color _parseColor(String colorStr) {
+    try {
+      final parsed = int.tryParse(colorStr);
+      if (parsed != null) return Color(parsed);
+      
+      final cleaned = colorStr.replaceAll('#', '');
+      if (cleaned.length == 6) {
+        return Color(int.parse('0xFF$cleaned'));
+      } else if (cleaned.length == 8) {
+        return Color(int.parse('0x$cleaned'));
+      }
+    } catch (_) {}
+    return const Color(0xFF2563EB); // Fallback safe blue accent
   }
 }
