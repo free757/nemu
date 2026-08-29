@@ -160,6 +160,16 @@ class SecurityRepositoryImpl implements SecurityRepository {
     "rules": [
       {
         "type": "field",
+        "inboundTag": ["socks-in", "http-in"],
+        "outboundTag": "proxy"
+      },
+      {
+        "type": "field",
+        "ip": ["${AppConstants.workerIP}"],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
         "network": "tcp,udp",
         "outboundTag": "proxy"
       }
