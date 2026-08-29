@@ -133,24 +133,31 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
 
   void _subscribeToNotifications() {
     try {
+      _notificationsSubscription?.cancel();
       _notificationsSubscription = Supabase.instance.client
           .from('notifications')
           .stream(primaryKey: ['id'])
           .order('created_at', ascending: false)
-          .listen((List<Map<String, dynamic>> data) {
-            if (mounted) {
-              if (data.length > _notifications.length && _notifications.isNotEmpty) {
-                final newNotif = data.first;
-                _showNewNotificationBanner(
-                  newNotif['title'] ?? 'New Notification',
-                  newNotif['content'] ?? '',
-                );
+          .listen(
+            (List<Map<String, dynamic>> data) {
+              if (mounted) {
+                if (data.length > _notifications.length && _notifications.isNotEmpty) {
+                  final newNotif = data.first;
+                  _showNewNotificationBanner(
+                    newNotif['title'] ?? 'New Notification',
+                    newNotif['content'] ?? '',
+                  );
+                }
+                setState(() {
+                  _notifications = data;
+                });
               }
-              setState(() {
-                _notifications = data;
-              });
-            }
-          });
+            },
+            onError: (error) {
+              debugPrint('[Notifications] Realtime stream error handled: $error');
+            },
+            cancelOnError: false,
+          );
     } catch (_) {}
   }
 
