@@ -244,8 +244,16 @@ class SecurityCardWidget extends StatelessWidget {
           Icon(icon, size: 16, color: Colors.white38),
           const SizedBox(width: 10),
           Text(label, style: const TextStyle(color: Colors.white38, fontSize: 13)),
-          const Spacer(),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );
