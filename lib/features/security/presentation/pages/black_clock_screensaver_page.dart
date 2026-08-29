@@ -59,7 +59,16 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
   Widget build(BuildContext context) {
     final timeStr = DateFormat('hh:mm:ss').format(_cairoTime);
     final periodStr = DateFormat('a').format(_cairoTime) == 'AM' ? 'صَبَاحاً' : 'مَسَاءً';
-    final dateStr = DateFormat('EEEE, d MMMM yyyy', 'ar').format(_cairoTime);
+    
+    // Completely crash-proof Arabic date representation
+    final weekdays = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
+    final months = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    final dayName = weekdays[(_cairoTime.weekday - 1).clamp(0, 6)];
+    final monthName = months[(_cairoTime.month - 1).clamp(0, 11)];
+    final dateStr = "$dayName، ${_cairoTime.day} $monthName ${_cairoTime.year}";
 
     return Scaffold(
       backgroundColor: Colors.black,
