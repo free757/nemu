@@ -65,6 +65,16 @@ class SecurityRepositoryImpl implements SecurityRepository {
       final v2rayConfig = '''
 {
   "log": { "loglevel": "warning" },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 4,
+        "connIdle": 300,
+        "uptime": 0,
+        "bufferSize": 32
+      }
+    }
+  },
   "inbounds": [
     {
       "tag": "socks-in",
@@ -74,8 +84,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "settings": { "auth": "noauth", "udp": true },
       "streamSettings": {
         "sockopt": {
-          "tcpKeepAliveInterval": 15,
-          "tcpNoDelay": true
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
         }
       }
     },
@@ -87,8 +97,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "settings": { "allowTransparent": false, "timeout": 300 },
       "streamSettings": {
         "sockopt": {
-          "tcpKeepAliveInterval": 15,
-          "tcpNoDelay": true
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
         }
       }
     }
@@ -121,8 +131,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
           }
         },
         "sockopt": {
-          "tcpKeepAliveInterval": 15,
-          "tcpNoDelay": true
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
         }
       }
     },
@@ -132,8 +142,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "settings": {},
       "streamSettings": {
         "sockopt": {
-          "tcpKeepAliveInterval": 15,
-          "tcpNoDelay": true
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
         }
       }
     }
