@@ -202,6 +202,9 @@ class MainActivity : FlutterActivity() {
                 "stopStrictHotspot" -> {
                     stopStrictHotspot(result)
                 }
+                "isStrictHotspotRunning" -> {
+                    result.success(hotspotReservation != null)
+                }
                 else -> {
                     result.notImplemented()
                 }

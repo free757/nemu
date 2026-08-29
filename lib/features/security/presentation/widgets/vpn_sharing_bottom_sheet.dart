@@ -99,6 +99,16 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   void initState() {
     super.initState();
     _loadSavedHotspotCredentials();
+    _checkStrictHotspotStatus();
+  }
+
+  Future<void> _checkStrictHotspotStatus() async {
+    final running = await OverlayManager.isStrictHotspotRunning();
+    if (mounted) {
+      setState(() {
+        _isStrictRunning = running;
+      });
+    }
   }
 
   Future<void> _loadSavedHotspotCredentials() async {
@@ -139,6 +149,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
       future: Future.wait([
         VpnSharingBottomSheet.getHotspotIP(),
         RootSharingService().checkRoot(),
+        OverlayManager.isStrictHotspotRunning(),
       ]),
       builder: (context, snapshot) {
         final ipAddress = (snapshot.data != null && snapshot.data![0] != null)
@@ -147,10 +158,14 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
         final hasRoot = (snapshot.data != null && snapshot.data!.length > 1)
             ? snapshot.data![1] as bool
             : false;
+        final strictRunning = (snapshot.data != null && snapshot.data!.length > 2)
+            ? snapshot.data![2] as bool
+            : _isStrictRunning;
         final proxyUrl = "socks5://$ipAddress:${AppConstants.localSocksPort}";
 
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final isStrict = _isStrictRunning || strictRunning;
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               decoration: BoxDecoration(
@@ -228,13 +243,13 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                           ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _isStrictRunning ? Colors.redAccent : Colors.amberAccent,
+                              backgroundColor: isStrict ? Colors.redAccent : Colors.amberAccent,
                               foregroundColor: AppTheme.darkInk,
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () async {
-                              if (_isStrictRunning) {
+                              if (isStrict) {
                                 final stopped = await OverlayManager.stopStrictHotspot();
                                 if (stopped) {
                                   _isStrictRunning = false;
@@ -272,7 +287,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                               }
                             },
                             child: Text(
-                              _isStrictRunning ? "إيقاف" : "تشغيل الآمن",
+                              isStrict ? "إيقاف" : "تشغيل الآمن",
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                             ),
                           ),

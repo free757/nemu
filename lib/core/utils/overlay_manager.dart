@@ -166,4 +166,13 @@ class OverlayManager {
       return false;
     }
   }
+
+  static Future<bool> isStrictHotspotRunning() async {
+    try {
+      final bool? res = await _channel.invokeMethod('isStrictHotspotRunning');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }
