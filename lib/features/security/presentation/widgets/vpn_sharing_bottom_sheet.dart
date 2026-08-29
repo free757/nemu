@@ -93,6 +93,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   int _selectedQrMode = 0; // 0: WiFi connect, 1: Proxy URL
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
+  bool _isStrictRunning = false;
 
   @override
   void initState() {
@@ -227,36 +228,53 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                           ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amberAccent,
+                              backgroundColor: _isStrictRunning ? Colors.redAccent : Colors.amberAccent,
                               foregroundColor: AppTheme.darkInk,
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () async {
-                              final res = await OverlayManager.startStrictHotspot();
-                              if (res != null && res['success'] == true) {
-                                if (res['ssid'] != null && res['ssid'].toString().isNotEmpty) {
-                                  _ssidController.text = res['ssid'];
-                                }
-                                if (res['password'] != null && res['password'].toString().isNotEmpty) {
-                                  _passController.text = res['password'];
-                                }
-                                await _saveHotspotCredentials();
-                                setModalState(() {});
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("تم تشغيل الهوت سبوت الآمن! لن يعمل الإنترنت إلا بالبروكسي 🛡️")),
-                                  );
+                              if (_isStrictRunning) {
+                                final stopped = await OverlayManager.stopStrictHotspot();
+                                if (stopped) {
+                                  _isStrictRunning = false;
+                                  setModalState(() {});
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("تم إيقاف الهوت سبوت الآمن")),
+                                    );
+                                  }
                                 }
                               } else {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("فشل تشغيل النمط المعزول: ${res?['error'] ?? 'غير مدعوم'}")),
-                                  );
+                                final res = await OverlayManager.startStrictHotspot();
+                                if (res != null && res['success'] == true) {
+                                  _isStrictRunning = true;
+                                  if (res['ssid'] != null && res['ssid'].toString().isNotEmpty) {
+                                    _ssidController.text = res['ssid'];
+                                  }
+                                  if (res['password'] != null && res['password'].toString().isNotEmpty) {
+                                    _passController.text = res['password'];
+                                  }
+                                  await _saveHotspotCredentials();
+                                  setModalState(() {});
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("تم تشغيل الهوت سبوت الآمن! لن يعمل الإنترنت إلا بالبروكسي 🛡️")),
+                                    );
+                                  }
+                                } else {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text("فشل تشغيل النمط المعزول: ${res?['error'] ?? 'غير مدعوم'}")),
+                                    );
+                                  }
                                 }
                               }
                             },
-                            child: const Text("تشغيل الآمن", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                            child: Text(
+                              _isStrictRunning ? "إيقاف" : "تشغيل الآمن",
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
                           ),
                         ],
                       ),
