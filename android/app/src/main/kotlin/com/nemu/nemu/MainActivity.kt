@@ -420,6 +420,20 @@ class MainActivity : FlutterActivity() {
     private fun startStrictHotspot(result: MethodChannel.Result) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (checkSelfPermission(android.Manifest.permission.NEARBY_WIFI_DEVICES) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(arrayOf(android.Manifest.permission.NEARBY_WIFI_DEVICES, android.Manifest.permission.ACCESS_FINE_LOCATION), 7788)
+                        result.success(mapOf("success" to false, "error" to "يرجى الموافقة على إذن الأجهزة القريبة (Nearby Devices)"))
+                        return
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), 7788)
+                        result.success(mapOf("success" to false, "error" to "يرجى الموافقة على إذن الموقع"))
+                        return
+                    }
+                }
+
                 android.util.Log.d("StrictHotspot", "Starting local-only hotspot...")
                 val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                 wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
