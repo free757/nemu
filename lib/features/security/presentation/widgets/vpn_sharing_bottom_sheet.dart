@@ -221,76 +221,122 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: Colors.amberAccent.withOpacity(0.3), width: 1),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.shield_outlined, color: Colors.amberAccent, size: 28),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  "وضع الحظر التام (Strict Proxy Only)",
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          Row(
+                            children: [
+                              const Icon(Icons.shield_outlined, color: Colors.amberAccent, size: 28),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "وضع الحظر التام (Strict Proxy Only)",
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "منع تسريب أي إنترنت مباشر للأجهزة المتصلة إلا بعد كتابة الهوست والمنفذ.",
+                                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "منع تسريب أي إنترنت مباشر للأجهزة المتصلة إلا بعد كتابة الهوست والمنفذ.",
-                                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isStrict ? Colors.redAccent : Colors.amberAccent,
+                                  foregroundColor: AppTheme.darkInk,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
-                              ],
-                            ),
+                                onPressed: () async {
+                                  if (isStrict) {
+                                    final stopped = await OverlayManager.stopStrictHotspot();
+                                    if (stopped) {
+                                      _isStrictRunning = false;
+                                      await _loadSavedHotspotCredentials();
+                                      setModalState(() {});
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("تم إيقاف الهوت سبوت الآمن")),
+                                        );
+                                      }
+                                    }
+                                  } else {
+                                    final res = await OverlayManager.startStrictHotspot();
+                                    if (res != null && res['success'] == true) {
+                                      _isStrictRunning = true;
+                                      if (res['ssid'] != null && res['ssid'].toString().isNotEmpty) {
+                                        _ssidController.text = res['ssid'];
+                                      }
+                                      if (res['password'] != null && res['password'].toString().isNotEmpty) {
+                                        _passController.text = res['password'];
+                                      }
+                                      setModalState(() {});
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("تم تشغيل الهوت سبوت الآمن! لن يعمل الإنترنت إلا بالبروكسي 🛡️")),
+                                        );
+                                      }
+                                    } else {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text("فشل تشغيل النمط المعزول: ${res?['error'] ?? 'غير مدعوم'}")),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                                child: Text(
+                                  isStrict ? "إيقاف" : "تشغيل الآمن",
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                                ),
+                              ),
+                            ],
                           ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isStrict ? Colors.redAccent : Colors.amberAccent,
-                              foregroundColor: AppTheme.darkInk,
+                          if (isStrict) ...[
+                            const SizedBox(height: 12),
+                            Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              decoration: BoxDecoration(
+                                color: Colors.amberAccent.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.amberAccent.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.lock, color: Colors.amberAccent, size: 14),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      "الشبكة الآمنة نشطة الآن: ${_ssidController.text}",
+                                      style: const TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Clipboard.setData(ClipboardData(text: _passController.text));
+                                      HapticFeedback.lightImpact();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text("تم نسخ كلمة مرور الشبكة الآمنة 📋"), duration: Duration(seconds: 1)),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amberAccent.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text("نسخ الباسوورد", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            onPressed: () async {
-                              if (isStrict) {
-                                final stopped = await OverlayManager.stopStrictHotspot();
-                                if (stopped) {
-                                  _isStrictRunning = false;
-                                  await _loadSavedHotspotCredentials();
-                                  setModalState(() {});
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("تم إيقاف الهوت سبوت الآمن")),
-                                    );
-                                  }
-                                }
-                              } else {
-                                final res = await OverlayManager.startStrictHotspot();
-                                if (res != null && res['success'] == true) {
-                                  _isStrictRunning = true;
-                                  if (res['ssid'] != null && res['ssid'].toString().isNotEmpty) {
-                                    _ssidController.text = res['ssid'];
-                                  }
-                                  if (res['password'] != null && res['password'].toString().isNotEmpty) {
-                                    _passController.text = res['password'];
-                                  }
-                                  setModalState(() {});
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("تم تشغيل الهوت سبوت الآمن! لن يعمل الإنترنت إلا بالبروكسي 🛡️")),
-                                    );
-                                  }
-                                } else {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text("فشل تشغيل النمط المعزول: ${res?['error'] ?? 'غير مدعوم'}")),
-                                    );
-                                  }
-                                }
-                              }
-                            },
-                            child: Text(
-                              isStrict ? "إيقاف" : "تشغيل الآمن",
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                            ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
