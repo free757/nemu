@@ -217,22 +217,21 @@ class MainActivity : FlutterActivity() {
      * to find the hotspot gateway IP — excludes loopback, VPN/tun, mobile data.
      */
     private fun getHotspotIP(): String {
+        // Exclude VPN interfaces, mobile data (rmnet, ccmni), loopback, AND normal client wifi (wlan0)
         val excludeIfaceNames = listOf("tun", "vpn", "ppp", "dummy", "lo", "rmnet", "ccmni", "docker")
-        val excludeSubnets = listOf("127.", "26.26.", "10.0.2.") // loopback + emulator + VPN
+        val excludeSubnets = listOf("127.", "26.26.", "10.0.2.", "192.168.") // Strictly block 192.168.x.x home router range
 
-        fun isVpnRange(ip: String): Boolean {
+        fun isForbiddenRange(ip: String): Boolean {
             if (ip.startsWith("127.")) return true
             if (ip.startsWith("100.")) return true  // CGNAT / Tailscale
+            if (ip.startsWith("192.168.")) return true // Completely ban all 192.168.x.x router subnets
             val parts = ip.split(".")
             if (parts.size == 4 && parts[0] == "172") {
                 val second = parts[1].toIntOrNull() ?: 0
-                if (second in 16..31) return true  // Docker / V2Ray tun
+                if (second in 16..19) return true  // Docker / V2Ray tun
             }
             return excludeSubnets.any { ip.startsWith(it) }
         }
-
-        fun isHomeWifi(ip: String) =
-            ip.startsWith("192.168.0.") || ip.startsWith("192.168.1.") || ip.startsWith("192.168.2.")
 
         fun isExcluded(name: String) = excludeIfaceNames.any { name.lowercase().contains(it) }
 
@@ -248,44 +247,44 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-            // Priority 1: Named hotspot interfaces (like ap0, swlan, softap)
-            val hotspotNames = listOf("ap", "swlan", "softap", "wlan1", "hotspot", "p2p-wlan")
+            // Priority 1: Isolated Hotspot interfaces (ap0, swlan, softap, p2p-wlan, wlan1, etc.)
+            val hotspotNames = listOf("ap", "swlan", "softap", "p2p-wlan", "wlan1", "hotspot")
             for (iface in ifaces) {
                 if (isExcluded(iface.name)) continue
                 if (hotspotNames.none { iface.name.lowercase().contains(it) }) continue
                 for (addr in iface.inetAddresses.toList()) {
                     if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
                         val ip = addr.hostAddress ?: continue
-                        return ip
+                        if (!isForbiddenRange(ip)) return ip
                     }
                 }
             }
 
-            // Priority 2: Non-home, non-VPN subnet
+            // Priority 2: Non-192.168, non-VPN IP from any active network interface (except wlan0 client)
+            for (iface in ifaces) {
+                if (isExcluded(iface.name) || iface.name.equals("wlan0", ignoreCase = true)) continue
+                for (addr in iface.inetAddresses.toList()) {
+                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                        val ip = addr.hostAddress ?: continue
+                        if (!isForbiddenRange(ip)) return ip
+                    }
+                }
+            }
+
+            // Priority 3: Any non-forbidden IP across all interfaces
             for (iface in ifaces) {
                 if (isExcluded(iface.name)) continue
                 for (addr in iface.inetAddresses.toList()) {
                     if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
                         val ip = addr.hostAddress ?: continue
-                        if (!isVpnRange(ip) && !isHomeWifi(ip)) return ip
-                    }
-                }
-            }
-
-            // Priority 3: Any non-VPN IPv4
-            for (iface in ifaces) {
-                if (isExcluded(iface.name)) continue
-                for (addr in iface.inetAddresses.toList()) {
-                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
-                        val ip = addr.hostAddress ?: continue
-                        if (!isVpnRange(ip)) return ip
+                        if (!isForbiddenRange(ip)) return ip
                     }
                 }
             }
         } catch (e: Exception) {
             android.util.Log.e("HotspotIP/Kotlin", "Error: $e")
         }
-        return "192.168.43.1"
+        return "10.96.218.1"
     }
 
     private fun getConnectedHotspotDevicesCount(): Int {

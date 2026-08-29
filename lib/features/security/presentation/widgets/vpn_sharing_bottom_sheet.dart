@@ -30,22 +30,17 @@ class VpnSharingBottomSheet extends StatefulWidget {
         includeLinkLocal: false,
       );
 
-      bool isVpnRange(String ip) {
-        if (ip.startsWith('127.') || ip.startsWith('100.') || ip.startsWith('26.26.')) return true;
+      bool isVpnOrForbiddenRange(String ip) {
+        if (ip.startsWith('127.') || ip.startsWith('100.') || ip.startsWith('26.26.') || ip.startsWith('192.168.')) return true;
         final parts = ip.split('.');
         if (parts.length == 4 && parts[0] == '172') {
           final s = int.tryParse(parts[1]) ?? 0;
-          if (s >= 16 && s <= 31) return true;
+          if (s >= 16 && s <= 19) return true;
         }
         return false;
       }
 
-      bool isHomeWifi(String ip) =>
-          ip.startsWith('192.168.0.') ||
-          ip.startsWith('192.168.1.') ||
-          ip.startsWith('192.168.2.');
-
-      const excludeNames = ['tun', 'vpn', 'ppp', 'rmnet', 'ccmni', 'dummy', 'lo', 'docker'];
+      const excludeNames = ['tun', 'vpn', 'ppp', 'rmnet', 'ccmni', 'dummy', 'lo', 'docker', 'wlan0'];
 
       for (var iface in interfaces) {
         final name = iface.name.toLowerCase();
@@ -53,8 +48,7 @@ class VpnSharingBottomSheet extends StatefulWidget {
         for (var addr in iface.addresses) {
           if (addr.isLoopback) continue;
           final ip = addr.address;
-          if (isVpnRange(ip)) continue;
-          if (isHomeWifi(ip)) continue;
+          if (isVpnOrForbiddenRange(ip)) continue;
           return ip;
         }
       }
@@ -64,7 +58,7 @@ class VpnSharingBottomSheet extends StatefulWidget {
         if (excludeNames.any((n) => name.contains(n))) continue;
         for (var addr in iface.addresses) {
           if (addr.isLoopback) continue;
-          if (!isVpnRange(addr.address)) return addr.address;
+          if (!isVpnOrForbiddenRange(addr.address)) return addr.address;
         }
       }
     } catch (e) {

@@ -23,7 +23,7 @@ class AppConstants {
   static const String vlessUUID = 'd342d11e-d424-4583-b36e-524ab1f0ade3';
   static const int localSocksPort = 10808;
   static const int localHttpPort = 10809;
-  static const String defaultHotspotFallbackIp = '192.168.43.1';
+  static const String defaultHotspotFallbackIp = '10.96.218.1';
   static const String proxyOnlyRemark = 'Nemu Proxy';
 
   // External Endpoints & Services
