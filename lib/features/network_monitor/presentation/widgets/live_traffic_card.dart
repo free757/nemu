@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import '../cubit/network_monitor_cubit.dart';
 
 class LiveTrafficCard extends StatelessWidget {
@@ -38,10 +39,10 @@ class LiveTrafficCard extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 8),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            color: isDark ? Colors.white.withOpacity(0.05) : AppTheme.lightCard,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+              color: isDark ? Colors.white.withOpacity(0.08) : AppTheme.lightBorder,
               width: 1,
             ),
             boxShadow: isDark

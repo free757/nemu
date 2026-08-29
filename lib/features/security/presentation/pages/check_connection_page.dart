@@ -363,9 +363,9 @@ class _CheckConnectionViewState extends State<CheckConnectionView> with WidgetsB
 
   Widget _buildHeader(BuildContext context, String name, bool isDark) {
     final int unreadCount = _notifications.length - _lastSeenCount;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textSecondary = isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF64748B);
-    final iconColor = isDark ? Colors.white70 : const Color(0xFF475569);
+    final textPrimary = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final textSecondary = isDark ? Colors.white.withOpacity(0.7) : AppTheme.lightTextSecondary;
+    final iconColor = isDark ? Colors.white70 : AppTheme.lightTextSecondary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),

@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'app_share_bottom_sheet.dart';
 
 class VpnSharingBottomSheet extends StatefulWidget {
@@ -549,7 +550,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
           ),
           child: Text(
             number,
-            style: const TextStyle(color: Color(0xFF16161A), fontSize: 11, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: AppTheme.darkInk, fontSize: 11, fontWeight: FontWeight.bold),
           ),
         ),
         const SizedBox(width: 10),

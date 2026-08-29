@@ -21,6 +21,10 @@ class AppTheme {
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightTextPrimary = Color(0xFF0F172A);
   static const Color lightTextSecondary = Color(0xFF64748B);
+  static const Color lightBorder = Color(0xFFE2E8F0);
+  static const Color darkBorder = Colors.white10;
+  static const Color darkInk = Color(0xFF16161A);
+  static const Color notificationBlue = Color(0xFF1E3A8A);
 
   static ThemeData get darkTheme {
     return ThemeData(

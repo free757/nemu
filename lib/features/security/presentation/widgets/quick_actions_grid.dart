@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'credentials_bottom_sheet.dart';
 import 'webcam_help_bottom_sheet.dart';
 import 'app_share_bottom_sheet.dart';
@@ -140,12 +141,12 @@ class QuickActionsGrid extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
-      color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+      color: isDark ? Colors.white.withOpacity(0.05) : AppTheme.lightCard,
       elevation: isDark ? 0 : 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-          color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE2E8F0),
+          color: isDark ? Colors.white.withOpacity(0.05) : AppTheme.lightBorder,
         ),
       ),
       child: InkWell(
@@ -170,7 +171,7 @@ class QuickActionsGrid extends StatelessWidget {
                 title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),

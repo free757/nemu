@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'package:nemu/features/auth/domain/entities/user_entity.dart';
 import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
 import 'vpn_sharing_bottom_sheet.dart';
@@ -27,14 +28,14 @@ class SecurityCardWidget extends StatelessWidget {
         final String ip = isLoaded ? (state as SecurityLoaded).status.ip : 'Checking...';
 
         return Card(
-          color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
+          color: isDark ? Colors.white.withOpacity(0.08) : AppTheme.lightCard,
           elevation: isDark ? 0 : 1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(25),
             side: BorderSide(
               color: isUSA
                   ? Colors.greenAccent.withOpacity(0.4)
-                  : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                  : (isDark ? Colors.white10 : AppTheme.lightBorder),
             ),
           ),
           child: Padding(
@@ -251,12 +252,12 @@ class SecurityCardWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+          Icon(icon, size: 16, color: isDark ? Colors.white38 : AppTheme.darkTextSecondary),
           const SizedBox(width: 10),
           Text(
             label,
             style: TextStyle(
-              color: isDark ? Colors.white38 : const Color(0xFF64748B),
+              color: isDark ? Colors.white38 : AppTheme.lightTextSecondary,
               fontSize: 13,
             ),
           ),
@@ -268,7 +269,7 @@ class SecurityCardWidget extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
               style: TextStyle(
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
