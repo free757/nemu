@@ -99,7 +99,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "protocol": "vless",
       "settings": {
         "vnext": [{
-          "address": "${AppConstants.workerHost}",
+          "address": "${AppConstants.workerIP}",
           "port": 443,
           "users": [{
             "id": "${AppConstants.vlessUUID}",
@@ -122,7 +122,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
         },
         "sockopt": {
           "tcpNoDelay": true,
-          "tcpKeepAliveInterval": 10
+          "tcpKeepAliveInterval": 15
         }
       }
     },
