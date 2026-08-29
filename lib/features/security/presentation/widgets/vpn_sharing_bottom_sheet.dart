@@ -87,6 +87,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   int _selectedQrMode = 0; // 0: WiFi connect, 1: Proxy URL
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
+  String _currentHotspotIp = AppConstants.defaultHotspotFallbackIp;
   bool _isStrictRunning = false;
   bool _showManualInstructions = false;
 
@@ -95,6 +96,16 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
     super.initState();
     _loadSavedHotspotCredentials();
     _checkStrictHotspotStatus();
+    _refreshHotspotIp();
+  }
+
+  Future<void> _refreshHotspotIp() async {
+    final ip = await VpnSharingBottomSheet.getHotspotIP();
+    if (mounted) {
+      setState(() {
+        _currentHotspotIp = ip;
+      });
+    }
   }
 
   Future<void> _checkStrictHotspotStatus() async {
@@ -142,23 +153,20 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   Widget build(BuildContext context) {
     return FutureBuilder<List<dynamic>>(
       future: Future.wait([
-        VpnSharingBottomSheet.getHotspotIP(),
         RootSharingService().checkRoot(),
         OverlayManager.isStrictHotspotRunning(),
         OverlayManager.getConnectedHotspotDevicesCount(),
       ]),
       builder: (context, snapshot) {
-        final ipAddress = (snapshot.data != null && snapshot.data![0] != null)
-            ? snapshot.data![0] as String
-            : AppConstants.defaultHotspotFallbackIp;
-        final hasRoot = (snapshot.data != null && snapshot.data!.length > 1)
-            ? snapshot.data![1] as bool
+        final ipAddress = _currentHotspotIp;
+        final hasRoot = (snapshot.data != null && snapshot.data!.isNotEmpty)
+            ? snapshot.data![0] as bool
             : false;
-        final strictRunning = (snapshot.data != null && snapshot.data!.length > 2)
-            ? snapshot.data![2] as bool
+        final strictRunning = (snapshot.data != null && snapshot.data!.length > 1)
+            ? snapshot.data![1] as bool
             : _isStrictRunning;
-        final connectedDevices = (snapshot.data != null && snapshot.data!.length > 3)
-            ? snapshot.data![3] as int
+        final connectedDevices = (snapshot.data != null && snapshot.data!.length > 2)
+            ? snapshot.data![2] as int
             : 0;
         final proxyUrl = "socks5://$ipAddress:${AppConstants.localSocksPort}";
 
@@ -394,6 +402,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                     if (stopped) {
                       _isStrictRunning = false;
                       await _loadSavedHotspotCredentials();
+                      await _refreshHotspotIp();
                       setModalState(() {});
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -411,6 +420,13 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       if (res['password'] != null && res['password'].toString().isNotEmpty) {
                         _passController.text = res['password'];
                       }
+                      // Wait a brief moment for Android ap0 interface to come up then refresh IP live
+                      Future.delayed(const Duration(milliseconds: 600), () async {
+                        await _refreshHotspotIp();
+                        if (context.mounted) {
+                          setModalState(() {});
+                        }
+                      });
                       setModalState(() {});
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
