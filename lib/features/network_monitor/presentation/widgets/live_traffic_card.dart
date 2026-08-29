@@ -39,10 +39,8 @@ class LiveTrafficCard extends StatelessWidget {
             color: Colors.white.withOpacity(0.05),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isUploading
-                  ? Colors.greenAccent.withOpacity(0.4)
-                  : Colors.white.withOpacity(0.08),
-              width: isUploading ? 1.5 : 1,
+              color: Colors.white.withOpacity(0.08),
+              width: 1,
             ),
           ),
           child: Column(
@@ -50,59 +48,28 @@ class LiveTrafficCard extends StatelessWidget {
             children: [
               // Header Row
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: isUploading
-                              ? Colors.greenAccent.withOpacity(0.2)
-                              : Colors.white.withOpacity(0.05),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.speed,
-                          color: isUploading ? Colors.greenAccent : Colors.white70,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        "مؤشر نقل البيانات اللحظي",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (isUploading)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.greenAccent.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 12),
-                          SizedBox(width: 4),
-                          Text(
-                            "جاري الرفع...",
-                            style: TextStyle(
-                              color: Colors.greenAccent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(
+                      Icons.speed,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    "مؤشر نقل البيانات اللحظي",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
