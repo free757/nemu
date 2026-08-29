@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
+import 'app_share_bottom_sheet.dart';
 
 class VpnSharingBottomSheet extends StatelessWidget {
   const VpnSharingBottomSheet({super.key});
@@ -288,20 +289,43 @@ class VpnSharingBottomSheet extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              AppShareBottomSheet.show(context);
+                            },
+                            icon: const Icon(Icons.qr_code_scanner, size: 16),
+                            label: const Text("مشاركة وتثبيت التطبيق APK", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.08),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              ),
+                            ),
                           ),
                         ),
-                        child: const Text("إغلاق", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              ),
+                            ),
+                            child: const Text("إغلاق", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

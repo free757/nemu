@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'credentials_bottom_sheet.dart';
 import 'webcam_help_bottom_sheet.dart';
 import 'app_share_bottom_sheet.dart';
+import 'vpn_sharing_bottom_sheet.dart';
 
 class QuickActionsGrid extends StatelessWidget {
   final dynamic user;
@@ -104,10 +105,13 @@ class QuickActionsGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildGridItem(
-                icon: Icons.qr_code_2,
+                icon: Icons.settings_input_antenna,
                 iconColor: Colors.greenAccent,
-                title: "تثبيت ومشاركة",
-                onTap: () => AppShareBottomSheet.show(context),
+                title: "مشاركة هوت سبوت",
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  VpnSharingBottomSheet.show(context);
+                },
                 trailing: const Padding(
                   padding: EdgeInsets.only(top: 8.0),
                   child: Icon(Icons.arrow_forward_ios, size: 12, color: Colors.white38),
