@@ -51,19 +51,31 @@ class _UserSessionGuardState extends State<UserSessionGuard> {
       _miscSubscription = Supabase.instance.client
           .from('misc_items')
           .stream(primaryKey: ['id'])
-          .listen((_) => _initOverlay());
+          .listen(
+            (_) => _initOverlay(),
+            onError: (error) {
+              debugPrint('[MiscItems] Stream error caught safely: $error');
+            },
+            cancelOnError: false,
+          );
     } catch (_) {}
 
     try {
       _remoteConfigSubscription = Supabase.instance.client
           .from('remote_configs')
           .stream(primaryKey: ['id'])
-          .listen((_) {
-            _initOverlay();
-            if (mounted) {
-              context.read<RemoteConfigCubit>().getProjects();
-            }
-          });
+          .listen(
+            (_) {
+              _initOverlay();
+              if (mounted) {
+                context.read<RemoteConfigCubit>().getProjects();
+              }
+            },
+            onError: (error) {
+              debugPrint('[RemoteConfig] Stream error caught safely: $error');
+            },
+            cancelOnError: false,
+          );
     } catch (_) {}
 
     _initOverlay();
