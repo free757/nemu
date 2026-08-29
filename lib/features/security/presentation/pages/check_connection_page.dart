@@ -36,14 +36,8 @@ class CheckConnectionPage extends StatelessWidget {
         BlocProvider.value(
           value: sl<SecurityCubit>()..checkConnection(),
         ),
-        BlocProvider(
-          create: (context) => sl<NetworkMonitorCubit>(),
-        ),
-        BlocProvider(
-          create: (context) => sl<RemoteConfigCubit>()..fetchProjects(),
-        ),
-        BlocProvider(
-          create: (context) => sl<AppUpdateCubit>(),
+        BlocProvider.value(
+          value: sl<RemoteConfigCubit>()..fetchProjects(),
         ),
       ],
       child: const CheckConnectionView(),

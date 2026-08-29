@@ -10,6 +10,7 @@ import 'features/auth/presentation/widgets/user_session_guard.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
+import 'features/app_update/presentation/cubit/app_update_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +46,9 @@ class NemuApp extends StatelessWidget {
         ),
         BlocProvider(
           create: (context) => di.sl<NetworkMonitorCubit>(),
+        ),
+        BlocProvider(
+          create: (context) => di.sl<AppUpdateCubit>(),
         ),
       ],
       child: MaterialApp(
