@@ -11,6 +11,15 @@ class AppConstants {
   // Cloudflare Proxy & VLESS Network Architecture
   static const String workerHost = 'nemu-proxy.free75711.workers.dev';
   static const String workerIP = '172.67.207.164';
+  static const List<String> cleanWorkerIPs = [
+    '172.67.207.164',
+    '104.16.132.229',
+    '104.16.133.229',
+    '104.17.232.29',
+    '104.17.233.29',
+    '162.159.192.1',
+    '172.64.155.249',
+  ];
   static const String vlessUUID = 'd342d11e-d424-4583-b36e-524ab1f0ade3';
   static const int localSocksPort = 10808;
   static const int localHttpPort = 10809;
