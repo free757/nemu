@@ -9,6 +9,8 @@ import 'features/auth/presentation/cubit/auth_cubit.dart';
 import 'features/auth/presentation/widgets/user_session_guard.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   OverlayManager.initialize();
@@ -36,8 +38,15 @@ class NemuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => di.sl<AuthCubit>()..checkAuth(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => di.sl<AuthCubit>()..checkAuth(),
+        ),
+        BlocProvider(
+          create: (context) => di.sl<NetworkMonitorCubit>(),
+        ),
+      ],
       child: MaterialApp(
         title: 'Nemu',
         debugShowCheckedModeBanner: false,
