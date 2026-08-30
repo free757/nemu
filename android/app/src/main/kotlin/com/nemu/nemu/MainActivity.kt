@@ -450,6 +450,7 @@ class MainActivity : FlutterActivity() {
                         super.onStarted(reservation)
                         android.util.Log.d("StrictHotspot", "Hotspot onStarted called successfully!")
                         hotspotReservation = reservation
+                        val config = reservation.wifiConfiguration
                         val rawSsid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             reservation.softApConfiguration?.ssid ?: config?.SSID ?: "NemuStrictHotspot"
                         } else {
