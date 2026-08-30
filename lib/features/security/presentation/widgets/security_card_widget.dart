@@ -59,7 +59,7 @@ class SecurityCardWidget extends StatelessWidget {
                         IconButton(
                           constraints: const BoxConstraints(),
                           padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+                          icon: const Icon(Icons.refresh_outlined, color: Colors.white54, size: 20),
                           onPressed: () {
                             HapticFeedback.lightImpact();
                             context.read<SecurityCubit>().checkConnection();
@@ -93,10 +93,10 @@ class SecurityCardWidget extends StatelessWidget {
                   ],
                 ),
                 const Divider(color: Colors.white10, height: 30),
-                _buildInfoRow(context, Icons.language, "Current IP", ip),
-                _buildInfoRow(context, Icons.security, "Protocol", "SOCKS5"),
-                _buildInfoRow(context, Icons.location_on, "Target", "United States"),
-                _buildInfoRow(context, Icons.shield_outlined, "Leak Shield", isUSA ? "Protected (DNS / WebRTC Safe) 🛡️" : "Standard"),
+                _buildInfoRow(context, Icons.language_outlined, "Current IP", ip),
+                _buildInfoRow(context, Icons.shield_outlined, "Protocol", "SOCKS5"),
+                _buildInfoRow(context, Icons.location_on_outlined, "Target", "United States"),
+                _buildInfoRow(context, Icons.verified_user_outlined, "Leak Shield", isUSA ? "Protected (DNS / WebRTC Safe) 🛡️" : "Standard"),
                 if (isConnected && isUSA) ...[
                   const Padding(
                     padding: EdgeInsets.only(top: 10),
@@ -115,7 +115,7 @@ class SecurityCardWidget extends StatelessWidget {
                         HapticFeedback.lightImpact();
                         VpnSharingBottomSheet.show(context);
                       },
-                      icon: const Icon(Icons.settings_input_antenna, size: 16),
+                      icon: const Icon(Icons.settings_input_antenna_outlined, size: 16),
                       label: const Text(
                         "مشاركة الاتصال (هوت سبوت)",
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
@@ -175,7 +175,7 @@ class SecurityCardWidget extends StatelessWidget {
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.public, color: Colors.blueAccent, size: 14),
+                                      const Icon(Icons.public_outlined, color: Colors.blueAccent, size: 14),
                                       const SizedBox(width: 6),
                                       Text(
                                         (state as SecurityLoaded).status.timezone,
@@ -212,7 +212,7 @@ class SecurityCardWidget extends StatelessWidget {
                                     ),
                                     child: const Row(
                                       children: [
-                                        Icon(Icons.settings, color: Colors.white, size: 14),
+                                        Icon(Icons.settings_outlined, color: Colors.white, size: 14),
                                         SizedBox(width: 4),
                                         Text(
                                           "الإعدادات",
