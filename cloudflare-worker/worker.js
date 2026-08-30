@@ -54,7 +54,7 @@ export default {
     if (upgradeHeader.toLowerCase() === "websocket") {
       return handleWS(request);
     }
-    return new Response("Nemu Proxy ✅ Zero-CPU Direct Engine Running", { status: 200 });
+    return new Response("Nemu Proxy ✅ Zero-CPU Native Direct Stream Running", { status: 200 });
   },
 };
 
@@ -72,11 +72,16 @@ async function handleWS(request) {
   const [client, server] = Object.values(new WebSocketPair());
   server.accept();
 
+  // Create stream from incoming WebSocket messages
   const readable = new ReadableStream({
     start(ctrl) {
       server.addEventListener("message", (e) => ctrl.enqueue(e.data));
-      server.addEventListener("close", () => ctrl.close());
-      server.addEventListener("error", (e) => ctrl.error(e));
+      server.addEventListener("close", () => {
+        try { ctrl.close(); } catch (_) {}
+      });
+      server.addEventListener("error", (e) => {
+        try { ctrl.error(e); } catch (_) {}
+      });
     },
   });
 
@@ -119,26 +124,32 @@ async function handleVless(ws, readable, socks5) {
   const vlessResp = new Uint8Array([buf[0], 0]);
   const payload   = firstBuf.slice(aIdx);
 
+  // Release lock on reader so stream can be piped natively!
+  reader.releaseLock();
+
   if (cmd === 2 && port === 53) {
-    await handleDNS(ws, vlessResp, payload, reader, socks5);
+    await handleDNS(ws, vlessResp, payload, readable, socks5);
     return;
   }
   if (cmd !== 1) throw new Error("unsupported cmd " + cmd);
-  await handleTCP(ws, vlessResp, payload, reader, addr, port, socks5);
+  await handleTCP(ws, vlessResp, payload, readable, addr, port, socks5);
 }
 
-async function handleTCP(ws, vlessResp, payload, reader, addr, port, socks5) {
+async function handleTCP(ws, vlessResp, payload, readable, addr, port, socks5) {
   const remote = socks5
     ? await connectViaSocks5(socks5, addr, port)
     : connect({ hostname: addr, port });
 
-  const w0 = remote.writable.getWriter();
-  if (payload.byteLength > 0) await w0.write(payload);
-  w0.releaseLock();
+  // 1. Send initial handshake payload if present
+  if (payload.byteLength > 0) {
+    const w0 = remote.writable.getWriter();
+    await w0.write(payload);
+    w0.releaseLock();
+  }
 
   let headerSent = false;
   
-  // ⚡ FAST PATH Remote -> WebSocket: Direct Header Injection on First Chunk then 0 CPU
+  // ⚡ 2. Remote -> WebSocket (Download Pipeline - 0 CPU)
   remote.readable.pipeTo(new WritableStream({
     write(chunk) {
       if (ws.readyState !== WebSocket.OPEN) return;
@@ -157,8 +168,24 @@ async function handleTCP(ws, vlessResp, payload, reader, addr, port, socks5) {
     abort() { safeClose(ws); }
   })).catch(() => safeClose(ws));
 
-  // ⚡ FAST PATH WebSocket -> Remote: Direct pipe without toAB array allocations
-  readable.pipeTo(remote.writable).catch(() => safeClose(ws));
+  // ⚡ 3. WebSocket -> Remote (Upload Pipeline - Direct C++ Kernel Pipe)
+  readable.pipeTo(new WritableStream({
+    async write(chunk) {
+      const w = remote.writable.getWriter();
+      try {
+        const ab = await toAB(chunk);
+        await w.write(ab);
+      } finally {
+        w.releaseLock();
+      }
+    },
+    close() {
+      try { remote.writable.close(); } catch (_) {}
+    },
+    abort() {
+      try { remote.writable.abort(); } catch (_) {}
+    }
+  })).catch(() => safeClose(ws));
 }
 
 async function connectViaSocks5(proxy, targetHost, targetPort) {
@@ -205,7 +232,7 @@ async function connectViaSocks5(proxy, targetHost, targetPort) {
   return sock;
 }
 
-async function handleDNS(ws, vlessResp, firstPayload, reader, socks5) {
+async function handleDNS(ws, vlessResp, firstPayload, readable, socks5) {
   let headerSent = false;
 
   async function sendDNS(pkt) {
@@ -243,6 +270,8 @@ async function handleDNS(ws, vlessResp, firstPayload, reader, socks5) {
   }
 
   await processChunks(await toAB(firstPayload));
+  
+  const reader = readable.getReader();
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
