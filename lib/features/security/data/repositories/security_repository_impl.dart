@@ -182,6 +182,13 @@ class SecurityRepositoryImpl implements SecurityRepository {
     "rules": [
       {
         "type": "field",
+        "domain": [
+          "domain:supabase.co"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
         "ip": [
           $cleanIpsJson
         ],
