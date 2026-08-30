@@ -4,7 +4,6 @@ const USER_ID = "d342d11e-d424-4583-b36e-524ab1f0ade3";
 
 const B2H = Array.from({ length: 256 }, (_, i) => (i + 256).toString(16).slice(1));
 
-// ✅ FIXED: Added missing bytes 6,7 and 3rd dash
 function uuidStringify(a, o = 0) {
   return [
     B2H[a[o]],B2H[a[o+1]],B2H[a[o+2]],B2H[a[o+3]],"-",
@@ -51,10 +50,11 @@ function safeClose(ws) {
 
 export default {
   async fetch(request) {
-    if (request.headers.get("Upgrade") === "websocket") {
+    const upgradeHeader = request.headers.get("Upgrade") || "";
+    if (upgradeHeader.toLowerCase() === "websocket") {
       return handleWS(request);
     }
-    return new Response("Nemu Proxy ✅ High-Speed Engine Running", { status: 200 });
+    return new Response("Nemu Proxy ✅ Zero-CPU Direct Engine Running", { status: 200 });
   },
 };
 
@@ -138,14 +138,17 @@ async function handleTCP(ws, vlessResp, payload, reader, addr, port, socks5) {
 
   let headerSent = false;
   
-  // Remote -> WebSocket (Download / Responses)
+  // ⚡ FAST PATH Remote -> WebSocket: Direct Header Injection on First Chunk then 0 CPU
   remote.readable.pipeTo(new WritableStream({
-    async write(chunk) {
+    write(chunk) {
       if (ws.readyState !== WebSocket.OPEN) return;
       if (!headerSent) {
+        const chunkAB = chunk instanceof ArrayBuffer ? chunk : chunk.buffer;
         const m = new Uint8Array(vlessResp.length + chunk.byteLength);
-        m.set(vlessResp); m.set(new Uint8Array(chunk), vlessResp.length);
-        ws.send(m.buffer); headerSent = true;
+        m.set(vlessResp);
+        m.set(new Uint8Array(chunkAB, chunk.byteOffset || 0, chunk.byteLength), vlessResp.length);
+        ws.send(m.buffer);
+        headerSent = true;
       } else {
         ws.send(chunk);
       }
@@ -154,24 +157,8 @@ async function handleTCP(ws, vlessResp, payload, reader, addr, port, socks5) {
     abort() { safeClose(ws); }
   })).catch(() => safeClose(ws));
 
-  // WebSocket -> Remote (Upload / Large Payloads)
-  (async () => {
-    const w = remote.writable.getWriter();
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          const ab = await toAB(value);
-          await w.write(ab);
-        }
-      }
-    } catch (_) {
-      // Ignore client abort to gracefully flush remaining remote buffer
-    } finally {
-      try { await w.close(); } catch (_) {}
-    }
-  })().catch(() => safeClose(ws));
+  // ⚡ FAST PATH WebSocket -> Remote: Direct pipe without toAB array allocations
+  readable.pipeTo(remote.writable).catch(() => safeClose(ws));
 }
 
 async function connectViaSocks5(proxy, targetHost, targetPort) {
@@ -231,11 +218,13 @@ async function handleDNS(ws, vlessResp, firstPayload, reader, socks5) {
     const dw = dnsSock.writable.getWriter();
     await dw.write(msg); dw.releaseLock();
     dnsSock.readable.pipeTo(new WritableStream({
-      async write(chunk) {
+      write(chunk) {
         if (ws.readyState !== WebSocket.OPEN) return;
         if (!headerSent) {
+          const chunkAB = chunk instanceof ArrayBuffer ? chunk : chunk.buffer;
           const m = new Uint8Array(vlessResp.length + chunk.byteLength);
-          m.set(vlessResp); m.set(new Uint8Array(chunk), vlessResp.length);
+          m.set(vlessResp);
+          m.set(new Uint8Array(chunkAB, chunk.byteOffset || 0, chunk.byteLength), vlessResp.length);
           ws.send(m.buffer); headerSent = true;
         } else ws.send(chunk);
       },
