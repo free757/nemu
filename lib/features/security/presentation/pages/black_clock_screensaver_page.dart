@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nemu/core/theme/app_theme.dart';
+import 'package:nemu/core/utils/overlay_manager.dart';
 import 'package:nemu/features/network_monitor/presentation/cubit/network_monitor_cubit.dart';
-
 import 'package:nemu/injection_container.dart';
 
 class BlackClockScreenSaverPage extends StatefulWidget {
@@ -36,6 +37,9 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
   @override
   void initState() {
     super.initState();
+    // ⚡ Keep Screen On & Prevent Device Sleep with AMOLED black power saver
+    OverlayManager.setKeepScreenOn(true);
+    OverlayManager.acquireWakeLock();
     _updateCairoTime();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateCairoTime();
@@ -44,7 +48,6 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
 
   void _updateCairoTime() {
     // Cairo is UTC+2 / UTC+3 (Egypt Standard Time)
-    // Using UTC + 3 hours (DST active in Egypt in Summer) or UTC + 2
     final nowUtc = DateTime.now().toUtc();
     final cairo = nowUtc.add(const Duration(hours: 3));
     if (mounted) {
@@ -57,6 +60,8 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
   @override
   void dispose() {
     _clockTimer?.cancel();
+    // ⚡ Restore normal screen timeout behavior when exiting screensaver
+    OverlayManager.setKeepScreenOn(false);
     super.dispose();
   }
 
@@ -92,7 +97,7 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top Status: Cairo Time Header
+                // Top Status: Cairo Time Header & Screen Lock Indicator
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -118,13 +123,13 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
                         ),
                       ],
                     ),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.touch_app_outlined, size: 14, color: Colors.white24),
-                        SizedBox(width: 4),
+                        Icon(Icons.lock_clock, size: 13, color: Colors.greenAccent.withValues(alpha: 0.7)),
+                        const SizedBox(width: 4),
                         Text(
-                          "المس الشاشة للإلغاء",
-                          style: TextStyle(color: Colors.white24, fontSize: 11),
+                          "وضع التشغيل الدائم نشط",
+                          style: TextStyle(color: Colors.greenAccent.withValues(alpha: 0.7), fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -159,7 +164,7 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
                     Text(
                       dateStr,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -167,50 +172,67 @@ class _BlackClockScreenSaverPageState extends State<BlackClockScreenSaverPage> {
                   ],
                 ),
 
-                // Bottom: Live Mini Traffic
-                BlocBuilder<NetworkMonitorCubit, NetworkMonitorState>(
-                  builder: (context, state) {
-                    final speed = (state is NetworkMonitorActive) ? state.speed : null;
-                    final upload = speed?.formattedUploadSpeed ?? "0 B/s";
-                    final download = speed?.formattedDownloadSpeed ?? "0 B/s";
-                    final devices = speed?.connectedDevicesCount ?? 0;
+                // Bottom: Live Mini Traffic & Tap hint
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    BlocBuilder<NetworkMonitorCubit, NetworkMonitorState>(
+                      builder: (context, state) {
+                        final speed = (state is NetworkMonitorActive) ? state.speed : null;
+                        final upload = speed?.formattedUploadSpeed ?? "0 B/s";
+                        final download = speed?.formattedDownloadSpeed ?? "0 B/s";
+                        final devices = speed?.connectedDevicesCount ?? 0;
 
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.03),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.06)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          Row(
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.03),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              const Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 14),
-                              const SizedBox(width: 4),
-                              Text(upload, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                              Row(
+                                children: [
+                                  const Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(upload, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.arrow_downward, color: Colors.blueAccent, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(download, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              if (devices > 0)
+                                Row(
+                                  children: [
+                                    const Icon(Icons.devices, color: Colors.amberAccent, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text("$devices أجهزة", style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
                             ],
                           ),
-                          Row(
-                            children: [
-                              const Icon(Icons.arrow_downward, color: Colors.blueAccent, size: 14),
-                              const SizedBox(width: 4),
-                              Text(download, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          if (devices > 0)
-                            Row(
-                              children: [
-                                const Icon(Icons.devices, color: Colors.amberAccent, size: 14),
-                                const SizedBox(width: 4),
-                                Text("$devices أجهزة", style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                        ],
-                      ),
-                    );
-                  },
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.touch_app_outlined, size: 13, color: Colors.white24),
+                        SizedBox(width: 4),
+                        Text(
+                          "المس أي مكان في الشاشة للعودة للرئيسية",
+                          style: TextStyle(color: Colors.white24, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),

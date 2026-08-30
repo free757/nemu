@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nemu/core/theme/app_theme.dart';
+import 'package:nemu/features/security/presentation/pages/black_clock_screensaver_page.dart';
 import 'credentials_bottom_sheet.dart';
 import 'webcam_help_bottom_sheet.dart';
-import 'app_share_bottom_sheet.dart';
 import 'vpn_sharing_bottom_sheet.dart';
 
 class QuickActionsGrid extends StatelessWidget {
@@ -48,7 +48,7 @@ class QuickActionsGrid extends StatelessWidget {
                     child: Switch(
                       value: showOverlay,
                       onChanged: onToggleOverlay,
-                      activeColor: Colors.blueAccent,
+                      activeThumbColor: Colors.blueAccent,
                     ),
                   ),
                 ),
@@ -96,7 +96,7 @@ class QuickActionsGrid extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
+                    color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -125,6 +125,35 @@ class QuickActionsGrid extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildGridItem(
+                context: context,
+                icon: Icons.bedtime_outlined,
+                iconColor: Colors.purpleAccent,
+                title: "شاشة توفير الطاقة",
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  BlackClockScreenSaverPage.open(context);
+                },
+                trailing: Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.purpleAccent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    "إبقاء نشط ⚡",
+                    style: TextStyle(color: Colors.purpleAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -141,12 +170,12 @@ class QuickActionsGrid extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
-      color: isDark ? Colors.white.withOpacity(0.05) : AppTheme.lightCard,
+      color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.lightCard,
       elevation: isDark ? 0 : 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-          color: isDark ? Colors.white.withOpacity(0.05) : AppTheme.lightBorder,
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.lightBorder,
         ),
       ),
       child: InkWell(
@@ -161,7 +190,7 @@ class QuickActionsGrid extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.15),
+                  color: iconColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: iconColor, size: 22),

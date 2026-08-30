@@ -32,6 +32,21 @@ class MainActivity : FlutterActivity() {
         this.channel = mChannel
         mChannel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "setKeepScreenOn" -> {
+                    try {
+                        val enable = call.argument<Boolean>("enable") ?: false
+                        runOnUiThread {
+                            if (enable) {
+                                window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            } else {
+                                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            }
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 "acquireWakeLock" -> {
                     try {
                         if (wakeLock == null) {

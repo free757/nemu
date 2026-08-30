@@ -136,6 +136,12 @@ class OverlayManager {
     }
   }
 
+  static Future<void> setKeepScreenOn(bool enable) async {
+    try {
+      await _channel.invokeMethod('setKeepScreenOn', {'enable': enable});
+    } catch (_) {}
+  }
+
   static Future<void> acquireWakeLock() async {
     try {
       await _channel.invokeMethod('acquireWakeLock');
