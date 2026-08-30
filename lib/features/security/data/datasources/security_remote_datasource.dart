@@ -19,9 +19,9 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
 
   Dio _getDio({bool useProxy = false}) {
     final dio = Dio(BaseOptions(
-      connectTimeout: AppConstants.networkTimeout,
-      receiveTimeout: AppConstants.networkTimeout,
-      sendTimeout: AppConstants.networkTimeout,
+      connectTimeout: const Duration(seconds: 4),
+      receiveTimeout: const Duration(seconds: 4),
+      sendTimeout: const Duration(seconds: 4),
     ));
 
     if (useProxy) {
@@ -121,9 +121,10 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       _lastFetchTime = null;
     }
 
-    // 1. Try Fast Parallel Race via V2Ray proxy first
+    // 1. In VPN mode, all traffic is routed through the VPN tunnel naturally.
+    // Try standard direct parallel race first (which goes through VPN tun)
     try {
-      final status = await _fastParallelRace(true);
+      final status = await _fastParallelRace(false);
       if (status != null) {
         _cachedStatus = status;
         _lastFetchTime = DateTime.now();
@@ -131,9 +132,9 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       }
     } catch (_) {}
 
-    // 2. Direct fast race fallback if proxy isn't routing yet
+    // 2. Try explicit local HTTP proxy port fallback
     try {
-      final status = await _fastParallelRace(false);
+      final status = await _fastParallelRace(true);
       if (status != null) {
         _cachedStatus = status;
         _lastFetchTime = DateTime.now();
