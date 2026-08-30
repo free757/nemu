@@ -84,6 +84,11 @@ class SecurityRepositoryImpl implements SecurityRepository {
         "udp": true,
         "userLevel": 0
       },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": false
+      },
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
@@ -100,6 +105,11 @@ class SecurityRepositoryImpl implements SecurityRepository {
         "allowTransparent": false,
         "timeout": 0,
         "userLevel": 0
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": false
       },
       "streamSettings": {
         "sockopt": {
@@ -168,7 +178,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
     ]
   },
   "routing": {
-    "domainStrategy": "AsIs",
+    "domainStrategy": "IPIfNonMatch",
     "rules": [
       {
         "type": "field",
