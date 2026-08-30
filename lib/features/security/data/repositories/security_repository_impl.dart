@@ -179,12 +179,17 @@ class SecurityRepositoryImpl implements SecurityRepository {
       },
       {
         "type": "field",
+        "network": "udp",
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
         "inboundTag": ["socks-in", "http-in"],
         "outboundTag": "proxy"
       },
       {
         "type": "field",
-        "network": "tcp,udp",
+        "network": "tcp",
         "outboundTag": "proxy"
       }
     ]
