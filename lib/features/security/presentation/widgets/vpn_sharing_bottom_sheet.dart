@@ -7,6 +7,7 @@ import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
 import 'package:nemu/core/utils/overlay_manager.dart';
 import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
+import 'package:nemu/injection_container.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nemu/core/theme/app_theme.dart';
 import 'app_share_bottom_sheet.dart';
@@ -421,8 +422,8 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       }
                     }
                   } else {
-                    // Check if VPN is currently active and connected
-                    final securityState = context.read<SecurityCubit>().state;
+                    // Check if VPN is currently active and connected via GetIt singleton
+                    final securityState = sl<SecurityCubit>().state;
                     final bool isVpnConnected = securityState is SecurityLoaded && securityState.isConnected;
                     if (!isVpnConnected) {
                       if (context.mounted) {
