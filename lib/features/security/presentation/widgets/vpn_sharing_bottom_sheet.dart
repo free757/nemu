@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
 import 'package:nemu/core/utils/overlay_manager.dart';
+import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nemu/core/theme/app_theme.dart';
 import 'app_share_bottom_sheet.dart';
@@ -419,6 +421,23 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       }
                     }
                   } else {
+                    // Check if VPN is currently active and connected
+                    final securityState = context.read<SecurityCubit>().state;
+                    final bool isVpnConnected = securityState is SecurityLoaded && securityState.isConnected;
+                    if (!isVpnConnected) {
+                      if (context.mounted) {
+                        HapticFeedback.heavyImpact();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("⚠️ يجب تشغيل اتصال الـ VPN أولاً قبل تفعيل شبكة الحظر الآمن!"),
+                            backgroundColor: Colors.redAccent,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     final res = await OverlayManager.startStrictHotspot();
                     if (res != null && res['success'] == true) {
                       _isStrictRunning = true;
