@@ -52,8 +52,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
     }
     debugPrint('[SecurityRepository] VPN permission granted!');
 
-    // 2. Direct SOCKS5 Native Engine - 100% On-Device (No Cloudflare, No External Servers)
-    // Pure Direct C++ V2Ray Routing with zero external dependencies
+    // 2. Direct HTTP Native Engine - 100% On-Device (No Cloudflare, No External Servers)
+    // Matches the actual HTTP proxy protocol exposed by the residential proxy server on port 46225
     final v2rayConfigMap = {
       "log": {
         "loglevel": "warning"
@@ -107,7 +107,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "outbounds": [
         {
           "tag": "proxy",
-          "protocol": "socks",
+          "protocol": "http",
           "settings": {
             "servers": [
               {
@@ -177,7 +177,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     final v2rayConfigJson = const JsonEncoder.withIndent('  ').convert(v2rayConfigMap);
 
-    debugPrint('[SecurityRepository] Starting 100% Direct Native V2Ray Proxy engine (No Cloudflare)...');
+    debugPrint('[SecurityRepository] Starting 100% Direct Native HTTP Proxy engine (No Cloudflare)...');
     await v2ray.startV2Ray(
       remark: AppConstants.proxyOnlyRemark,
       config: v2rayConfigJson,
