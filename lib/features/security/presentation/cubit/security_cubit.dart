@@ -140,6 +140,15 @@ class SecurityCubit extends Cubit<SecurityState> {
     } else {
       try {
         debugPrint('[SecurityCubit] Initiating VPN disconnect command...');
+        // Leak protection: automatically tear down strict hotspot & root sharing when VPN disconnects
+        try {
+          await OverlayManager.stopStrictHotspot();
+          if (RootSharingService().isSharing) {
+            await RootSharingService().disableRootSharing();
+          }
+        } catch (e) {
+          debugPrint('[SecurityCubit] Leak protection cleanup notice: $e');
+        }
         await securityRepository.disconnectVpn();
         await OverlayManager.releaseWakeLock();
         

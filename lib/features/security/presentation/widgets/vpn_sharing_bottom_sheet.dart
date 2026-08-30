@@ -422,21 +422,43 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       }
                     }
                   } else {
-                    // Check if VPN is currently active and connected via GetIt singleton
-                    final securityState = sl<SecurityCubit>().state;
+                    // Check if VPN is currently active, if not auto-connect it smoothly
+                    final securityCubit = sl<SecurityCubit>();
+                    final securityState = securityCubit.state;
                     final bool isVpnConnected = securityState is SecurityLoaded && securityState.isConnected;
+                    
                     if (!isVpnConnected) {
-                      if (context.mounted) {
-                        HapticFeedback.heavyImpact();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("⚠️ يجب تشغيل اتصال الـ VPN أولاً قبل تفعيل شبكة الحظر الآمن!"),
-                            backgroundColor: Colors.redAccent,
-                            duration: Duration(seconds: 3),
-                          ),
+                      final authState = sl<AuthCubit>().state;
+                      if (authState is AuthAuthenticated) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("⚡ جاري تشغيل اتصال البروكسي المشفر أولاً..."),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                        await securityCubit.toggleVpn(
+                          connect: true,
+                          ip: authState.user.proxyIp,
+                          port: authState.user.proxyPort,
+                          user: authState.user.proxyUsername,
+                          pass: authState.user.proxyPassword,
                         );
+                        // Wait a brief moment for VPN tunnel handshake
+                        await Future.delayed(AppConstants.vpnHandshakeDelay);
+                      } else {
+                        if (context.mounted) {
+                          HapticFeedback.heavyImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("⚠️ يرجى تسجيل الدخول أولاً لتفعيل البروكسي الآمن"),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                        return;
                       }
-                      return;
                     }
 
                     final res = await OverlayManager.startStrictHotspot();
@@ -448,7 +470,6 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       if (res['password'] != null && res['password'].toString().isNotEmpty) {
                         _passController.text = res['password'];
                       }
-                      // Wait a brief moment for Android ap0 interface to come up then refresh IP live
                       Future.delayed(const Duration(milliseconds: 600), () async {
                         await _refreshHotspotIp();
                         if (context.mounted) {
@@ -457,8 +478,9 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       });
                       setModalState(() {});
                       if (context.mounted) {
+                        HapticFeedback.mediumImpact();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("تم تشغيل الهوت سبوت الآمن! لن يعمل الإنترنت إلا بالبروكسي 🛡️")),
+                          const SnackBar(content: Text("تم تفعيل البروكسي والشبكة المعزولة بنجاح! 🛡️🚀")),
                         );
                       }
                     } else {
