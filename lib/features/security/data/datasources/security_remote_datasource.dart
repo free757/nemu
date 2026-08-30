@@ -14,7 +14,6 @@ abstract class SecurityRemoteDataSource {
 class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
   SecurityRemoteDataSourceImpl();
 
-  // In-memory cache for ultra-fast instant UI loading
   static ConnectionStatusModel? _cachedStatus;
   static DateTime? _lastFetchTime;
 
@@ -52,9 +51,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
           return ConnectionStatusModel.fromIpWhoIs(data);
         }
       }
-    } catch (e) {
-      debugPrint('[_fetchIpWhoIs] error: $e');
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -73,30 +70,26 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
           return ConnectionStatusModel.fromJson(data);
         }
       }
-    } catch (e) {
-      debugPrint('[_fetchIpApi] error: $e');
-    }
+    } catch (_) {}
     return null;
   }
 
-  Future<ConnectionStatusModel?> _fetchIpApiCo(bool useProxy) async {
+  Future<ConnectionStatusModel?> _fetchIpInfo(bool useProxy) async {
     try {
       final dio = _getDio(useProxy: useProxy);
       final response = await dio.get(
-        AppConstants.ipApiCoUrl,
+        AppConstants.ipInfoIoUrl,
         options: Options(headers: {'Connection': 'close'}),
       );
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = response.data is String
             ? json.decode(response.data as String) as Map<String, dynamic>
             : response.data as Map<String, dynamic>;
-        if (data['error'] == null || data['error'] == false) {
-          return ConnectionStatusModel.fromIpApiCo(data);
+        if (data['ip'] != null) {
+          return ConnectionStatusModel.fromIpInfo(data);
         }
       }
-    } catch (e) {
-      debugPrint('[_fetchIpApiCo] error: $e');
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -116,7 +109,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
 
     _fetchIpWhoIs(useProxy).then(handleResult).catchError((_) => handleResult(null));
     _fetchIpApi(useProxy).then(handleResult).catchError((_) => handleResult(null));
-    _fetchIpApiCo(useProxy).then(handleResult).catchError((_) => handleResult(null));
+    _fetchIpInfo(useProxy).then(handleResult).catchError((_) => handleResult(null));
 
     return completer.future;
   }
