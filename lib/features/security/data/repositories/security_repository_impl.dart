@@ -66,7 +66,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
   final v2rayConfig = '''
 {
-  "log": { "loglevel": "warning" },
+  "log": { "loglevel": "debug" },
   "inbounds": [
     {
       "tag": "socks-in",
@@ -178,7 +178,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
       },
       {
         "type": "field",
-        "network": "tcp,udp",
+        "network": "udp",
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "network": "tcp",
         "outboundTag": "proxy"
       }
     ]
