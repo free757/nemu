@@ -15,13 +15,13 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
   SecurityRemoteDataSourceImpl();
 
   static ConnectionStatusModel? _cachedStatus;
-  static DateTime? _lastFetchTime;
+  static DateTime? _lastFetchTime; // reserved for future TTL cache logic
 
   Dio _getDio({bool useProxy = false}) {
     final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 4),
-      receiveTimeout: const Duration(seconds: 4),
-      sendTimeout: const Duration(seconds: 4),
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 6),
+      sendTimeout: const Duration(seconds: 6),
     ));
 
     if (useProxy) {
@@ -127,17 +127,13 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       _lastFetchTime = null;
     }
 
-    // 1. Try parallel race via TUN network (Direct sockets)
-    try {
-      final status = await _fastParallelRace(false);
-      if (status != null) {
-        _cachedStatus = status;
-        _lastFetchTime = DateTime.now();
-        return status;
-      }
-    } catch (_) {}
+    // Small delay to allow proxy environment to stabilize
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    // 2. Fallback to local HTTP proxy adapter
+    // 1. Primary: route through local V2Ray HTTP proxy (127.0.0.1:localHttpPort).
+    //    Dart's native HttpClient does NOT automatically use the VPN TUN interface,
+    //    so direct requests (proxy=false) cause HandshakeException when VPN is active.
+    //    Using the explicit local HTTP proxy adapter is always reliable.
     try {
       final status = await _fastParallelRace(true);
       if (status != null) {
@@ -147,12 +143,22 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       }
     } catch (_) {}
 
-    // 3. Fallback to cache if available
+    // 2. Fallback: try without proxy adapter (works when VPN is off)
+    try {
+      final status = await _fastParallelRace(false);
+      if (status != null) {
+        _cachedStatus = status;
+        _lastFetchTime = DateTime.now();
+        return status;
+      }
+    } catch (_) {}
+
+    // 3. Return cached result if available
     if (_cachedStatus != null) {
       return _cachedStatus!;
     }
 
-    // Fallback default status if API calls timed out on network switch
+    // 4. Last-resort default
     return const ConnectionStatusModel(
       ip: '51.194.195.104',
       country: 'United States',
