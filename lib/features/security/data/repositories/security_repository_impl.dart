@@ -149,10 +149,6 @@ class SecurityRepositoryImpl implements SecurityRepository {
           "tcpNoDelay": true,
           "tcpKeepAliveInterval": 10
         }
-      },
-      "mux": {
-        "enabled": true,
-        "concurrency": 8
       }
     },
     {
