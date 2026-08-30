@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -52,140 +51,151 @@ class SecurityRepositoryImpl implements SecurityRepository {
     }
     debugPrint('[SecurityRepository] VPN permission granted!');
 
-    // 2. Direct HTTP Proxy Engine with Direct UDP DNS Routing
-    // HTTP Proxies only support TCP; UDP (DNS 53) must route via freedom direct
-    final v2rayConfigMap = {
-      "log": {
-        "loglevel": "warning"
-      },
-      "policy": {
-        "levels": {
-          "0": {
-            "handshake": 4,
-            "connIdle": 45,
-            "uplinkOnly": 2,
-            "downlinkOnly": 2
-          }
-        }
-      },
-      "inbounds": [
-        {
-          "tag": "socks-in",
-          "listen": "0.0.0.0",
-          "port": AppConstants.localSocksPort,
-          "protocol": "socks",
-          "settings": {
-            "auth": "noauth",
-            "udp": true,
-            "userLevel": 0
-          },
-          "streamSettings": {
-            "sockopt": {
-              "tcpNoDelay": true,
-              "tcpKeepAliveInterval": 10
-            }
-          }
-        },
-        {
-          "tag": "http-in",
-          "listen": "0.0.0.0",
-          "port": AppConstants.localHttpPort,
-          "protocol": "http",
-          "settings": {
-            "allowTransparent": false,
-            "timeout": 0,
-            "userLevel": 0
-          },
-          "streamSettings": {
-            "sockopt": {
-              "tcpNoDelay": true,
-              "tcpKeepAliveInterval": 10
-            }
-          }
-        }
-      ],
-      "outbounds": [
-        {
-          "tag": "proxy",
-          "protocol": "http",
-          "settings": {
-            "servers": [
-              {
-                "address": ip,
-                "port": port,
-                "users": [
-                  {
-                    "user": user,
-                    "pass": pass,
-                    "level": 0
-                  }
-                ]
-              }
-            ]
-          },
-          "streamSettings": {
-            "sockopt": {
-              "tcpNoDelay": true,
-              "tcpKeepAliveInterval": 10
-            }
-          }
-        },
-        {
-          "tag": "direct",
-          "protocol": "freedom",
-          "settings": {
-            "domainStrategy": "UseIP",
-            "userLevel": 0
-          },
-          "streamSettings": {
-            "sockopt": {
-              "tcpNoDelay": true,
-              "tcpKeepAliveInterval": 10
-            }
-          }
-        }
-      ],
-      "dns": {
-        "servers": [
-          AppConstants.primaryDns,
-          AppConstants.secondaryDns
-        ]
-      },
-      "routing": {
-        "domainStrategy": "AsIs",
-        "rules": [
-          {
-            "type": "field",
-            "ip": [
-              ip
-            ],
-            "outboundTag": "direct"
-          },
-          {
-            "type": "field",
-            "network": "udp",
-            "outboundTag": "direct"
-          },
-          {
-            "type": "field",
-            "inboundTag": ["socks-in", "http-in"],
-            "outboundTag": "proxy"
-          },
-          {
-            "type": "field",
-            "network": "tcp",
-            "outboundTag": "proxy"
-          }
-        ]
+    // 2. Build WebSocket path with per-user proxy credentials
+    final encodedUser = Uri.encodeComponent(user);
+    final encodedPass = Uri.encodeComponent(pass);
+    final wsPath = '/?ph=${Uri.encodeComponent(ip)}&pp=$port&pu=$encodedUser&pw=$encodedPass';
+    final cleanIpsJson = [AppConstants.workerIP, ...AppConstants.cleanWorkerIPs]
+        .toSet()
+        .map((ip) => '"$ip"')
+        .join(',\n          ');
+
+    final v2rayConfig = '''
+{
+  "log": { "loglevel": "warning" },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 4,
+        "connIdle": 45,
+        "uplinkOnly": 2,
+        "downlinkOnly": 2
       }
-    };
+    }
+  },
+  "inbounds": [
+    {
+      "tag": "socks-in",
+      "listen": "0.0.0.0",
+      "port": ${AppConstants.localSocksPort},
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true,
+        "userLevel": 0
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
+        }
+      }
+    },
+    {
+      "tag": "http-in",
+      "listen": "0.0.0.0",
+      "port": ${AppConstants.localHttpPort},
+      "protocol": "http",
+      "settings": {
+        "allowTransparent": false,
+        "timeout": 0,
+        "userLevel": 0
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [{
+          "address": "${AppConstants.workerIP}",
+          "port": 443,
+          "users": [{
+            "id": "${AppConstants.vlessUUID}",
+            "encryption": "none",
+            "level": 0
+          }]
+        }]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "allowInsecure": false,
+          "serverName": "${AppConstants.workerHost}"
+        },
+        "wsSettings": {
+          "path": "$wsPath",
+          "headers": {
+            "Host": "${AppConstants.workerHost}"
+          }
+        },
+        "sockopt": {
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIP",
+        "userLevel": 0
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tcpNoDelay": true,
+          "tcpKeepAliveInterval": 10
+        }
+      }
+    }
+  ],
+  "dns": {
+    "hosts": {
+      "${AppConstants.workerHost}": "${AppConstants.workerIP}"
+    },
+    "servers": [
+      "${AppConstants.primaryDns}",
+      "${AppConstants.secondaryDns}"
+    ]
+  },
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "ip": [
+          $cleanIpsJson
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["socks-in", "http-in"],
+        "outboundTag": "proxy"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "outboundTag": "proxy"
+      }
+    ]
+  }
+}
+''';
 
-    final v2rayConfigJson = const JsonEncoder.withIndent('  ').convert(v2rayConfigMap);
-
-    debugPrint('[SecurityRepository] Starting Direct HTTP Proxy Engine with Direct UDP DNS...');
+    debugPrint('[SecurityRepository] Starting Ultra-Fast Cloudflare VLESS Tunnel...');
     await v2ray.startV2Ray(
       remark: AppConstants.proxyOnlyRemark,
-      config: v2rayConfigJson,
+      config: v2rayConfig,
       proxyOnly: false,
     );
   }

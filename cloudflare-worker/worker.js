@@ -38,6 +38,7 @@ function toUint8(v) {
   if (v && v.buffer) return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
   return new Uint8Array(v);
 }
+
 async function toAB(v) {
   if (v instanceof ArrayBuffer) return v;
   if (v && v.buffer) return v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength);
@@ -77,7 +78,6 @@ async function handleWS(request) {
 }
 
 async function handleVlessDirect(ws, socks5) {
-  // Listen once for the VLESS Handshake header message
   const firstData = await new Promise((resolve, reject) => {
     const onMsg = (e) => {
       cleanup();
@@ -119,39 +119,42 @@ async function handleVlessDirect(ws, socks5) {
     addr = `${buf[aIdx]}.${buf[aIdx+1]}.${buf[aIdx+2]}.${buf[aIdx+3]}`;
     aIdx += 4;
   } else if (aType === 2) {
-    const len = buf[aIdx++];
-    addr = new TextDecoder().decode(buf.slice(aIdx, aIdx + len));
-    aIdx += len;
+    const dLen = buf[aIdx];
+    addr = new TextDecoder().decode(buf.slice(aIdx + 1, aIdx + 1 + dLen));
+    aIdx += 1 + dLen;
   } else if (aType === 3) {
-    const p = [];
-    for (let i = 0; i < 8; i++) p.push(((buf[aIdx+i*2] << 8) | buf[aIdx+i*2+1]).toString(16));
-    addr = p.join(":"); aIdx += 16;
-  } else throw new Error("unknown aType " + aType);
-
-  const vlessResp = new Uint8Array([buf[0], 0]);
-  const payload   = firstBuf.slice(aIdx);
-
-  if (cmd === 2 && port === 53) {
-    await handleDNS(ws, vlessResp, payload, socks5);
-    return;
+    const parts = [];
+    for (let i = 0; i < 16; i += 2) {
+      parts.push(((buf[aIdx + i] << 8) | buf[aIdx + i + 1]).toString(16));
+    }
+    addr = parts.join(":");
+    aIdx += 16;
+  } else {
+    throw new Error("unsupported addr type: " + aType);
   }
-  if (cmd !== 1) throw new Error("unsupported cmd " + cmd);
 
-  // Connect to Remote Socket
+  const payload = buf.slice(aIdx);
+  const vlessResp = new Uint8Array([buf[0], 0]);
+
+  if (cmd === 2) {
+    // UDP (DNS)
+    return handleDNS(ws, vlessResp, payload, socks5);
+  }
+
+  // TCP Stream Connection to target via Proxy
   const remote = socks5
     ? await connectViaSocks5(socks5, addr, port)
     : connect({ hostname: addr, port });
 
   const remoteWriter = remote.writable.getWriter();
 
-  // 1. Write initial payload if present
   if (payload.byteLength > 0) {
     await remoteWriter.write(payload);
   }
 
   let headerSent = false;
 
-  // ⚡ 2. Download Pipe: Remote TCP -> WebSocket (0 CPU streaming)
+  // Zero-CPU native pipe from Remote TCP -> WebSocket
   remote.readable.pipeTo(new WritableStream({
     write(chunk) {
       if (ws.readyState !== WebSocket.OPEN) return;
@@ -170,7 +173,7 @@ async function handleVlessDirect(ws, socks5) {
     abort() { safeClose(ws); }
   })).catch(() => safeClose(ws));
 
-  // ⚡ 3. Upload Pipe: Direct WebSocket Event -> TCP Socket (Zero Stream / Zero Lock overhead)
+  // Native WebSocket -> Remote TCP
   ws.addEventListener("message", (e) => {
     if (e.data) {
       remoteWriter.write(e.data).catch(() => safeClose(ws));
