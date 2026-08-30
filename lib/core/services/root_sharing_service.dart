@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../utils/constants.dart';
 
 class RootSharingService {
   static final RootSharingService _instance = RootSharingService._internal();
@@ -45,20 +46,20 @@ class RootSharingService {
       'iptables -t nat -D PREROUTING -i wlan+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53 2>/dev/null || true',
       'iptables -t nat -D PREROUTING -i rndis+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53 2>/dev/null || true',
 
-      // ── Allow hotspot clients to directly reach port 10808 (SOCKS5) and 10809 (HTTP) ──
-      'iptables -D INPUT -i ap+ -p tcp --dport 10808 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i wlan+ -p tcp --dport 10808 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i rndis+ -p tcp --dport 10808 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i ap+ -p tcp --dport 10809 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i wlan+ -p tcp --dport 10809 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i rndis+ -p tcp --dport 10809 -j ACCEPT 2>/dev/null || true',
+      // ── Allow hotspot clients to directly reach port ${AppConstants.localSocksPort} (SOCKS5) and ${AppConstants.localHttpPort} (HTTP) ──
+      'iptables -D INPUT -i ap+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i wlan+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i rndis+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i ap+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i wlan+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i rndis+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT 2>/dev/null || true',
 
-      'iptables -I INPUT -i ap+ -p tcp --dport 10808 -j ACCEPT',
-      'iptables -I INPUT -i wlan+ -p tcp --dport 10808 -j ACCEPT',
-      'iptables -I INPUT -i rndis+ -p tcp --dport 10808 -j ACCEPT',
-      'iptables -I INPUT -i ap+ -p tcp --dport 10809 -j ACCEPT',
-      'iptables -I INPUT -i wlan+ -p tcp --dport 10809 -j ACCEPT',
-      'iptables -I INPUT -i rndis+ -p tcp --dport 10809 -j ACCEPT',
+      'iptables -I INPUT -i ap+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT',
+      'iptables -I INPUT -i wlan+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT',
+      'iptables -I INPUT -i rndis+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT',
+      'iptables -I INPUT -i ap+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT',
+      'iptables -I INPUT -i wlan+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT',
+      'iptables -I INPUT -i rndis+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT',
 
       // ── NAT forwarding: hotspot → tun+ (transparent VPN for non-proxy clients) ──
       'iptables -t nat -I POSTROUTING -o tun+ -j MASQUERADE',
@@ -69,10 +70,10 @@ class RootSharingService {
       'iptables -I FORWARD -i tun+ -o wlan+ -m state --state RELATED,ESTABLISHED -j ACCEPT',
       'iptables -I FORWARD -i tun+ -o rndis+ -m state --state RELATED,ESTABLISHED -j ACCEPT',
 
-      // ── Redirect DNS from hotspot clients → Google DNS via VPN ──
-      'iptables -t nat -I PREROUTING -i ap+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53',
-      'iptables -t nat -I PREROUTING -i wlan+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53',
-      'iptables -t nat -I PREROUTING -i rndis+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53',
+      // ── Redirect DNS from hotspot clients → Primary DNS via VPN ──
+      'iptables -t nat -I PREROUTING -i ap+ -p udp --dport 53 -j DNAT --to-destination ${AppConstants.primaryDns}:53',
+      'iptables -t nat -I PREROUTING -i wlan+ -p udp --dport 53 -j DNAT --to-destination ${AppConstants.primaryDns}:53',
+      'iptables -t nat -I PREROUTING -i rndis+ -p udp --dport 53 -j DNAT --to-destination ${AppConstants.primaryDns}:53',
     ];
 
     try {
@@ -99,13 +100,13 @@ class RootSharingService {
     if (!_isSharing) return true;
 
     final commands = [
-      // ── Remove INPUT rules for port 10808 ──
-      'iptables -D INPUT -i ap+ -p tcp --dport 10808 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i wlan+ -p tcp --dport 10808 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i rndis+ -p tcp --dport 10808 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i ap+ -p tcp --dport 10809 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i wlan+ -p tcp --dport 10809 -j ACCEPT 2>/dev/null || true',
-      'iptables -D INPUT -i rndis+ -p tcp --dport 10809 -j ACCEPT 2>/dev/null || true',
+      // ── Remove INPUT rules for port ${AppConstants.localSocksPort} and ${AppConstants.localHttpPort} ──
+      'iptables -D INPUT -i ap+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i wlan+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i rndis+ -p tcp --dport ${AppConstants.localSocksPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i ap+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i wlan+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT 2>/dev/null || true',
+      'iptables -D INPUT -i rndis+ -p tcp --dport ${AppConstants.localHttpPort} -j ACCEPT 2>/dev/null || true',
       // ── Remove NAT & FORWARD rules ──
       'iptables -t nat -D POSTROUTING -o tun+ -j MASQUERADE 2>/dev/null || true',
       'iptables -D FORWARD -i ap+ -o tun+ -j ACCEPT 2>/dev/null || true',
@@ -114,9 +115,9 @@ class RootSharingService {
       'iptables -D FORWARD -i tun+ -o ap+ -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true',
       'iptables -D FORWARD -i tun+ -o wlan+ -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true',
       'iptables -D FORWARD -i tun+ -o rndis+ -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true',
-      'iptables -t nat -D PREROUTING -i ap+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53 2>/dev/null || true',
-      'iptables -t nat -D PREROUTING -i wlan+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53 2>/dev/null || true',
-      'iptables -t nat -D PREROUTING -i rndis+ -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53 2>/dev/null || true',
+      'iptables -t nat -D PREROUTING -i ap+ -p udp --dport 53 -j DNAT --to-destination ${AppConstants.primaryDns}:53 2>/dev/null || true',
+      'iptables -t nat -D PREROUTING -i wlan+ -p udp --dport 53 -j DNAT --to-destination ${AppConstants.primaryDns}:53 2>/dev/null || true',
+      'iptables -t nat -D PREROUTING -i rndis+ -p udp --dport 53 -j DNAT --to-destination ${AppConstants.primaryDns}:53 2>/dev/null || true',
     ];
 
     try {

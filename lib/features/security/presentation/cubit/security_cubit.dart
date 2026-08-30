@@ -21,7 +21,7 @@ class SecurityCubit extends Cubit<SecurityState> {
     required this.securityRepository,
     required this.vpnStatusNotifier,
   }) : super(SecurityInitial()) {
-    print('[SecurityCubit] Initialized. Current VPN status: ${vpnStatusNotifier.value}');
+    debugPrint('[SecurityCubit] Initialized. Current VPN status: ${vpnStatusNotifier.value}');
     // Register listener so changes in V2Ray background status update the UI instantly!
     vpnStatusNotifier.addListener(_onVpnStatusChanged);
   }
@@ -29,18 +29,18 @@ class SecurityCubit extends Cubit<SecurityState> {
   /// Returns true only when V2Ray reports CONNECTED
   bool get _isVpnConnected {
     final isConnected = vpnStatusNotifier.value == 'CONNECTED';
-    print('[SecurityCubit] _isVpnConnected check: ${vpnStatusNotifier.value} (isConnected = $isConnected)');
+    debugPrint('[SecurityCubit] _isVpnConnected check: ${vpnStatusNotifier.value} (isConnected = $isConnected)');
     return isConnected;
   }
 
   /// Automatically triggered whenever the V2Ray callback changes the connection status
   void _onVpnStatusChanged() {
-    print('[SecurityCubit] VPN background status changed callback: "${vpnStatusNotifier.value}"');
+    debugPrint('[SecurityCubit] VPN background status changed callback: "${vpnStatusNotifier.value}"');
     
     if (state is SecurityLoaded) {
       final currentLoaded = state as SecurityLoaded;
       final newIsConnected = _isVpnConnected;
-      print('[SecurityCubit] Current state is SecurityLoaded. Updating isConnected from ${currentLoaded.isConnected} to $newIsConnected');
+      debugPrint('[SecurityCubit] Current state is SecurityLoaded. Updating isConnected from ${currentLoaded.isConnected} to $newIsConnected');
       emit(SecurityLoaded(
         currentLoaded.status,
         isConnected: newIsConnected,
@@ -50,7 +50,7 @@ class SecurityCubit extends Cubit<SecurityState> {
     } else {
       // If we are in another state but VPN becomes connected, load a placeholder and check connection
       if (_isVpnConnected) {
-        print('[SecurityCubit] VPN is CONNECTED but state is $state. Emitting default loaded status and triggering connection verification.');
+        debugPrint('[SecurityCubit] VPN is CONNECTED but state is $state. Emitting default loaded status and triggering connection verification.');
         emit(const SecurityLoaded(
           ConnectionStatus(
             ip: 'Fetching...',
@@ -111,47 +111,47 @@ class SecurityCubit extends Cubit<SecurityState> {
     String? user,
     String? pass,
   }) async {
-    print('[SecurityCubit] toggleVpn called: connect=$connect, ip=$ip, port=$port, user=$user');
+    debugPrint('[SecurityCubit] toggleVpn called: connect=$connect, ip=$ip, port=$port, user=$user');
     emit(SecurityLoading());
     
     if (connect) {
       if (ip == null || port == null || user == null || pass == null) {
-        print('[SecurityCubit] Aborting VPN connection: missing credentials!');
+        debugPrint('[SecurityCubit] Aborting VPN connection: missing credentials!');
         emit(SecurityError('Missing Proxy Credentials'));
         return;
       }
       
       try {
-        print('[SecurityCubit] Initiating VPN connection command...');
+        debugPrint('[SecurityCubit] Initiating VPN connection command...');
         // Acquire wake lock & wifi lock to keep CPU and networking alive during long hotspot sharing/uploads
         await OverlayManager.acquireWakeLock();
         await securityRepository.connectVpn(ip: ip, port: port, user: user, pass: pass);
         
         // Wait for V2Ray handshake
-        print('[SecurityCubit] Waiting for V2Ray handshake...');
+        debugPrint('[SecurityCubit] Waiting for V2Ray handshake...');
         await Future.delayed(AppConstants.vpnHandshakeDelay);
         
         // Clear cache and verify actual connection IP via Worker proxy
         await checkConnection(forceRefresh: true);
       } catch (e) {
-        print('[SecurityCubit] Exception caught during VPN connection: $e');
+        debugPrint('[SecurityCubit] Exception caught during VPN connection: $e');
         emit(SecurityError(e.toString()));
       }
     } else {
       try {
-        print('[SecurityCubit] Initiating VPN disconnect command...');
+        debugPrint('[SecurityCubit] Initiating VPN disconnect command...');
         await securityRepository.disconnectVpn();
         await OverlayManager.releaseWakeLock();
         
-        print('[SecurityCubit] Waiting for teardown...');
+        debugPrint('[SecurityCubit] Waiting for teardown...');
         await Future.delayed(AppConstants.vpnTeardownDelay);
         
-        print('[SecurityCubit] Verifying disconnection status...');
+        debugPrint('[SecurityCubit] Verifying disconnection status...');
         final failureOrStatus = await checkConnectionUseCase();
         
         failureOrStatus.fold(
           (failure) {
-            print('[SecurityCubit] Disconnection verification complete (Failed fetch expected): ${failure.message}');
+            debugPrint('[SecurityCubit] Disconnection verification complete (Failed fetch expected): ${failure.message}');
             emit(const SecurityLoaded(
               ConnectionStatus(
                 ip: 'Disconnected',
@@ -167,12 +167,12 @@ class SecurityCubit extends Cubit<SecurityState> {
             ));
           },
           (status) {
-            print('[SecurityCubit] Disconnection verification complete. Current network IP: ${status.ip}');
+            debugPrint('[SecurityCubit] Disconnection verification complete. Current network IP: ${status.ip}');
             emit(SecurityLoaded(status, isConnected: false));
           },
         );
       } catch (e) {
-        print('[SecurityCubit] Exception caught during VPN disconnection: $e');
+        debugPrint('[SecurityCubit] Exception caught during VPN disconnection: $e');
         emit(SecurityError(e.toString()));
       }
     }
@@ -180,7 +180,7 @@ class SecurityCubit extends Cubit<SecurityState> {
 
   @override
   Future<void> close() {
-    print('[SecurityCubit] Closing Cubit. Removing listener...');
+    debugPrint('[SecurityCubit] Closing Cubit. Removing listener...');
     vpnStatusNotifier.removeListener(_onVpnStatusChanged);
     return super.close();
   }
