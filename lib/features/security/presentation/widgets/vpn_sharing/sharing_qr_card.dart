@@ -33,12 +33,25 @@ class _SharingQrCardState extends State<SharingQrCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: isDark ? Colors.white.withValues(alpha: 0.03) : AppTheme.lightCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.lightBorder),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
       ),
       child: Column(
         children: [
@@ -46,7 +59,7 @@ class _SharingQrCardState extends State<SharingQrCard> {
           Container(
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
+              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -61,18 +74,22 @@ class _SharingQrCardState extends State<SharingQrCard> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 7),
                       decoration: BoxDecoration(
-                        color: _selectedQrMode == 0 ? Colors.greenAccent : Colors.transparent,
+                        color: _selectedQrMode == 0 ? AppTheme.accentGreen : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.wifi_outlined, size: 14, color: _selectedQrMode == 0 ? Colors.black : Colors.white70),
+                          Icon(
+                            Icons.wifi_outlined,
+                            size: 14,
+                            color: _selectedQrMode == 0 ? AppTheme.darkInk : secondaryTextColor,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             "اتصال واي فاي سريع",
                             style: TextStyle(
-                              color: _selectedQrMode == 0 ? Colors.black : Colors.white70,
+                              color: _selectedQrMode == 0 ? AppTheme.darkInk : secondaryTextColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 11,
                             ),
@@ -92,18 +109,22 @@ class _SharingQrCardState extends State<SharingQrCard> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 7),
                       decoration: BoxDecoration(
-                        color: _selectedQrMode == 1 ? Colors.greenAccent : Colors.transparent,
+                        color: _selectedQrMode == 1 ? AppTheme.accentGreen : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.bolt_outlined, size: 14, color: _selectedQrMode == 1 ? Colors.black : Colors.white70),
+                          Icon(
+                            Icons.bolt_outlined,
+                            size: 14,
+                            color: _selectedQrMode == 1 ? AppTheme.darkInk : secondaryTextColor,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             "كود البروكسي ⚡",
                             style: TextStyle(
-                              color: _selectedQrMode == 1 ? Colors.black : Colors.white70,
+                              color: _selectedQrMode == 1 ? AppTheme.darkInk : secondaryTextColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 11,
                             ),
@@ -129,7 +150,7 @@ class _SharingQrCardState extends State<SharingQrCard> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.greenAccent.withValues(alpha: 0.1),
+                      color: AppTheme.accentGreen.withValues(alpha: 0.15),
                       blurRadius: 15,
                       spreadRadius: 1,
                     )
@@ -159,14 +180,14 @@ class _SharingQrCardState extends State<SharingQrCard> {
                   children: [
                     Text(
                       _selectedQrMode == 0 ? "امسح الكاميرا للاتصال فوراً 📶" : "كود إعدادات البروكسي للتطبيقات ⚡",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: TextStyle(color: primaryTextColor, fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _selectedQrMode == 0
                           ? "وجّه كاميرا الهاتف الثاني نحو الكود للاتصال بشبكة الواي فاي بدون كتابة الباسوورد."
                           : "انسخ أو امسح هذا الرابط داخل برامج الشبكة أو Minute Data.",
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
+                      style: TextStyle(color: secondaryTextColor, fontSize: 11),
                     ),
                   ],
                 ),
@@ -174,7 +195,7 @@ class _SharingQrCardState extends State<SharingQrCard> {
             ],
           ),
 
-          // Editable Fields
+          // Text fields for SSID and Password
           if (_selectedQrMode == 0) ...[
             const SizedBox(height: 12),
             Row(
@@ -182,14 +203,14 @@ class _SharingQrCardState extends State<SharingQrCard> {
                 Expanded(
                   child: TextField(
                     controller: widget.ssidController,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(color: primaryTextColor, fontSize: 12),
                     decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.wifi_outlined, size: 16, color: Colors.white38),
+                      prefixIcon: Icon(Icons.wifi_outlined, size: 16, color: secondaryTextColor),
                       labelText: "اسم الشبكة (SSID)",
-                      labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                      labelStyle: TextStyle(color: secondaryTextColor, fontSize: 11),
                       isDense: true,
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.04),
+                      fillColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                     ),
                     onChanged: (_) {
@@ -202,14 +223,14 @@ class _SharingQrCardState extends State<SharingQrCard> {
                 Expanded(
                   child: TextField(
                     controller: widget.passController,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(color: primaryTextColor, fontSize: 12),
                     decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.key_outlined, size: 16, color: Colors.white38),
+                      prefixIcon: Icon(Icons.key_outlined, size: 16, color: secondaryTextColor),
                       labelText: "كلمة السر (Password)",
-                      labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                      labelStyle: TextStyle(color: secondaryTextColor, fontSize: 11),
                       isDense: true,
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.04),
+                      fillColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                     ),
                     onChanged: (_) {

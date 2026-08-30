@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'package:nemu/core/services/root_sharing_service.dart';
 
 class RootSharingCard extends StatelessWidget {
@@ -11,29 +12,33 @@ class RootSharingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.greenAccent.withValues(alpha: 0.05),
+        color: AppTheme.accentGreen.withValues(alpha: isDark ? 0.05 : 0.08),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.2), width: 1),
+        border: Border.all(color: AppTheme.accentGreen.withValues(alpha: 0.2), width: 1),
       ),
       child: Row(
         children: [
-          const Icon(Icons.admin_panel_settings_outlined, color: Colors.greenAccent, size: 26),
+          const Icon(Icons.admin_panel_settings_outlined, color: AppTheme.accentGreen, size: 26),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "مشاركة الروت التلقائية (Root Auto Share)",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(color: primaryTextColor, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   "مشاركة اتصال البروكسي تلقائياً دون أي إعداد يدوي على الهواتف المتصلة.",
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
+                  style: TextStyle(color: secondaryTextColor, fontSize: 11),
                 ),
               ],
             ),
@@ -65,7 +70,7 @@ class RootSharingCard extends StatelessWidget {
                 }
               }
             },
-            activeThumbColor: Colors.greenAccent,
+            activeThumbColor: AppTheme.accentGreen,
           ),
         ],
       ),

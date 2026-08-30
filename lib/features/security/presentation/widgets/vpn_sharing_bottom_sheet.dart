@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
 import 'package:nemu/core/utils/overlay_manager.dart';
+import 'package:nemu/core/theme/app_theme.dart';
 import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
 import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:nemu/injection_container.dart';
@@ -75,9 +76,11 @@ class VpnSharingBottomSheet extends StatefulWidget {
   }
 
   static void show(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.black,
+      backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
@@ -263,12 +266,19 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
           builder: (context, setModalState) {
             final isStrict = _isStrictRunning || strictRunning;
 
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final primaryTextColor = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+            final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06), width: 1),
+                border: Border.all(
+                  color: isDark ? Colors.white.withValues(alpha: 0.06) : AppTheme.lightBorder,
+                  width: 1,
+                ),
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -279,7 +289,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -294,6 +304,8 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       stepNumber: "1",
                       title: "اتصال الواي فاي والهوت سبوت",
                       subtitle: "شغّل الوضع الآمن لمنع أي تسريب، أو استخدم الهوت سبوت العادي",
+                      primaryColor: primaryTextColor,
+                      secondaryColor: secondaryTextColor,
                       child: StrictHotspotCard(
                         isStrict: isStrict,
                         ssidController: _ssidController,
@@ -317,6 +329,8 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                       stepNumber: "2",
                       title: "إعدادات البروكسي للهاتف الآخر",
                       subtitle: "أدخل هذه البيانات في تطبيق Minute Data أو إعدادات الواي فاي",
+                      primaryColor: primaryTextColor,
+                      secondaryColor: secondaryTextColor,
                       child: ProxyDetailsCard(ipAddress: ipAddress),
                     ),
 
@@ -334,7 +348,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                     const SizedBox(height: 20),
 
                     // Action Footer Buttons
-                    _buildFooterActions(context),
+                    _buildFooterActions(context, isDark, primaryTextColor, secondaryTextColor),
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -350,6 +364,8 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
     required String stepNumber,
     required String title,
     required String subtitle,
+    required Color primaryColor,
+    required Color secondaryColor,
     required Widget child,
   }) {
     return Column(
@@ -362,19 +378,19 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
               height: 22,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.greenAccent.withValues(alpha: 0.2),
+                color: AppTheme.accentGreen.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.greenAccent, width: 1),
+                border: Border.all(color: AppTheme.accentGreen, width: 1),
               ),
               child: Text(
                 stepNumber,
-                style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: AppTheme.accentGreen, fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ],
         ),
@@ -382,7 +398,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
           padding: const EdgeInsets.only(right: 30, top: 2, bottom: 10),
           child: Text(
             subtitle,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+            style: TextStyle(color: secondaryColor, fontSize: 11),
           ),
         ),
         child,
@@ -390,7 +406,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
     );
   }
 
-  Widget _buildFooterActions(BuildContext context) {
+  Widget _buildFooterActions(BuildContext context, bool isDark, Color primaryColor, Color secondaryColor) {
     return Row(
       children: [
         Expanded(
@@ -399,15 +415,24 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
               Navigator.pop(context);
               AppShareBottomSheet.show(context);
             },
-            icon: const Icon(Icons.qr_code_scanner_outlined, size: 16),
-            label: const Text("مشاركة وتثبيت التطبيق APK", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            icon: Icon(Icons.qr_code_scanner_outlined, size: 16, color: isDark ? Colors.white : AppTheme.primaryBlue),
+            label: Text(
+              "مشاركة وتثبيت التطبيق APK",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: isDark ? Colors.white : AppTheme.primaryBlue,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.08),
-              foregroundColor: Colors.white,
+              backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.primaryBlue.withValues(alpha: 0.08),
+              elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 13),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                side: BorderSide(
+                  color: isDark ? Colors.white.withValues(alpha: 0.1) : AppTheme.primaryBlue.withValues(alpha: 0.2),
+                ),
               ),
             ),
           ),
@@ -420,10 +445,12 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
               padding: const EdgeInsets.symmetric(vertical: 13),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                side: BorderSide(
+                  color: isDark ? Colors.white.withValues(alpha: 0.1) : AppTheme.lightBorder,
+                ),
               ),
             ),
-            child: const Text("إغلاق", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+            child: Text("إغلاق", style: TextStyle(color: secondaryColor, fontWeight: FontWeight.bold)),
           ),
         ),
       ],

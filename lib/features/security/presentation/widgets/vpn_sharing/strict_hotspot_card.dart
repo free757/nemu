@@ -18,15 +18,32 @@ class StrictHotspotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isStrict ? Colors.amberAccent.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.03),
+        color: isStrict
+            ? AppTheme.warningOrange.withValues(alpha: isDark ? 0.08 : 0.12)
+            : (isDark ? Colors.white.withValues(alpha: 0.03) : AppTheme.lightCard),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isStrict ? Colors.amberAccent.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.08),
+          color: isStrict
+              ? AppTheme.warningOrange.withValues(alpha: 0.4)
+              : (isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.lightBorder),
           width: 1,
         ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,7 +52,7 @@ class StrictHotspotCard extends StatelessWidget {
             children: [
               Icon(
                 isStrict ? Icons.shield_outlined : Icons.lock_outline,
-                color: isStrict ? Colors.amberAccent : Colors.white70,
+                color: isStrict ? AppTheme.warningOrange : secondaryTextColor,
                 size: 24,
               ),
               const SizedBox(width: 10),
@@ -46,7 +63,7 @@ class StrictHotspotCard extends StatelessWidget {
                     Text(
                       "وضع الحظر التام (Strict Proxy Only)",
                       style: TextStyle(
-                        color: isStrict ? Colors.amberAccent : Colors.white,
+                        color: isStrict ? AppTheme.warningOrange : primaryTextColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -56,17 +73,18 @@ class StrictHotspotCard extends StatelessWidget {
                       isStrict
                           ? "النت المباشر محظور 100% — لا اتصال إلا عبر البروكسي 🛡️"
                           : "إنشاء شبكة هوت سبوت معزولة تمنع مرور أي نت مباشر",
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
+                      style: TextStyle(color: secondaryTextColor, fontSize: 11),
                     ),
                   ],
                 ),
               ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isStrict ? Colors.redAccent : Colors.amberAccent,
-                  foregroundColor: AppTheme.darkInk,
+                  backgroundColor: isStrict ? AppTheme.dangerRed : AppTheme.warningOrange,
+                  foregroundColor: isStrict ? Colors.white : AppTheme.darkInk,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
                 onPressed: () => onToggle(),
                 icon: Icon(isStrict ? Icons.power_settings_new_outlined : Icons.security_outlined, size: 14),
@@ -82,18 +100,18 @@ class StrictHotspotCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: Colors.amberAccent.withValues(alpha: 0.12),
+                color: AppTheme.warningOrange.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.25)),
+                border: Border.all(color: AppTheme.warningOrange.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.wifi_lock_outlined, color: Colors.amberAccent, size: 15),
+                  const Icon(Icons.wifi_lock_outlined, color: AppTheme.warningOrange, size: 15),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       "الشبكة: ${ssidController.text}",
-                      style: const TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: AppTheme.warningOrange, fontSize: 11, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -108,14 +126,21 @@ class StrictHotspotCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.amberAccent.withValues(alpha: 0.2),
+                        color: AppTheme.warningOrange.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.copy_outlined, size: 11, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text("نسخ الباسوورد", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          Icon(Icons.copy_outlined, size: 11, color: isDark ? Colors.white : AppTheme.lightTextPrimary),
+                          const SizedBox(width: 4),
+                          Text(
+                            "نسخ الباسوورد",
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppTheme.lightTextPrimary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     ),

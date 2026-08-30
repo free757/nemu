@@ -14,13 +14,25 @@ class _SharingInstructionsCardState extends State<SharingInstructionsCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.02),
+        color: isDark ? Colors.white.withValues(alpha: 0.02) : AppTheme.lightCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : AppTheme.lightBorder),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,16 +45,16 @@ class _SharingInstructionsCardState extends State<SharingInstructionsCard> {
             },
             child: Row(
               children: [
-                const Icon(Icons.help_outline, color: Colors.greenAccent, size: 18),
+                const Icon(Icons.help_outline, color: AppTheme.accentGreen, size: 18),
                 const SizedBox(width: 8),
                 const Text(
                   "خطوات الإعداد على الهاتف الآخر (Minute Data)",
-                  style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(color: AppTheme.accentGreen, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const Spacer(),
                 Icon(
                   _isExpanded ? Icons.expand_less_outlined : Icons.expand_more_outlined,
-                  color: Colors.white54,
+                  color: secondaryTextColor,
                   size: 18,
                 ),
               ],
@@ -50,20 +62,20 @@ class _SharingInstructionsCardState extends State<SharingInstructionsCard> {
           ),
           if (_isExpanded) ...[
             const SizedBox(height: 12),
-            _buildStepRow("1", "اتصل بشبكة الهوت سبوت (أو امسح كود الـ QR بالكاميرا)."),
+            _buildStepRow("1", "اتصل بشبكة الهوت سبوت (أو امسح كود الـ QR بالكاميرا).", secondaryTextColor),
             const SizedBox(height: 6),
-            _buildStepRow("2", "في الهاتف الآخر، ادخل إعدادات شبكة الواي فاي -> خيارات متقدمة -> البروكسي (Proxy) -> يدوي (Manual)."),
+            _buildStepRow("2", "في الهاتف الآخر، ادخل إعدادات شبكة الواي فاي -> خيارات متقدمة -> البروكسي (Proxy) -> يدوي (Manual).", secondaryTextColor),
             const SizedBox(height: 6),
-            _buildStepRow("3", "اكتب عنوان الـ Host والمنفذ ${AppConstants.localHttpPort} (أو ضعهما داخل Minute Data مباشرة)."),
+            _buildStepRow("3", "اكتب عنوان الـ Host والمنفذ ${AppConstants.localHttpPort} (أو ضعهما داخل Minute Data مباشرة).", secondaryTextColor),
             const SizedBox(height: 6),
-            _buildStepRow("4", "🛡️ لمنع تسريب الـ DNS: في إعدادات الهاتف الثاني اذهب إلى Private DNS -> واكتب: ${AppConstants.privateDnsOneDot}."),
+            _buildStepRow("4", "🛡️ لمنع تسريب الـ DNS: في إعدادات الهاتف الثاني اذهب إلى Private DNS -> واكتب: ${AppConstants.privateDnsOneDot}.", secondaryTextColor),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildStepRow(String number, String text) {
+  Widget _buildStepRow(String number, String text, Color textColor) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -72,7 +84,7 @@ class _SharingInstructionsCardState extends State<SharingInstructionsCard> {
           height: 16,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
-            color: Colors.greenAccent,
+            color: AppTheme.accentGreen,
             shape: BoxShape.circle,
           ),
           child: Text(
@@ -84,7 +96,7 @@ class _SharingInstructionsCardState extends State<SharingInstructionsCard> {
         Expanded(
           child: Text(
             text,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11, height: 1.3),
+            style: TextStyle(color: textColor, fontSize: 11, height: 1.3),
           ),
         ),
       ],
