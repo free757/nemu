@@ -66,7 +66,17 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
   final v2rayConfig = '''
 {
-  "log": { "loglevel": "debug" },
+  "log": { "loglevel": "warning" },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 4,
+        "connIdle": 45,
+        "uplinkOnly": 2,
+        "downlinkOnly": 2
+      }
+    }
+  },
   "inbounds": [
     {
       "tag": "socks-in",
