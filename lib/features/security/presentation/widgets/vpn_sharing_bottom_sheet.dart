@@ -77,7 +77,6 @@ class VpnSharingBottomSheet extends StatefulWidget {
 
   static void show(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     showModalBottomSheet(
       context: context,
       backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
@@ -96,32 +95,31 @@ class VpnSharingBottomSheet extends StatefulWidget {
 class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
+
   String _currentHotspotIp = AppConstants.defaultHotspotFallbackIp;
   bool _isStrictRunning = false;
+  bool _hasRoot = false;
+  int _connectedDevices = 0;
+
+  // Stable future — computed once in initState, not recreated on each rebuild
+  late Future<List<dynamic>> _initFuture;
 
   @override
   void initState() {
     super.initState();
+    _initFuture = Future.wait([
+      RootSharingService().checkRoot(),
+      OverlayManager.isStrictHotspotRunning(),
+      OverlayManager.getConnectedHotspotDevicesCount(),
+    ]);
     _loadSavedHotspotCredentials();
-    _checkStrictHotspotStatus();
     _refreshHotspotIp();
   }
 
   Future<void> _refreshHotspotIp() async {
     final ip = await VpnSharingBottomSheet.getHotspotIP();
     if (mounted) {
-      setState(() {
-        _currentHotspotIp = ip;
-      });
-    }
-  }
-
-  Future<void> _checkStrictHotspotStatus() async {
-    final running = await OverlayManager.isStrictHotspotRunning();
-    if (mounted) {
-      setState(() {
-        _isStrictRunning = running;
-      });
+      setState(() => _currentHotspotIp = ip);
     }
   }
 
@@ -150,15 +148,14 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
     } catch (_) {}
   }
 
-  Future<void> _handleStrictToggle(StateSetter setModalState) async {
+  Future<void> _handleStrictToggle() async {
     if (_isStrictRunning) {
       final stopped = await OverlayManager.stopStrictHotspot();
       if (stopped) {
-        _isStrictRunning = false;
         await _loadSavedHotspotCredentials();
         await _refreshHotspotIp();
-        setModalState(() {});
         if (mounted) {
+          setState(() => _isStrictRunning = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("تم إيقاف الهوت سبوت الآمن")),
           );
@@ -166,8 +163,8 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
       }
     } else {
       final securityCubit = sl<SecurityCubit>();
-      final securityState = securityCubit.state;
-      final bool isVpnConnected = securityState is SecurityLoaded && securityState.isConnected;
+      final bool isVpnConnected = securityCubit.state is SecurityLoaded &&
+          (securityCubit.state as SecurityLoaded).isConnected;
 
       if (!isVpnConnected) {
         final authState = sl<AuthCubit>().state;
@@ -203,33 +200,27 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
       }
 
       final res = await OverlayManager.startStrictHotspot();
+      if (!mounted) return;
+
       if (res != null && res['success'] == true) {
-        _isStrictRunning = true;
-        if (res['ssid'] != null && res['ssid'].toString().isNotEmpty) {
-          _ssidController.text = res['ssid'];
-        }
-        if (res['password'] != null && res['password'].toString().isNotEmpty) {
-          _passController.text = res['password'];
-        }
-        Future.delayed(const Duration(milliseconds: 600), () async {
-          await _refreshHotspotIp();
-          if (mounted) {
-            setModalState(() {});
+        setState(() {
+          _isStrictRunning = true;
+          if (res['ssid'] != null && res['ssid'].toString().isNotEmpty) {
+            _ssidController.text = res['ssid'];
+          }
+          if (res['password'] != null && res['password'].toString().isNotEmpty) {
+            _passController.text = res['password'];
           }
         });
-        setModalState(() {});
-        if (mounted) {
-          HapticFeedback.mediumImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("تم تفعيل البروكسي والشبكة المعزولة بنجاح! 🛡️🚀")),
-          );
-        }
+        Future.delayed(const Duration(milliseconds: 600), _refreshHotspotIp);
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم تفعيل البروكسي والشبكة المعزولة بنجاح! 🛡️🚀")),
+        );
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("فشل تشغيل النمط المعزول: ${res?['error'] ?? 'غير مدعوم'}")),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("فشل تشغيل النمط المعزول: ${res?['error'] ?? 'غير مدعوم'}")),
+        );
       }
     }
   }
@@ -244,117 +235,107 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<dynamic>>(
-      future: Future.wait([
-        RootSharingService().checkRoot(),
-        OverlayManager.isStrictHotspotRunning(),
-        OverlayManager.getConnectedHotspotDevicesCount(),
-      ]),
+      future: _initFuture,
       builder: (context, snapshot) {
-        final ipAddress = _currentHotspotIp;
-        final hasRoot = (snapshot.data != null && snapshot.data!.isNotEmpty)
-            ? snapshot.data![0] as bool
-            : false;
-        final strictRunning = (snapshot.data != null && snapshot.data!.length > 1)
-            ? snapshot.data![1] as bool
-            : _isStrictRunning;
-        final connectedDevices = (snapshot.data != null && snapshot.data!.length > 2)
-            ? snapshot.data![2] as int
-            : 0;
-        final proxyUrl = "socks5://$ipAddress:${AppConstants.localSocksPort}";
+        if (snapshot.hasData) {
+          _hasRoot = snapshot.data![0] as bool;
+          _connectedDevices = snapshot.data![2] as int;
+          final strictFromFuture = snapshot.data![1] as bool;
+          if (!_isStrictRunning && strictFromFuture) {
+            _isStrictRunning = strictFromFuture;
+          }
+        }
 
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final isStrict = _isStrictRunning || strictRunning;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final primaryTextColor = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+        final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+        final proxyUrl = "socks5://$_currentHotspotIp:${AppConstants.localSocksPort}";
 
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            final primaryTextColor = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
-            final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
-
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                border: Border.all(
-                  color: isDark ? Colors.white.withValues(alpha: 0.06) : AppTheme.lightBorder,
-                  width: 1,
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            border: Border.all(
+              color: isDark ? Colors.white.withValues(alpha: 0.06) : AppTheme.lightBorder,
+              width: 1,
+            ),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle Bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : Colors.black.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Handle Bar
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-                    // Header
-                    SharingHeaderWidget(connectedDevices: connectedDevices),
-                    const SizedBox(height: 20),
+                // Header
+                SharingHeaderWidget(connectedDevices: _connectedDevices),
+                const SizedBox(height: 20),
 
-                    // STEP 1: Strict Hotspot & Wi-Fi Access
-                    _buildStepSection(
-                      stepNumber: "1",
-                      title: "اتصال الواي فاي والهوت سبوت",
-                      subtitle: "شغّل الوضع الآمن لمنع أي تسريب، أو استخدم الهوت سبوت العادي",
-                      primaryColor: primaryTextColor,
-                      secondaryColor: secondaryTextColor,
-                      child: StrictHotspotCard(
-                        isStrict: isStrict,
-                        ssidController: _ssidController,
-                        passController: _passController,
-                        onToggle: () => _handleStrictToggle(setModalState),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // STEP 2: QR Code & Wi-Fi Details
-                    SharingQrCard(
-                      proxyUrl: proxyUrl,
-                      ssidController: _ssidController,
-                      passController: _passController,
-                      onCredentialsChanged: _saveHotspotCredentials,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // STEP 3: Proxy Configuration (Host & Ports)
-                    _buildStepSection(
-                      stepNumber: "2",
-                      title: "إعدادات البروكسي للهاتف الآخر",
-                      subtitle: "أدخل هذه البيانات في تطبيق Minute Data أو إعدادات الواي فاي",
-                      primaryColor: primaryTextColor,
-                      secondaryColor: secondaryTextColor,
-                      child: ProxyDetailsCard(ipAddress: ipAddress),
-                    ),
-
-                    // Optional Root Sharing (if device is rooted)
-                    if (hasRoot) ...[
-                      const SizedBox(height: 16),
-                      RootSharingCard(onToggled: () => setModalState(() {})),
-                    ],
-
-                    const SizedBox(height: 16),
-
-                    // STEP 4: How-to Setup Accordion
-                    const SharingInstructionsCard(),
-
-                    const SizedBox(height: 20),
-
-                    // Action Footer Buttons
-                    _buildFooterActions(context, isDark, primaryTextColor, secondaryTextColor),
-                    const SizedBox(height: 8),
-                  ],
+                // STEP 1: Strict Hotspot & Wi-Fi Access
+                _buildStepSection(
+                  stepNumber: "1",
+                  title: "اتصال الواي فاي والهوت سبوت",
+                  subtitle: "شغّل الوضع الآمن لمنع أي تسريب، أو استخدم الهوت سبوت العادي",
+                  primaryColor: primaryTextColor,
+                  secondaryColor: secondaryTextColor,
+                  child: StrictHotspotCard(
+                    isStrict: _isStrictRunning,
+                    ssidController: _ssidController,
+                    passController: _passController,
+                    onToggle: _handleStrictToggle,
+                  ),
                 ),
-              ),
-            );
-          },
+                const SizedBox(height: 16),
+
+                // STEP 2: QR Code & Wi-Fi Details
+                SharingQrCard(
+                  proxyUrl: proxyUrl,
+                  ssidController: _ssidController,
+                  passController: _passController,
+                  onCredentialsChanged: _saveHotspotCredentials,
+                ),
+                const SizedBox(height: 16),
+
+                // STEP 3: Proxy Configuration (Host & Ports)
+                _buildStepSection(
+                  stepNumber: "2",
+                  title: "إعدادات البروكسي للهاتف الآخر",
+                  subtitle: "أدخل هذه البيانات في تطبيق Minute Data أو إعدادات الواي فاي",
+                  primaryColor: primaryTextColor,
+                  secondaryColor: secondaryTextColor,
+                  child: ProxyDetailsCard(ipAddress: _currentHotspotIp),
+                ),
+
+                // Optional Root Sharing (if device is rooted)
+                if (_hasRoot) ...[
+                  const SizedBox(height: 16),
+                  RootSharingCard(onToggled: () => setState(() {})),
+                ],
+
+                const SizedBox(height: 16),
+
+                // STEP 4: How-to Setup Accordion
+                const SharingInstructionsCard(),
+
+                const SizedBox(height: 20),
+
+                // Action Footer Buttons
+                _buildFooterActions(context, isDark, primaryTextColor, secondaryTextColor),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -384,13 +365,21 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
               ),
               child: Text(
                 stepNumber,
-                style: const TextStyle(color: AppTheme.accentGreen, fontSize: 11, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: AppTheme.accentGreen,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               title,
-              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(
+                color: primaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -406,7 +395,12 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
     );
   }
 
-  Widget _buildFooterActions(BuildContext context, bool isDark, Color primaryColor, Color secondaryColor) {
+  Widget _buildFooterActions(
+    BuildContext context,
+    bool isDark,
+    Color primaryColor,
+    Color secondaryColor,
+  ) {
     return Row(
       children: [
         Expanded(
@@ -415,7 +409,11 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
               Navigator.pop(context);
               AppShareBottomSheet.show(context);
             },
-            icon: Icon(Icons.qr_code_scanner_outlined, size: 16, color: isDark ? Colors.white : AppTheme.primaryBlue),
+            icon: Icon(
+              Icons.qr_code_scanner_outlined,
+              size: 16,
+              color: isDark ? Colors.white : AppTheme.primaryBlue,
+            ),
             label: Text(
               "مشاركة وتثبيت التطبيق APK",
               style: TextStyle(
@@ -425,13 +423,17 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : AppTheme.primaryBlue.withValues(alpha: 0.08),
+              backgroundColor: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : AppTheme.primaryBlue.withValues(alpha: 0.08),
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 13),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
                 side: BorderSide(
-                  color: isDark ? Colors.white.withValues(alpha: 0.1) : AppTheme.primaryBlue.withValues(alpha: 0.2),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : AppTheme.primaryBlue.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -446,11 +448,16 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
                 side: BorderSide(
-                  color: isDark ? Colors.white.withValues(alpha: 0.1) : AppTheme.lightBorder,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : AppTheme.lightBorder,
                 ),
               ),
             ),
-            child: Text("إغلاق", style: TextStyle(color: secondaryColor, fontWeight: FontWeight.bold)),
+            child: Text(
+              "إغلاق",
+              style: TextStyle(color: secondaryColor, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       ],
