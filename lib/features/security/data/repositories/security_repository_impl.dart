@@ -67,6 +67,20 @@ class SecurityRepositoryImpl implements SecurityRepository {
   final v2rayConfig = '''
 {
   "log": { "loglevel": "warning" },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 8,
+        "connIdle": 300,
+        "uplinkOnly": 0,
+        "downlinkOnly": 0
+      }
+    },
+    "system": {
+      "statsInboundUplink": false,
+      "statsInboundDownlink": false
+    }
+  },
   "inbounds": [
     {
       "tag": "socks-in",
@@ -81,7 +95,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
-          "tcpKeepAliveInterval": 15
+          "tcpKeepAliveInterval": 10
         }
       }
     },
@@ -98,7 +112,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
-          "tcpKeepAliveInterval": 15
+          "tcpKeepAliveInterval": 10
         }
       }
     }
@@ -113,7 +127,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
           "port": 443,
           "users": [{
             "id": "${AppConstants.vlessUUID}",
-            "encryption": "none"
+            "encryption": "none",
+            "level": 0
           }]
         }]
       },
@@ -132,14 +147,21 @@ class SecurityRepositoryImpl implements SecurityRepository {
         },
         "sockopt": {
           "tcpNoDelay": true,
-          "tcpKeepAliveInterval": 15
+          "tcpKeepAliveInterval": 10
         }
+      },
+      "mux": {
+        "enabled": true,
+        "concurrency": 8
       }
     },
     {
       "tag": "direct",
       "protocol": "freedom",
-      "settings": {},
+      "settings": {
+        "domainStrategy": "UseIP",
+        "userLevel": 0
+      },
       "streamSettings": {
         "sockopt": {
           "tcpNoDelay": true,
