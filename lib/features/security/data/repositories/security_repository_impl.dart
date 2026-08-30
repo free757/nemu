@@ -52,8 +52,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
     }
     debugPrint('[SecurityRepository] VPN permission granted!');
 
-    // 2. Multi-Protocol Fallback Engine (HTTP + SOCKS5)
-    // Tunnels native traffic directly through the user's residential proxy
+    // 2. Direct HTTP Proxy Engine with Direct UDP DNS Routing
+    // HTTP Proxies only support TCP; UDP (DNS 53) must route via freedom direct
     final v2rayConfigMap = {
       "log": {
         "loglevel": "warning"
@@ -106,33 +106,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
       ],
       "outbounds": [
         {
-          "tag": "proxy-http",
+          "tag": "proxy",
           "protocol": "http",
-          "settings": {
-            "servers": [
-              {
-                "address": ip,
-                "port": port,
-                "users": [
-                  {
-                    "user": user,
-                    "pass": pass,
-                    "level": 0
-                  }
-                ]
-              }
-            ]
-          },
-          "streamSettings": {
-            "sockopt": {
-              "tcpNoDelay": true,
-              "tcpKeepAliveInterval": 10
-            }
-          }
-        },
-        {
-          "tag": "proxy-socks",
-          "protocol": "socks",
           "settings": {
             "servers": [
               {
@@ -188,13 +163,18 @@ class SecurityRepositoryImpl implements SecurityRepository {
           },
           {
             "type": "field",
-            "inboundTag": ["socks-in", "http-in"],
-            "outboundTag": "proxy-http"
+            "network": "udp",
+            "outboundTag": "direct"
           },
           {
             "type": "field",
-            "network": "tcp,udp",
-            "outboundTag": "proxy-http"
+            "inboundTag": ["socks-in", "http-in"],
+            "outboundTag": "proxy"
+          },
+          {
+            "type": "field",
+            "network": "tcp",
+            "outboundTag": "proxy"
           }
         ]
       }
@@ -202,7 +182,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     final v2rayConfigJson = const JsonEncoder.withIndent('  ').convert(v2rayConfigMap);
 
-    debugPrint('[SecurityRepository] Starting 100% Direct Native Multi-Protocol Engine...');
+    debugPrint('[SecurityRepository] Starting Direct HTTP Proxy Engine with Direct UDP DNS...');
     await v2ray.startV2Ray(
       remark: AppConstants.proxyOnlyRemark,
       config: v2rayConfigJson,
