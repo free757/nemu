@@ -43,15 +43,15 @@ class SecurityRepositoryImpl implements SecurityRepository {
     // We retry once to catch the case where the user just granted permission.
     bool permissionGranted = await v2ray.requestPermission();
     if (!permissionGranted) {
-      print('[SecurityRepository] Permission not yet granted, retrying after 2s...');
+      debugPrint('[SecurityRepository] Permission not yet granted, retrying after 2s...');
       await Future.delayed(const Duration(seconds: 2));
       permissionGranted = await v2ray.requestPermission();
       if (!permissionGranted) {
-        print('[SecurityRepository] VPN permission denied by user.');
+        debugPrint('[SecurityRepository] VPN permission denied by user.');
         return;
       }
     }
-    print('[SecurityRepository] VPN permission granted!');
+    debugPrint('[SecurityRepository] VPN permission granted!');
 
     // Build WebSocket path with per-user SOCKS5 credentials
     // Cloudflare Worker connects to user's SOCKS5 proxy on their behalf
@@ -59,10 +59,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
     final encodedUser = Uri.encodeComponent(user);
     final encodedPass = Uri.encodeComponent(pass);
     final wsPath = '/?ph=${Uri.encodeComponent(ip)}&pp=$port&pu=$encodedUser&pw=$encodedPass';
-    print('[SecurityRepository] Worker host: ${AppConstants.workerHost}');
-    print('[SecurityRepository] WS path: $wsPath');
+  final cleanIpsJson = [AppConstants.workerIP, ...AppConstants.cleanWorkerIPs]
+      .toSet()
+      .map((ip) => '"$ip"')
+      .join(',\n          ');
 
-      final v2rayConfig = '''
+  final v2rayConfig = '''
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
@@ -161,12 +163,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
       {
         "type": "field",
         "ip": [
-          "${AppConstants.workerIP}",
-          "172.67.207.164",
-          "104.16.132.229",
-          "104.16.133.229",
-          "104.17.232.29",
-          "104.17.233.29"
+          $cleanIpsJson
         ],
         "outboundTag": "direct"
       },
