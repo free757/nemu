@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../core/utils/constants.dart';
 import '../models/connection_status_model.dart';
 
@@ -51,7 +52,9 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
           return ConnectionStatusModel.fromIpWhoIs(data);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[_fetchIpWhoIs] error: $e');
+    }
     return null;
   }
 
@@ -70,7 +73,9 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
           return ConnectionStatusModel.fromJson(data);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[_fetchIpApi] error: $e');
+    }
     return null;
   }
 
@@ -89,7 +94,9 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
           return ConnectionStatusModel.fromIpApiCo(data);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[_fetchIpApiCo] error: $e');
+    }
     return null;
   }
 
@@ -121,18 +128,7 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       _lastFetchTime = null;
     }
 
-    // 1. In VPN mode, all traffic is routed through the VPN tunnel naturally.
-    // Try standard direct parallel race first (which goes through VPN tun)
-    try {
-      final status = await _fastParallelRace(false);
-      if (status != null) {
-        _cachedStatus = status;
-        _lastFetchTime = DateTime.now();
-        return status;
-      }
-    } catch (_) {}
-
-    // 2. Try explicit local HTTP proxy port fallback
+    // 1. Try parallel race via local HTTP proxy first
     try {
       final status = await _fastParallelRace(true);
       if (status != null) {
@@ -142,7 +138,17 @@ class SecurityRemoteDataSourceImpl implements SecurityRemoteDataSource {
       }
     } catch (_) {}
 
-    // 3. If everything fails but we have a recent cache (< 3 minutes), return it
+    // 2. Try direct parallel race via VPN tun
+    try {
+      final status = await _fastParallelRace(false);
+      if (status != null) {
+        _cachedStatus = status;
+        _lastFetchTime = DateTime.now();
+        return status;
+      }
+    } catch (_) {}
+
+    // 3. Fallback to cache if available
     if (_cachedStatus != null &&
         _lastFetchTime != null &&
         DateTime.now().difference(_lastFetchTime!).inMinutes < 3) {
