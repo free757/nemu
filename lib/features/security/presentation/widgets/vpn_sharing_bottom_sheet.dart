@@ -7,6 +7,7 @@ import 'package:nemu/core/services/root_sharing_service.dart';
 import 'package:nemu/core/utils/constants.dart';
 import 'package:nemu/core/utils/overlay_manager.dart';
 import 'package:nemu/features/security/presentation/cubit/security_cubit.dart';
+import 'package:nemu/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:nemu/injection_container.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nemu/core/theme/app_theme.dart';
@@ -442,8 +443,8 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                           connect: true,
                           ip: authState.user.proxyIp,
                           port: authState.user.proxyPort,
-                          user: authState.user.proxyUsername,
-                          pass: authState.user.proxyPassword,
+                          user: authState.user.proxyUser,
+                          pass: authState.user.proxyPass,
                         );
                         // Wait a brief moment for VPN tunnel handshake
                         await Future.delayed(AppConstants.vpnHandshakeDelay);

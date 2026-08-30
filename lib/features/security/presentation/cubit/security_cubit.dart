@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/utils/constants.dart';
 import '../../../../core/utils/overlay_manager.dart';
+import '../../../../core/services/root_sharing_service.dart';
 import '../../domain/entities/connection_status.dart';
 import '../../domain/repositories/security_repository.dart';
 import '../../domain/usecases/check_connection_usecase.dart';
