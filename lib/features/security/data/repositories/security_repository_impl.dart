@@ -52,8 +52,8 @@ class SecurityRepositoryImpl implements SecurityRepository {
     }
     debugPrint('[SecurityRepository] VPN permission granted!');
 
-    // 2. Direct HTTP Native Engine - 100% On-Device (No Cloudflare, No External Servers)
-    // Matches the actual HTTP proxy protocol exposed by the residential proxy server on port 46225
+    // 2. Multi-Protocol Fallback Engine (HTTP + SOCKS5)
+    // Tunnels native traffic directly through the user's residential proxy
     final v2rayConfigMap = {
       "log": {
         "loglevel": "warning"
@@ -106,8 +106,33 @@ class SecurityRepositoryImpl implements SecurityRepository {
       ],
       "outbounds": [
         {
-          "tag": "proxy",
+          "tag": "proxy-http",
           "protocol": "http",
+          "settings": {
+            "servers": [
+              {
+                "address": ip,
+                "port": port,
+                "users": [
+                  {
+                    "user": user,
+                    "pass": pass,
+                    "level": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "streamSettings": {
+            "sockopt": {
+              "tcpNoDelay": true,
+              "tcpKeepAliveInterval": 10
+            }
+          }
+        },
+        {
+          "tag": "proxy-socks",
+          "protocol": "socks",
           "settings": {
             "servers": [
               {
@@ -164,12 +189,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
           {
             "type": "field",
             "inboundTag": ["socks-in", "http-in"],
-            "outboundTag": "proxy"
+            "outboundTag": "proxy-http"
           },
           {
             "type": "field",
             "network": "tcp,udp",
-            "outboundTag": "proxy"
+            "outboundTag": "proxy-http"
           }
         ]
       }
@@ -177,7 +202,7 @@ class SecurityRepositoryImpl implements SecurityRepository {
 
     final v2rayConfigJson = const JsonEncoder.withIndent('  ').convert(v2rayConfigMap);
 
-    debugPrint('[SecurityRepository] Starting 100% Direct Native HTTP Proxy engine (No Cloudflare)...');
+    debugPrint('[SecurityRepository] Starting 100% Direct Native Multi-Protocol Engine...');
     await v2ray.startV2Ray(
       remark: AppConstants.proxyOnlyRemark,
       config: v2rayConfigJson,
