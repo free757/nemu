@@ -72,29 +72,36 @@ async function handleWS(request) {
   const [client, server] = Object.values(new WebSocketPair());
   server.accept();
 
-  // Create stream from incoming WebSocket messages
-  const readable = new ReadableStream({
-    start(ctrl) {
-      server.addEventListener("message", (e) => ctrl.enqueue(e.data));
-      server.addEventListener("close", () => {
-        try { ctrl.close(); } catch (_) {}
-      });
-      server.addEventListener("error", (e) => {
-        try { ctrl.error(e); } catch (_) {}
-      });
-    },
-  });
-
-  handleVless(server, readable, socks5).catch(() => safeClose(server));
+  handleVlessDirect(server, socks5).catch(() => safeClose(server));
   return new Response(null, { status: 101, webSocket: client });
 }
 
-async function handleVless(ws, readable, socks5) {
-  const reader = readable.getReader();
-  const { value: first, done } = await reader.read();
-  if (done || !first) return;
+async function handleVlessDirect(ws, socks5) {
+  // Listen once for the VLESS Handshake header message
+  const firstData = await new Promise((resolve, reject) => {
+    const onMsg = (e) => {
+      cleanup();
+      resolve(e.data);
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error("WS closed during handshake"));
+    };
+    const onErr = (e) => {
+      cleanup();
+      reject(e);
+    };
+    function cleanup() {
+      ws.removeEventListener("message", onMsg);
+      ws.removeEventListener("close", onClose);
+      ws.removeEventListener("error", onErr);
+    }
+    ws.addEventListener("message", onMsg);
+    ws.addEventListener("close", onClose);
+    ws.addEventListener("error", onErr);
+  });
 
-  const firstBuf = await toAB(first);
+  const firstBuf = await toAB(firstData);
   const buf = new Uint8Array(firstBuf);
   if (buf.length < 24) throw new Error("too short");
 
@@ -124,32 +131,27 @@ async function handleVless(ws, readable, socks5) {
   const vlessResp = new Uint8Array([buf[0], 0]);
   const payload   = firstBuf.slice(aIdx);
 
-  // Release lock on reader so stream can be piped natively!
-  reader.releaseLock();
-
   if (cmd === 2 && port === 53) {
-    await handleDNS(ws, vlessResp, payload, readable, socks5);
+    await handleDNS(ws, vlessResp, payload, socks5);
     return;
   }
   if (cmd !== 1) throw new Error("unsupported cmd " + cmd);
-  await handleTCP(ws, vlessResp, payload, readable, addr, port, socks5);
-}
 
-async function handleTCP(ws, vlessResp, payload, readable, addr, port, socks5) {
+  // Connect to Remote Socket
   const remote = socks5
     ? await connectViaSocks5(socks5, addr, port)
     : connect({ hostname: addr, port });
 
-  // 1. Send initial handshake payload if present
+  const remoteWriter = remote.writable.getWriter();
+
+  // 1. Write initial payload if present
   if (payload.byteLength > 0) {
-    const w0 = remote.writable.getWriter();
-    await w0.write(payload);
-    w0.releaseLock();
+    await remoteWriter.write(payload);
   }
 
   let headerSent = false;
-  
-  // ⚡ 2. Remote -> WebSocket (Download Pipeline - 0 CPU)
+
+  // ⚡ 2. Download Pipe: Remote TCP -> WebSocket (0 CPU streaming)
   remote.readable.pipeTo(new WritableStream({
     write(chunk) {
       if (ws.readyState !== WebSocket.OPEN) return;
@@ -168,20 +170,22 @@ async function handleTCP(ws, vlessResp, payload, readable, addr, port, socks5) {
     abort() { safeClose(ws); }
   })).catch(() => safeClose(ws));
 
-  // ⚡ 3. WebSocket -> Remote (Upload Pipeline: Pure Single Writer Stream - 0 Lock Overhead)
-  const remoteWriter = remote.writable.getWriter();
-  readable.pipeTo(new WritableStream({
-    async write(chunk) {
-      const ab = await toAB(chunk);
-      await remoteWriter.write(ab);
-    },
-    close() {
-      try { remoteWriter.close(); } catch (_) {}
-    },
-    abort() {
-      try { remoteWriter.abort(); } catch (_) {}
+  // ⚡ 3. Upload Pipe: Direct WebSocket Event -> TCP Socket (Zero Stream / Zero Lock overhead)
+  ws.addEventListener("message", (e) => {
+    if (e.data) {
+      remoteWriter.write(e.data).catch(() => safeClose(ws));
     }
-  })).catch(() => safeClose(ws));
+  });
+
+  ws.addEventListener("close", () => {
+    try { remoteWriter.close(); } catch (_) {}
+    safeClose(ws);
+  });
+
+  ws.addEventListener("error", () => {
+    try { remoteWriter.abort(); } catch (_) {}
+    safeClose(ws);
+  });
 }
 
 async function connectViaSocks5(proxy, targetHost, targetPort) {
@@ -228,49 +232,49 @@ async function connectViaSocks5(proxy, targetHost, targetPort) {
   return sock;
 }
 
-async function handleDNS(ws, vlessResp, firstPayload, readable, socks5) {
+async function handleDNS(ws, vlessResp, firstPayload, socks5) {
   let headerSent = false;
 
-  async function sendDNS(pkt) {
-    const dnsSock = socks5
-      ? await connectViaSocks5(socks5, "8.8.8.8", 53)
-      : connect({ hostname: "8.8.8.8", port: 53 });
-    const msg = new Uint8Array(pkt.byteLength + 2);
-    msg[0] = (pkt.byteLength >> 8) & 0xff; msg[1] = pkt.byteLength & 0xff;
-    msg.set(new Uint8Array(pkt), 2);
-    const dw = dnsSock.writable.getWriter();
-    await dw.write(msg); dw.releaseLock();
-    dnsSock.readable.pipeTo(new WritableStream({
-      write(chunk) {
-        if (ws.readyState !== WebSocket.OPEN) return;
-        if (!headerSent) {
-          const chunkAB = chunk instanceof ArrayBuffer ? chunk : chunk.buffer;
-          const m = new Uint8Array(vlessResp.length + chunk.byteLength);
-          m.set(vlessResp);
-          m.set(new Uint8Array(chunkAB, chunk.byteOffset || 0, chunk.byteLength), vlessResp.length);
-          ws.send(m.buffer); headerSent = true;
-        } else ws.send(chunk);
-      },
-    })).catch(() => {});
-  }
+  const dnsSock = socks5
+    ? await connectViaSocks5(socks5, "8.8.8.8", 53)
+    : connect({ hostname: "8.8.8.8", port: 53 });
 
-  async function processChunks(ab) {
+  const dw = dnsSock.writable.getWriter();
+
+  dnsSock.readable.pipeTo(new WritableStream({
+    write(chunk) {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      if (!headerSent) {
+        const chunkAB = chunk instanceof ArrayBuffer ? chunk : chunk.buffer;
+        const m = new Uint8Array(vlessResp.length + chunk.byteLength);
+        m.set(vlessResp);
+        m.set(new Uint8Array(chunkAB, chunk.byteOffset || 0, chunk.byteLength), vlessResp.length);
+        ws.send(m.buffer); headerSent = true;
+      } else ws.send(chunk);
+    },
+  })).catch(() => {});
+
+  async function processAndSend(data) {
+    const ab = await toAB(data);
     const ua = new Uint8Array(ab);
     let off = 0;
     while (off + 2 <= ua.length) {
       const l = (ua[off] << 8) | ua[off + 1];
       if (off + 2 + l > ua.length) break;
-      await sendDNS(ua.slice(off + 2, off + 2 + l).buffer);
+      const pkt = ua.slice(off + 2, off + 2 + l);
+      const msg = new Uint8Array(pkt.byteLength + 2);
+      msg[0] = (pkt.byteLength >> 8) & 0xff; msg[1] = pkt.byteLength & 0xff;
+      msg.set(pkt, 2);
+      await dw.write(msg);
       off += 2 + l;
     }
   }
 
-  await processChunks(await toAB(firstPayload));
-  
-  const reader = readable.getReader();
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    await processChunks(await toAB(value));
+  if (firstPayload.byteLength > 0) {
+    await processAndSend(firstPayload);
   }
+
+  ws.addEventListener("message", (e) => {
+    if (e.data) processAndSend(e.data).catch(() => {});
+  });
 }
