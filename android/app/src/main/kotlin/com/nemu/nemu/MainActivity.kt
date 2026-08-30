@@ -450,22 +450,25 @@ class MainActivity : FlutterActivity() {
                         super.onStarted(reservation)
                         android.util.Log.d("StrictHotspot", "Hotspot onStarted called successfully!")
                         hotspotReservation = reservation
-                        val config = reservation.wifiConfiguration
-                        val ssid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        val rawSsid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             reservation.softApConfiguration?.ssid ?: config?.SSID ?: "NemuStrictHotspot"
                         } else {
                             config?.SSID ?: "NemuStrictHotspot"
                         }
-                        val password = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        val rawPassword = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             reservation.softApConfiguration?.passphrase ?: config?.preSharedKey ?: ""
                         } else {
                             config?.preSharedKey ?: ""
                         }
-                        android.util.Log.d("StrictHotspot", "SSID: $ssid, Pass: $password")
+                        // Android wifiConfiguration.SSID / preSharedKey often includes surrounding double quotes (e.g. "\"DIRECT-xyz\"")
+                        val cleanSsid = rawSsid.removeSurrounding("\"")
+                        val cleanPassword = rawPassword.removeSurrounding("\"")
+
+                        android.util.Log.d("StrictHotspot", "SSID: $cleanSsid, Pass: $cleanPassword")
                         val responseMap = mapOf(
                             "success" to true,
-                            "ssid" to ssid,
-                            "password" to password,
+                            "ssid" to cleanSsid,
+                            "password" to cleanPassword,
                             "ip" to getHotspotIP()
                         )
                         result.success(responseMap)

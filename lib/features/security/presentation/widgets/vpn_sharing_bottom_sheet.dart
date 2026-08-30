@@ -134,6 +134,14 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
     }
   }
 
+  String _escapeWifiQrString(String input) {
+    return input
+        .replaceAll(r'\', r'\\')
+        .replaceAll(';', r'\;')
+        .replaceAll(',', r'\,')
+        .replaceAll(':', r'\:');
+  }
+
   Future<void> _saveHotspotCredentials() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -612,7 +620,7 @@ class _VpnSharingBottomSheetState extends State<VpnSharingBottomSheet> {
                 ),
                 child: QrImageView(
                   data: _selectedQrMode == 0
-                      ? "WIFI:S:${_ssidController.text};T:WPA;P:${_passController.text};;"
+                      ? "WIFI:S:${_escapeWifiQrString(_ssidController.text.replaceAll('\"', ''))};T:WPA;P:${_escapeWifiQrString(_passController.text.replaceAll('\"', ''))};;"
                       : proxyUrl,
                   version: QrVersions.auto,
                   size: 110.0,
