@@ -137,11 +137,10 @@ async function handleVlessDirect(ws, socks5) {
   const vlessResp = new Uint8Array([buf[0], 0]);
 
   if (cmd === 2) {
-    // UDP (DNS)
     return handleDNS(ws, vlessResp, payload, socks5);
   }
 
-  // TCP Stream Connection to target via Proxy
+  // Connect to Remote Socket
   const remote = socks5
     ? await connectViaSocks5(socks5, addr, port)
     : connect({ hostname: addr, port });
@@ -149,12 +148,12 @@ async function handleVlessDirect(ws, socks5) {
   const remoteWriter = remote.writable.getWriter();
 
   if (payload.byteLength > 0) {
-    await remoteWriter.write(payload);
+    remoteWriter.write(payload).catch(() => {});
   }
 
   let headerSent = false;
 
-  // Zero-CPU native pipe from Remote TCP -> WebSocket
+  // 1. Download Pipe: Remote TCP -> WebSocket
   remote.readable.pipeTo(new WritableStream({
     write(chunk) {
       if (ws.readyState !== WebSocket.OPEN) return;
@@ -173,22 +172,47 @@ async function handleVlessDirect(ws, socks5) {
     abort() { safeClose(ws); }
   })).catch(() => safeClose(ws));
 
-  // Native WebSocket -> Remote TCP
-  ws.addEventListener("message", (e) => {
-    if (e.data) {
-      remoteWriter.write(e.data).catch(() => safeClose(ws));
+  // 2. Upload Stream: Direct transform and pipeTo without async loop
+  let uploadClosed = false;
+  const uploadStream = new ReadableStream({
+    start(controller) {
+      ws.addEventListener("message", (e) => {
+        if (uploadClosed) return;
+        if (e.data) {
+          controller.enqueue(e.data);
+        }
+      });
+      ws.addEventListener("close", () => {
+        if (!uploadClosed) {
+          uploadClosed = true;
+          try { controller.close(); } catch (_) {}
+        }
+      });
+      ws.addEventListener("error", (err) => {
+        if (!uploadClosed) {
+          uploadClosed = true;
+          try { controller.error(err); } catch (_) {}
+        }
+      });
+    },
+    cancel() {
+      uploadClosed = true;
     }
   });
 
-  ws.addEventListener("close", () => {
-    try { remoteWriter.close(); } catch (_) {}
-    safeClose(ws);
-  });
-
-  ws.addEventListener("error", () => {
-    try { remoteWriter.abort(); } catch (_) {}
-    safeClose(ws);
-  });
+  uploadStream.pipeTo(new WritableStream({
+    write(chunk) {
+      return remoteWriter.write(chunk);
+    },
+    close() {
+      try { remoteWriter.close(); } catch (_) {}
+      safeClose(ws);
+    },
+    abort() {
+      try { remoteWriter.abort(); } catch (_) {}
+      safeClose(ws);
+    }
+  })).catch(() => safeClose(ws));
 }
 
 async function connectViaSocks5(proxy, targetHost, targetPort) {
