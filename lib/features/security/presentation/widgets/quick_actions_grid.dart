@@ -25,7 +25,7 @@ class QuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusColor = isWebcamConnected ? Colors.greenAccent : Colors.orangeAccent;
-    final statusIcon = isWebcamConnected ? Icons.videocam : Icons.videocam_off_outlined;
+    final statusIcon = isWebcamConnected ? Icons.videocam_outlined : Icons.videocam_off_outlined;
 
     return Column(
       children: [
@@ -34,7 +34,7 @@ class QuickActionsGrid extends StatelessWidget {
             Expanded(
               child: _buildGridItem(
                 context: context,
-                icon: Icons.layers,
+                icon: Icons.layers_outlined,
                 iconColor: Colors.blueAccent,
                 title: "الزر العائم",
                 onTap: () {
@@ -58,13 +58,13 @@ class QuickActionsGrid extends StatelessWidget {
             Expanded(
               child: _buildGridItem(
                 context: context,
-                icon: Icons.security,
+                icon: Icons.shield_outlined,
                 iconColor: Colors.amberAccent,
                 title: "بيانات الحساب",
                 onTap: () => CredentialsBottomSheet.show(context, user),
                 trailing: const Padding(
                   padding: EdgeInsets.only(top: 8.0),
-                  child: Icon(Icons.arrow_forward_ios, size: 12, color: Colors.white38),
+                  child: Icon(Icons.arrow_forward_ios_outlined, size: 12, color: Colors.white38),
                 ),
               ),
             ),
@@ -110,7 +110,7 @@ class QuickActionsGrid extends StatelessWidget {
             Expanded(
               child: _buildGridItem(
                 context: context,
-                icon: Icons.settings_input_antenna,
+                icon: Icons.settings_input_antenna_outlined,
                 iconColor: Colors.greenAccent,
                 title: "مشاركة هوت سبوت",
                 onTap: () {
@@ -119,7 +119,7 @@ class QuickActionsGrid extends StatelessWidget {
                 },
                 trailing: const Padding(
                   padding: EdgeInsets.only(top: 8.0),
-                  child: Icon(Icons.arrow_forward_ios, size: 12, color: Colors.white38),
+                  child: Icon(Icons.arrow_forward_ios_outlined, size: 12, color: Colors.white38),
                 ),
               ),
             ),
