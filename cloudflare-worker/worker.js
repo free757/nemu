@@ -168,22 +168,18 @@ async function handleTCP(ws, vlessResp, payload, readable, addr, port, socks5) {
     abort() { safeClose(ws); }
   })).catch(() => safeClose(ws));
 
-  // ⚡ 3. WebSocket -> Remote (Upload Pipeline - Direct C++ Kernel Pipe)
+  // ⚡ 3. WebSocket -> Remote (Upload Pipeline: Pure Single Writer Stream - 0 Lock Overhead)
+  const remoteWriter = remote.writable.getWriter();
   readable.pipeTo(new WritableStream({
     async write(chunk) {
-      const w = remote.writable.getWriter();
-      try {
-        const ab = await toAB(chunk);
-        await w.write(ab);
-      } finally {
-        w.releaseLock();
-      }
+      const ab = await toAB(chunk);
+      await remoteWriter.write(ab);
     },
     close() {
-      try { remote.writable.close(); } catch (_) {}
+      try { remoteWriter.close(); } catch (_) {}
     },
     abort() {
-      try { remote.writable.abort(); } catch (_) {}
+      try { remoteWriter.abort(); } catch (_) {}
     }
   })).catch(() => safeClose(ws));
 }
