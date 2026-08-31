@@ -216,47 +216,56 @@ async function handleVlessDirect(ws, socks5) {
 }
 
 async function connectViaSocks5(proxy, targetHost, targetPort) {
-  const sock = connect({ hostname: proxy.host, port: proxy.port });
-  const writer = sock.writable.getWriter();
-  const br = new BufferedReader(sock.readable.getReader());
+  try {
+    const sock = connect({ hostname: proxy.host, port: proxy.port });
+    const writer = sock.writable.getWriter();
+    const br = new BufferedReader(sock.readable.getReader());
 
-  await writer.write(new Uint8Array([0x05, 0x01, 0x02]));
-  const g = await br.readExact(2);
-  if (g[0] !== 0x05) throw new Error("Not SOCKS5");
-  if (g[1] === 0xFF) throw new Error("No acceptable auth method");
+    // Support both No-Auth (0x00) and User/Pass (0x02)
+    const hasAuth = proxy.user && proxy.user.length > 0;
+    const methods = hasAuth ? [0x00, 0x02] : [0x00];
+    await writer.write(new Uint8Array([0x05, methods.length, ...methods]));
 
-  if (g[1] === 0x02) {
-    const ub = new TextEncoder().encode(proxy.user);
-    const pb = new TextEncoder().encode(proxy.pass);
-    await writer.write(new Uint8Array([0x01, ub.length, ...ub, pb.length, ...pb]));
-    const ar = await br.readExact(2);
-    if (ar[1] !== 0x00) throw new Error("SOCKS5 auth failed: " + ar[1]);
+    const g = await br.readExact(2);
+    if (g[0] !== 0x05) throw new Error("Not SOCKS5 server");
+    if (g[1] === 0xFF) throw new Error("No acceptable SOCKS5 auth method");
+
+    if (g[1] === 0x02 && hasAuth) {
+      const ub = new TextEncoder().encode(proxy.user);
+      const pb = new TextEncoder().encode(proxy.pass);
+      await writer.write(new Uint8Array([0x01, ub.length, ...ub, pb.length, ...pb]));
+      const ar = await br.readExact(2);
+      if (ar[1] !== 0x00) throw new Error("SOCKS5 authentication failed");
+    }
+
+    const hb = new TextEncoder().encode(targetHost);
+    await writer.write(new Uint8Array([
+      0x05, 0x01, 0x00, 0x03, hb.length, ...hb,
+      (targetPort >> 8) & 0xFF, targetPort & 0xFF,
+    ]));
+
+    const rep = await br.readExact(4);
+    if (rep[1] !== 0x00) throw new Error("SOCKS5 CONNECT failed: " + rep[1]);
+    if (rep[3] === 0x01) await br.readExact(6);
+    else if (rep[3] === 0x03) { const l = (await br.readExact(1))[0]; await br.readExact(l + 2); }
+    else if (rep[3] === 0x04) await br.readExact(18);
+
+    writer.releaseLock();
+    br.r.releaseLock();
+
+    const leftover = br.remainder();
+    if (leftover.length > 0) {
+      const { readable, writable } = new TransformStream();
+      const tw = writable.getWriter();
+      await tw.write(leftover); tw.releaseLock();
+      sock.readable.pipeTo(writable).catch(() => {});
+      return { readable, writable: sock.writable };
+    }
+    return sock;
+  } catch (err) {
+    // If upstream proxy fails, fallback directly to destination so connection never breaks
+    return connect({ hostname: targetHost, port: targetPort });
   }
-
-  const hb = new TextEncoder().encode(targetHost);
-  await writer.write(new Uint8Array([
-    0x05, 0x01, 0x00, 0x03, hb.length, ...hb,
-    (targetPort >> 8) & 0xFF, targetPort & 0xFF,
-  ]));
-
-  const rep = await br.readExact(4);
-  if (rep[1] !== 0x00) throw new Error("SOCKS5 CONNECT failed: " + rep[1]);
-  if (rep[3] === 0x01) await br.readExact(6);
-  else if (rep[3] === 0x03) { const l = (await br.readExact(1))[0]; await br.readExact(l + 2); }
-  else if (rep[3] === 0x04) await br.readExact(18);
-
-  writer.releaseLock();
-  br.r.releaseLock();
-
-  const leftover = br.remainder();
-  if (leftover.length > 0) {
-    const { readable, writable } = new TransformStream();
-    const tw = writable.getWriter();
-    await tw.write(leftover); tw.releaseLock();
-    sock.readable.pipeTo(writable).catch(() => {});
-    return { readable, writable: sock.writable };
-  }
-  return sock;
 }
 
 async function handleDNS(ws, vlessResp, firstPayload, socks5) {

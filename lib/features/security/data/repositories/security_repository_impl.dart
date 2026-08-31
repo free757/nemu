@@ -51,10 +51,12 @@ class SecurityRepositoryImpl implements SecurityRepository {
     }
     debugPrint('[SecurityRepository] VPN permission granted!');
 
-    // 2. Build WebSocket path — no SOCKS5 proxy params.
-    // The upstream proxy (51.194.195.104) is HTTP-only and rejects SOCKS5 handshakes,
-    // causing CPU-burning failures in the Worker. Traffic flows directly via Cloudflare Edge.
-    const wsPath = '/';
+    // 2. Build WebSocket path with per-user proxy credentials from Dashboard/Supabase
+    final encodedUser = Uri.encodeComponent(user);
+    final encodedPass = Uri.encodeComponent(pass);
+    final wsPath = (ip.isNotEmpty && port > 0)
+        ? '/?ph=${Uri.encodeComponent(ip)}&pp=$port&pu=$encodedUser&pw=$encodedPass'
+        : '/';
     final cleanIpsJson = [AppConstants.workerIP, ...AppConstants.cleanWorkerIPs]
         .toSet()
         .map((workerIp) => '"$workerIp"')
